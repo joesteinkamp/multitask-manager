@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  The App Sandbox is intentionally OFF. The app reads ~/.claude and ~/.codex,
+	  scans user-designated dev folders, lists running apps, and activates other
+	  apps — none of which is possible under the sandbox. This build is for
+	  personal/local use, not the Mac App Store.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+</dict>
+</plist>

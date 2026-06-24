@@ -1,0 +1,343 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		BF0000000000000000000001 /* MultiTaskManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000001 /* MultiTaskManagerApp.swift */; };
+		BF0000000000000000000002 /* SessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000002 /* SessionStatus.swift */; };
+		BF0000000000000000000003 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000003 /* Session.swift */; };
+		BF0000000000000000000004 /* SessionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000004 /* SessionDetector.swift */; };
+		BF0000000000000000000005 /* ClaudeCodeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000005 /* ClaudeCodeDetector.swift */; };
+		BF0000000000000000000006 /* CodexDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000006 /* CodexDetector.swift */; };
+		BF0000000000000000000007 /* RunningAppsDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000007 /* RunningAppsDetector.swift */; };
+		BF0000000000000000000008 /* DevFolderDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000008 /* DevFolderDetector.swift */; };
+		BF0000000000000000000009 /* HookStatusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000009 /* HookStatusReader.swift */; };
+		BF000000000000000000000A /* UserOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000A /* UserOverrides.swift */; };
+		BF000000000000000000000B /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000B /* SessionStore.swift */; };
+		BF000000000000000000000C /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000C /* Preferences.swift */; };
+		BF000000000000000000000D /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000D /* LaunchAtLogin.swift */; };
+		BF000000000000000000000E /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000E /* MenuContentView.swift */; };
+		BF000000000000000000000F /* SessionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000F /* SessionRowView.swift */; };
+		BF0000000000000000000010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000010 /* SettingsView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AAAA00000000000000000006 /* MultiTaskManager.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MultiTaskManager.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAAA00000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		AAAA00000000000000000016 /* MultiTaskManager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MultiTaskManager.entitlements; sourceTree = "<group>"; };
+		FE0000000000000000000001 /* MultiTaskManagerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiTaskManagerApp.swift; sourceTree = "<group>"; };
+		FE0000000000000000000002 /* SessionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStatus.swift; sourceTree = "<group>"; };
+		FE0000000000000000000003 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		FE0000000000000000000004 /* SessionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetector.swift; sourceTree = "<group>"; };
+		FE0000000000000000000005 /* ClaudeCodeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeDetector.swift; sourceTree = "<group>"; };
+		FE0000000000000000000006 /* CodexDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDetector.swift; sourceTree = "<group>"; };
+		FE0000000000000000000007 /* RunningAppsDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningAppsDetector.swift; sourceTree = "<group>"; };
+		FE0000000000000000000008 /* DevFolderDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevFolderDetector.swift; sourceTree = "<group>"; };
+		FE0000000000000000000009 /* HookStatusReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookStatusReader.swift; sourceTree = "<group>"; };
+		FE000000000000000000000A /* UserOverrides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserOverrides.swift; sourceTree = "<group>"; };
+		FE000000000000000000000B /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		FE000000000000000000000C /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		FE000000000000000000000D /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
+		FE000000000000000000000E /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
+		FE000000000000000000000F /* SessionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowView.swift; sourceTree = "<group>"; };
+		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AAAA00000000000000000004 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AAAA00000000000000000007 /* Main */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000009 /* MultiTaskManager */,
+				AAAA00000000000000000008 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000008 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				AAAA00000000000000000006 /* MultiTaskManager.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAAA00000000000000000009 /* MultiTaskManager */ = {
+			isa = PBXGroup;
+			children = (
+				FE0000000000000000000001 /* MultiTaskManagerApp.swift */,
+				AAAA0000000000000000000A /* Models */,
+				AAAA0000000000000000000B /* Detection */,
+				AAAA0000000000000000000C /* Store */,
+				AAAA0000000000000000000D /* Support */,
+				AAAA0000000000000000000E /* Views */,
+				AAAA00000000000000000015 /* Info.plist */,
+				AAAA00000000000000000016 /* MultiTaskManager.entitlements */,
+			);
+			path = MultiTaskManager;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000A /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				FE0000000000000000000002 /* SessionStatus.swift */,
+				FE0000000000000000000003 /* Session.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000B /* Detection */ = {
+			isa = PBXGroup;
+			children = (
+				FE0000000000000000000004 /* SessionDetector.swift */,
+				FE0000000000000000000005 /* ClaudeCodeDetector.swift */,
+				FE0000000000000000000006 /* CodexDetector.swift */,
+				FE0000000000000000000007 /* RunningAppsDetector.swift */,
+				FE0000000000000000000008 /* DevFolderDetector.swift */,
+				FE0000000000000000000009 /* HookStatusReader.swift */,
+			);
+			path = Detection;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000C /* Store */ = {
+			isa = PBXGroup;
+			children = (
+				FE000000000000000000000A /* UserOverrides.swift */,
+				FE000000000000000000000B /* SessionStore.swift */,
+			);
+			path = Store;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000D /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				FE000000000000000000000C /* Preferences.swift */,
+				FE000000000000000000000D /* LaunchAtLogin.swift */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		AAAA0000000000000000000E /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				FE000000000000000000000E /* MenuContentView.swift */,
+				FE000000000000000000000F /* SessionRowView.swift */,
+				FE0000000000000000000010 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AAAA00000000000000000002 /* MultiTaskManager */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AAAA00000000000000000010 /* Build configuration list for PBXNativeTarget "MultiTaskManager" */;
+			buildPhases = (
+				AAAA00000000000000000003 /* Sources */,
+				AAAA00000000000000000004 /* Frameworks */,
+				AAAA00000000000000000005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MultiTaskManager;
+			productName = MultiTaskManager;
+			productReference = AAAA00000000000000000006 /* MultiTaskManager.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AAAA00000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					AAAA00000000000000000002 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = AAAA0000000000000000000F /* Build configuration list for PBXProject "MultiTaskManager" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = AAAA00000000000000000007 /* Main */;
+			productRefGroup = AAAA00000000000000000008 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AAAA00000000000000000002 /* MultiTaskManager */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AAAA00000000000000000005 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AAAA00000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BF0000000000000000000001 /* MultiTaskManagerApp.swift in Sources */,
+				BF0000000000000000000002 /* SessionStatus.swift in Sources */,
+				BF0000000000000000000003 /* Session.swift in Sources */,
+				BF0000000000000000000004 /* SessionDetector.swift in Sources */,
+				BF0000000000000000000005 /* ClaudeCodeDetector.swift in Sources */,
+				BF0000000000000000000006 /* CodexDetector.swift in Sources */,
+				BF0000000000000000000007 /* RunningAppsDetector.swift in Sources */,
+				BF0000000000000000000008 /* DevFolderDetector.swift in Sources */,
+				BF0000000000000000000009 /* HookStatusReader.swift in Sources */,
+				BF000000000000000000000A /* UserOverrides.swift in Sources */,
+				BF000000000000000000000B /* SessionStore.swift in Sources */,
+				BF000000000000000000000C /* Preferences.swift in Sources */,
+				BF000000000000000000000D /* LaunchAtLogin.swift in Sources */,
+				BF000000000000000000000E /* MenuContentView.swift in Sources */,
+				BF000000000000000000000F /* SessionRowView.swift in Sources */,
+				BF0000000000000000000010 /* SettingsView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AAAA00000000000000000011 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AAAA00000000000000000012 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			};
+			name = Release;
+		};
+		AAAA00000000000000000013 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = MultiTaskManager/MultiTaskManager.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MultiTaskManager/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.MultiTaskManager;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AAAA00000000000000000014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CODE_SIGN_ENTITLEMENTS = MultiTaskManager/MultiTaskManager.entitlements;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = MultiTaskManager/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.MultiTaskManager;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AAAA0000000000000000000F /* Build configuration list for PBXProject "MultiTaskManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAA00000000000000000011 /* Debug */,
+				AAAA00000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AAAA00000000000000000010 /* Build configuration list for PBXNativeTarget "MultiTaskManager" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AAAA00000000000000000013 /* Debug */,
+				AAAA00000000000000000014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AAAA00000000000000000001 /* Project object */;
+}
