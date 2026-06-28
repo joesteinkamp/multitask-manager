@@ -24,6 +24,13 @@ flags the ones that have **gone quiet and are waiting on you**.
 - **"Needs attention" detection.** A session that hasn't shown activity for a
   configurable window is flagged as **waiting for you** (orange), versus actively
   **working** (green) or long-**idle** (gray). See *How status works* below.
+- **Per-project briefings.** Expand any session row to see, at a glance:
+  - **Goal** — what the project is for, read from its description docs.
+  - **Now** — what the live session is working on this moment (its latest prompt).
+  - **Next** — what to pick up when it's waiting on you (your roadmap/todo).
+
+  This is assembled from plain files on disk — **no AI/inference** — so it's fast
+  and private. See *Project briefings* below.
 - **Manual control.** Add your own items, remove auto-detected ones (they stay
   removed), rename, and pin. All of this persists across relaunches.
 
@@ -73,6 +80,39 @@ a project as waiting when the agent finishes:
 The app reads these when the **Hook status files** detector is enabled. It works
 fully without any hooks configured.
 
+## Project briefings
+
+The point of this app is to keep you in flow across many parallel projects, so each
+session row can expand into a three-line briefing — answering "what is this, what's
+happening, and what's next" without you opening the project. **It uses no model or
+inference**; it just reads files that are already in your repo:
+
+| Line | Where it comes from |
+| --- | --- |
+| 🎯 **Goal** | First real paragraph of the first of these that exists: `README.md`, `CLAUDE.md`, `AGENTS.md`, `PROJECT.md`, `PRODUCT.md`, `GOAL.md` |
+| 〰️ **Now** | The most recent user prompt in the live session transcript (Claude Code / Codex). Reads only the tail of the file, so it's cheap |
+| ➡️ **Next** | The first unchecked task(s) — `- [ ] …` — in `ROADMAP.md`, then `TODO.md` |
+
+Notes:
+
+- Reading is done on a background thread and **cached by file modification time**, so
+  expanding a row and the periodic refresh stay snappy even with many projects.
+- **Dev-folder** projects (no transcript) still show Goal and Next — handy for repos
+  you're editing without an agent attached.
+- Toggle the whole feature in **Settings → Detection → Project briefing**.
+- Nothing is sent anywhere; it's all local file reads.
+
+To get the most out of it, keep a one-line purpose near the top of your project's
+README (or a dedicated `GOAL.md`) and track work as markdown checkboxes in
+`ROADMAP.md` / `TODO.md`:
+
+```markdown
+## Roadmap
+- [x] Ship v1 menu bar app
+- [ ] Add per-project briefings   ← shown as "Next"
+- [ ] Notarize and distribute
+```
+
 ## Build & run
 
 1. Open `MultiTaskManager/MultiTaskManager.xcodeproj` in Xcode 15+ (macOS 13+).
@@ -93,11 +133,11 @@ allow it.
 ```
 MultiTaskManager/
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
-├── Models/                       # Session, SessionStatus, SessionSource
-├── Detection/                    # SessionDetector protocol + 5 detectors
+├── Models/                       # Session, SessionStatus, SessionSource, ProjectContext
+├── Detection/                    # SessionDetector protocol + 5 detectors + ProjectContextReader
 ├── Store/                        # SessionStore (merge + heuristic), UserOverrides
 ├── Support/                      # Preferences, LaunchAtLogin
-└── Views/                        # MenuContentView, SessionRowView, SettingsView
+└── Views/                        # MenuContentView, SessionRowView (+ ProjectBriefView), SettingsView
 ```
 
 Detectors conform to `SessionDetector` and are easy to add — implement `detect()`

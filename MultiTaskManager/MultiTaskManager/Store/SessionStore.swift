@@ -64,12 +64,16 @@ final class SessionStore: ObservableObject {
 
         let detectors = makeDetectors()
         let snapshot = overrides
+        let contextEnabled = prefs.enableProjectContext
 
         work.async { [weak self] in
             let raw = detectors.flatMap { $0.detect() }
+            // Read project briefings (goal/now/next) off the main thread so the file
+            // I/O never blocks the UI. Cached by file mtime inside the reader.
+            let enriched = contextEnabled ? ProjectContextReader.shared.attach(to: raw) : raw
             Task { @MainActor in
                 guard let self else { return }
-                self.sessions = self.merge(raw: raw, overrides: snapshot)
+                self.sessions = self.merge(raw: enriched, overrides: snapshot)
                 self.lastRefresh = Date()
                 self.isRefreshing = false
             }

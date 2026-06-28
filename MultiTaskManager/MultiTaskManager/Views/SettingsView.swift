@@ -34,6 +34,12 @@ private struct DetectorSettings: View {
             Section {
                 Toggle("Hide idle sessions", isOn: $prefs.hideIdle)
             }
+            Section("Project briefing") {
+                Toggle("Show goal / now / next per project", isOn: $prefs.enableProjectContext)
+                Text("Reads each project's README/CLAUDE/AGENTS/PROJECT/PRODUCT/GOAL for the goal, the live transcript for what it's working on now, and ROADMAP/TODO checkboxes for what's next. Expand a session row to see it.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

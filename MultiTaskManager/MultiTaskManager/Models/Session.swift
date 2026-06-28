@@ -54,6 +54,15 @@ struct Session: Identifiable, Codable, Hashable {
     var pid: Int32?
     var bundleId: String?
 
+    /// Path to the session's transcript/log, when one exists (Claude Code / Codex).
+    /// Used to read what the session is working on right now. `nil` for desktop-app,
+    /// dev-folder, and manual entries.
+    var transcriptPath: String?
+
+    /// Plain-text project briefing (goal / now / next) assembled by
+    /// `ProjectContextReader`. Transient — recomputed each refresh, never persisted.
+    var context: ProjectContext?
+
     /// Precise status reported by an opt-in hook, when available. Overrides the
     /// activity-timeout heuristic.
     var hookStatus: SessionStatus?

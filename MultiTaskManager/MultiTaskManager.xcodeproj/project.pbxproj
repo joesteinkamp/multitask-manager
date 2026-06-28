@@ -23,6 +23,8 @@
 		BF000000000000000000000E /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000E /* MenuContentView.swift */; };
 		BF000000000000000000000F /* SessionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000F /* SessionRowView.swift */; };
 		BF0000000000000000000010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000010 /* SettingsView.swift */; };
+		BF0000000000000000000011 /* ProjectContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000011 /* ProjectContext.swift */; };
+		BF0000000000000000000012 /* ProjectContextReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000012 /* ProjectContextReader.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,8 @@
 		FE000000000000000000000E /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
 		FE000000000000000000000F /* SessionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowView.swift; sourceTree = "<group>"; };
 		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		FE0000000000000000000011 /* ProjectContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContext.swift; sourceTree = "<group>"; };
+		FE0000000000000000000012 /* ProjectContextReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContextReader.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +98,7 @@
 			children = (
 				FE0000000000000000000002 /* SessionStatus.swift */,
 				FE0000000000000000000003 /* Session.swift */,
+				FE0000000000000000000011 /* ProjectContext.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -107,6 +112,7 @@
 				FE0000000000000000000007 /* RunningAppsDetector.swift */,
 				FE0000000000000000000008 /* DevFolderDetector.swift */,
 				FE0000000000000000000009 /* HookStatusReader.swift */,
+				FE0000000000000000000012 /* ProjectContextReader.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -223,6 +229,8 @@
 				BF000000000000000000000E /* MenuContentView.swift in Sources */,
 				BF000000000000000000000F /* SessionRowView.swift in Sources */,
 				BF0000000000000000000010 /* SettingsView.swift in Sources */,
+				BF0000000000000000000011 /* ProjectContext.swift in Sources */,
+				BF0000000000000000000012 /* ProjectContextReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
