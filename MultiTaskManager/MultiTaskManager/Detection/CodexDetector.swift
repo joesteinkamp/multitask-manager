@@ -40,7 +40,8 @@ struct CodexDetector: SessionDetector {
                 projectName: projectName,
                 projectPath: cwd,
                 source: .codex,
-                lastActivity: mtime
+                lastActivity: mtime,
+                transcriptPath: url.path
             )
             if let existing = byProject[key], existing.lastActivity >= mtime { continue }
             byProject[key] = session

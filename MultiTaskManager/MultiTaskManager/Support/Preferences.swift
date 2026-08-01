@@ -51,6 +51,12 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(hideIdle, forKey: Keys.hideIdle) }
     }
 
+    /// Whether to assemble per-project briefings (goal / now / next) from the
+    /// project's markdown files and show them in the expandable row.
+    @Published var enableProjectContext: Bool {
+        didSet { defaults.set(enableProjectContext, forKey: Keys.enableProjectContext) }
+    }
+
     private init() {
         defaults.register(defaults: [
             Keys.activeThreshold: 20.0,
@@ -62,7 +68,8 @@ final class Preferences: ObservableObject {
             Keys.enableRunningApps: true,
             Keys.enableDevFolders: true,
             Keys.enableHooks: true,
-            Keys.hideIdle: false
+            Keys.hideIdle: false,
+            Keys.enableProjectContext: true
         ])
 
         activeThreshold = defaults.double(forKey: Keys.activeThreshold)
@@ -76,6 +83,7 @@ final class Preferences: ObservableObject {
         enableDevFolders = defaults.bool(forKey: Keys.enableDevFolders)
         enableHooks = defaults.bool(forKey: Keys.enableHooks)
         hideIdle = defaults.bool(forKey: Keys.hideIdle)
+        enableProjectContext = defaults.bool(forKey: Keys.enableProjectContext)
 
         devFolders = defaults.stringArray(forKey: Keys.devFolders) ?? []
         bundleAllowlist = defaults.stringArray(forKey: Keys.bundleAllowlist) ?? Self.defaultBundleAllowlist
@@ -107,5 +115,6 @@ final class Preferences: ObservableObject {
         static let bundleAllowlist = "bundleAllowlist"
         static let appNameKeywords = "appNameKeywords"
         static let hideIdle = "hideIdle"
+        static let enableProjectContext = "enableProjectContext"
     }
 }

@@ -45,7 +45,8 @@ struct ClaudeCodeDetector: SessionDetector {
                 projectName: projectName,
                 projectPath: cwd,
                 source: .claudeCode,
-                lastActivity: mtime
+                lastActivity: mtime,
+                transcriptPath: latest.path
             )
             sessions.append(session)
         }
