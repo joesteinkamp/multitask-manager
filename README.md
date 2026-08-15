@@ -7,8 +7,8 @@ thing you always need first, which agent has gone quiet and is waiting on you.
 Today that ships as a lightweight macOS **menu bar** app. It auto-detects ongoing
 sessions across Claude Code, Codex, the Claude/Codex desktop apps, and any folder
 you're actively working in; figures out which project each belongs to; and flags
-the ones that are **waiting on you**. Where it goes next — a CLI, a web app, and
-agents you can launch and schedule rather than just watch — is in
+the ones that are **waiting on you**. Where it goes next — a task board, a CLI,
+and agents you can launch and schedule rather than just watch — is in
 [ROADMAP.md](ROADMAP.md).
 
 > **Status:** v1 shipped, and built to be compiled and run on your own Mac
@@ -42,8 +42,8 @@ agents you can launch and schedule rather than just watch — is in
 
 ## Where this is going
 
-v1 *watches* agent sessions. The direction is to **drive** them — one engine
-behind three surfaces, built on top of a portable AI harness
+v1 *watches* agent sessions. The direction is to **drive** them — one native Mac
+app with two surfaces, plus a CLI, built on top of a portable AI harness
 ([`agent-global-instructions`](https://github.com/joesteinkamp/agent-global-instructions))
 that already owns how agents behave: instructions, guardrail hooks, the
 cross-tool orchestration contract, model routing, memory, long-autonomy loops.
@@ -51,9 +51,12 @@ What it has no place for is seeing and steering all of it at once.
 
 | Surface | For |
 | --- | --- |
-| **Menu bar** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Menu bar popover** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Main window** | The long-run view: every project, the task board, run history |
 | **CLI** (`mtm`) | Scripting and hooks; agents reading and writing state themselves |
-| **Web app** | Remote control from a phone or another machine; the long-run view |
+
+Deliberately **no web app** — everything stays in the Mac app. See
+[Non-goals](ROADMAP.md#non-goals) for why that was considered and cut.
 
 The arc is **watch → understand → control → delegate → schedule**, ending at:
 describe an outcome, have it broken into tasks, route each to yourself or an

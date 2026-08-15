@@ -10,13 +10,13 @@ directly on top of my harness
 The harness already decides *how* agents behave — instructions, guardrail hooks,
 the cross-tool orchestration contract, model routing, memory, `/loop` autonomy.
 What it doesn't have is a place to **see and drive** all of it. That's this
-project. Three surfaces over one engine:
+project — one native Mac app with two surfaces, plus a CLI, over one engine:
 
 | Surface | For |
 |---|---|
-| **Menu bar** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Menu bar popover** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Main window** | The long-run view: every project, the task board, run history |
 | **CLI** (`mtm`) | Scripting, hooks, and agents themselves reading/writing state |
-| **Web app** | Remote control from a phone or another machine; the long-run view |
 
 And the arc of capability:
 
@@ -94,19 +94,21 @@ produces. Highest value per unit of risk; no new infrastructure.
 
 ## Phase 2 — Extract the core
 
-Three surfaces can't sit on a SwiftUI view model. Split the engine out before
-building the CLI and web app, not after.
+A popover, a window, a CLI, and a scheduler can't all sit on one SwiftUI view
+model. Split the engine out before building on it, not after.
 
 - [ ] **Extract a `MultiTaskCore` Swift package.**
       Move models, detectors, store, and the context reader out of the app
       target; the menu bar app becomes a thin client.
 - [ ] **Run detection in a background daemon (`mtmd`).**
       One process owns detection and state, runs under `launchd`, and survives
-      the menu bar app being closed. Surfaces subscribe to it.
+      the app being closed — which is also what scheduled runs need later.
+      Surfaces subscribe to it.
 - [ ] **Define the local IPC contract.**
       JSON over a Unix socket at `~/.multitaskmanager/sock` — `list`, `get`,
       `subscribe` (streaming updates), `act` — with a versioned envelope from
-      day one.
+      day one. Keeping it transport-agnostic is what leaves the door open if
+      remote access ever earns its way back in.
 - [ ] **Ship the `mtm` CLI.**
       `mtm status`, `mtm ls --json`, `mtm watch`. Machine-readable output is the
       point: hooks, scripts, and agents are all callers. Also the fastest way to
@@ -135,6 +137,10 @@ Stop being read-only. The app launches and steers agents.
 - [ ] **Triage attention when several sessions are waiting at once.**
       Rank by what's actually blocking — an approval gate outranks a run that
       merely finished.
+- [ ] **Audit every control-plane action.**
+      Once the app can launch and steer agents, what it did on my behalf goes to
+      the audit log in the harness's own JSONL format, so `audit.sh` shows one
+      start-to-finish timeline whether a run started from a terminal or from here.
 
 ---
 
@@ -160,6 +166,11 @@ outlive any one session, and may be mine or an agent's.
 - [ ] **Import roadmap checkboxes as tasks.**
       The `ROADMAP.md` / `TODO.md` items the briefing already reads become real
       tasks — this file included.
+- [ ] **Open a real main window for the board.**
+      The task graph, agent activity timeline, and run history across every
+      project — the long-run view a menu bar popover structurally can't hold.
+      Same app, same engine: the popover stays the ambient glance, the window is
+      where I actually plan. Reachable from the popover and from `mtm open`.
 
 ---
 
@@ -185,24 +196,7 @@ outlive any one session, and may be mine or an agent's.
 
 ---
 
-## Phase 6 — Web app
-
-- [ ] **Serve the same core contract over HTTP/WebSocket.**
-      One engine, one API shape, three clients — the web adapter must not fork
-      the model.
-- [ ] **Build the board view.**
-      The whole task graph, agent activity timeline, and run history — the
-      long-run view a menu bar popover can't hold.
-- [ ] **Make it usable remotely from my phone.**
-      Bound to the tailnet by default, never the open internet: approve a gate,
-      kick off a task, read a run report.
-- [ ] **Authenticate and audit the control plane.**
-      Even on a private tailnet — authenticated access, and every control-plane
-      action written to the audit log.
-
----
-
-## Phase 7 — Hardening & distribution
+## Phase 6 — Hardening & distribution
 
 Ongoing, not last — pull items forward as the surface area grows.
 
@@ -230,7 +224,12 @@ Ongoing, not last — pull items forward as the surface area grows.
 
 - **Not a coding agent.** It orchestrates agents; it doesn't write the code.
 - **No cloud service.** No accounts, no telemetry, no data leaving the machine.
-  The web app is self-hosted on my own network.
+- **No web app, no server.** *Considered and cut.* Its two jobs were the
+  long-run view and reaching the board from a phone. The first is a window in
+  the Mac app, not a second UI to build and keep in sync; the second isn't worth
+  a self-hosted server, auth, and tailnet binding for a tool whose agents all run
+  on this Mac anyway. The daemon's transport-agnostic IPC keeps this reversible
+  if remote access ever earns its place — the decision costs no architecture.
 - **Not a replacement for the harness.** The harness owns agent behavior and
   guardrails. Where this app needs new agent-side convention, that convention
   ships upstream in `agent-global-instructions`.
