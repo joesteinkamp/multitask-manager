@@ -66,8 +66,10 @@ worktrees, converging back — while you watch the whole board.
 Near-term work reads what the harness already writes to disk: the
 `~/.ai-logs/tool-calls.jsonl` audit log as a real activity signal, `~/.ai-context/`
 dirs as single orchestration waves instead of N unrelated rows, `ai/*` worktrees
-and their converge conflicts, and the `~/.ai/` delegate roster. Full plan and
-phases: **[ROADMAP.md](ROADMAP.md)**.
+and their converge conflicts, and the `~/.ai/` delegate roster.
+
+Phases and rationale: **[ROADMAP.md](ROADMAP.md)**. Design decisions and build
+order: **[docs/PLAN.md](docs/PLAN.md)**.
 
 Everything stays local and inference-free; the harness stays the source of truth
 (new agent-side conventions ship upstream there, not here); and confirmation

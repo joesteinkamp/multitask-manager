@@ -1,5 +1,8 @@
 # Roadmap
 
+This is the *what* and *why*. For the *how* — design decisions, build order, and
+the things most likely to go wrong — see **[docs/PLAN.md](docs/PLAN.md)**.
+
 ## Where this is going
 
 MultiTask Manager starts as a menu bar app that *watches* agent sessions. It
