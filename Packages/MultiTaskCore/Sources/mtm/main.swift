@@ -13,7 +13,8 @@ struct MTM: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
-        subcommands: [Status.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
+        subcommands: [Status.self, Projects.self, Show.self, List.self, Watch.self,
+                      Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
 }
@@ -59,35 +60,250 @@ struct Status: AsyncParsableCommand {
     @OptionGroup var options: EngineOptions
 
     func run() async throws {
-        let client = options.client()
-        let all = try await client.list()
-        let waiting = all.triageQueue()
+        let snapshot = try await options.client().list()
+        let projects = snapshot.activeProjects
 
-        if waiting.isEmpty {
-            print("Nothing is waiting on you. \(all.sessions.count) session(s) tracked.")
+        guard !projects.isEmpty else {
+            print("No projects tracked yet. Start a session in one, or add it with `mtm projects add`.")
+            return
+        }
+
+        let needing = projects.filter { $0.status == .needsYou }
+        if needing.isEmpty {
+            print("Nothing is waiting on you across \(projects.count) project\(projects.count == 1 ? "" : "s").")
         } else {
-            print("\(waiting.count) waiting on you:\n")
-            for session in waiting {
-                let age = Format.duration(Date().timeIntervalSince(session.lastActivity))
-                let why = session.waiting?.label ?? "Quiet"
-                print("  \(session.projectName.padded(to: 24)) \(why.padded(to: 18)) \(age) ago")
-                if let reason = session.reason, !reason.isEmpty {
-                    print("  \(String(repeating: " ", count: 24))\(reason)")
-                }
-            }
+            print("\(needing.count) project\(needing.count == 1 ? "" : "s") need you:\n")
+            for project in needing { Render.projectLine(project) }
+            print("")
         }
 
-        let stalled = all.repositories.filter(\.needsAttention)
-        if !stalled.isEmpty {
-            print("\nConverge stalled:")
-            for repo in stalled {
-                print("  \(repo.name): \(repo.conflictMarkers.joined(separator: ", "))")
-            }
+        // Everything else, so one command answers "what's the state of things".
+        let rest = projects.filter { $0.status != .needsYou }
+        if !rest.isEmpty {
+            for project in rest { Render.projectLine(project) }
         }
 
-        for reason in all.degraded {
+        let dormant = snapshot.dormantProjects
+        if !dormant.isEmpty {
+            print("\n\(dormant.count) project\(dormant.count == 1 ? "" : "s") have gone quiet — a stuck project shouts, a forgotten one doesn't.")
+        }
+
+        for reason in snapshot.degraded {
             FileHandle.standardError.write(Data("note: \(reason.message)\n".utf8))
         }
+    }
+}
+
+// MARK: - projects
+
+struct Projects: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Every project, with what each one needs.",
+        subcommands: [ProjectsAdd.self, ProjectsArchive.self, ProjectsPark.self]
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Flag(name: .long, help: "Include archived and parked projects.")
+    var all = false
+
+    @Flag(name: .long, help: "Emit JSON. Versioned, and meant for scripts and agents.")
+    var json = false
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        let projects = all ? snapshot.projects : snapshot.activeProjects
+
+        if json {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(ProjectListPayload(projects: projects,
+                                                             refreshedAt: snapshot.refreshedAt))
+            print(String(decoding: data, as: UTF8.self))
+            return
+        }
+
+        guard !projects.isEmpty else {
+            print("No projects tracked yet.")
+            return
+        }
+        for project in projects {
+            Render.projectLine(project)
+            if let one = project.oneLiner { print("      \(ProjectContextReader.truncate(one, to: 88))") }
+        }
+    }
+}
+
+struct ProjectListPayload: Encodable {
+    var payloadVersion = 1
+    var projects: [Project]
+    var refreshedAt: Date
+}
+
+struct ProjectsAdd: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "add",
+        abstract: "Track a project — including one that has no repository yet."
+    )
+
+    @Argument(help: "Project name.")
+    var name: String
+
+    @Option(name: .long, help: "Repository or working directory, if it has one.")
+    var path: String?
+
+    @Option(name: .long, help: "External reference, e.g. linear:ENG-412.")
+    var ref: String?
+
+    func run() throws {
+        let store = ProjectStore()
+        let resolved = path.map { FileSupport.expandingTilde($0) }
+        let id = resolved.map(ProjectRecord.identifier(forPath:))
+            ?? ProjectRecord.identifier(forName: name)
+
+        store.save(ProjectRecord(id: id, name: name, path: resolved, externalRef: ref))
+        print("Tracking \(name) (\(id))")
+        if resolved == nil {
+            print("No path set — this is an idea, not a checkout. That's allowed.")
+        }
+    }
+}
+
+struct ProjectsArchive: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "archive",
+        abstract: "Stop a project competing for attention, without deleting it."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Project id or name, or any unique prefix.")
+    var id: String
+
+    func run() async throws {
+        guard var record = try await Render.resolveRecord(id, options: options) else { return }
+        record.lifecycle = .archived
+        ProjectStore().save(record)
+        print("Archived \(record.name).")
+    }
+}
+
+struct ProjectsPark: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "park",
+        abstract: "Quiet a project until a date, then let it come back on its own."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Project id or name, or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Days to stay quiet.")
+    var days: Int = 7
+
+    func run() async throws {
+        guard var record = try await Render.resolveRecord(id, options: options) else { return }
+        let until = Date().addingTimeInterval(Double(days) * 86_400)
+        record.lifecycle = .parked(until: until)
+        ProjectStore().save(record)
+        print("Parked \(record.name) until \(Format.day(until)).")
+    }
+}
+
+// MARK: - show
+
+struct Show: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Everything about one project."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Project id or name, or any unique prefix.")
+    var id: String
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        let matches = snapshot.projects.filter {
+            $0.id.hasPrefix(id) || $0.name.lowercased().hasPrefix(id.lowercased())
+        }
+        guard let project = matches.first, matches.count == 1 else {
+            print(matches.isEmpty ? "No project matching \"\(id)\"."
+                                  : "\"\(id)\" matches \(matches.count) projects.")
+            return
+        }
+
+        print(project.name)
+        if let one = project.oneLiner { print(one) }
+        print("")
+        print("Status     \(project.status.label) — \(project.statusReason)")
+        if let progress = project.progress {
+            print("Progress   \(progress.summary) (\(Int(progress.fraction * 100))%) from \(progress.source)")
+        }
+        if let path = project.path { print("Path       \(path)") }
+        if !project.briefs.meetsMinimum {
+            print("Briefs     missing \(project.briefs.missing.joined(separator: ", "))")
+        }
+
+        if !project.sessions.isEmpty {
+            print("\nSessions")
+            for session in project.sessions {
+                let age = Format.duration(Date().timeIntervalSince(session.lastActivity))
+                print("  \(session.status.label.padded(to: 16)) \(age) ago  \(session.source.label)")
+                if let now = session.context?.now { print("      \(ProjectContextReader.truncate(now, to: 88))") }
+            }
+        }
+
+        if !project.nextSteps.isEmpty {
+            print("\nNext")
+            for step in project.nextSteps.prefix(5) { print("  · \(step)") }
+        }
+
+        if let brief = project.brief, !brief.successMetrics.isEmpty {
+            print("\nSuccess metrics")
+            for metric in brief.successMetrics.prefix(4) { print("  · \(ProjectContextReader.truncate(metric, to: 88))") }
+        }
+
+        if !project.waves.isEmpty {
+            print("\nWaves")
+            for wave in project.waves {
+                print("  \(wave.id) — \(wave.doneCount)/\(wave.delegates.count) delegates done")
+            }
+        }
+    }
+}
+
+// MARK: - shared rendering
+
+enum Render {
+    static func projectLine(_ project: Project) {
+        let badge = project.status.label.padded(to: 12)
+        let progress = project.progress.map { " \($0.summary)" } ?? ""
+        print("  \(badge) \(project.name.padded(to: 26)) \(project.statusReason)\(progress)")
+    }
+
+    /// Resolves a project from the *live snapshot* rather than only from the
+    /// store, so a project discovered from a running session can be archived or
+    /// parked like any other. The record is written on that action — the refresh
+    /// path itself stays read-only.
+    ///
+    /// Accepts any unique id or name prefix: people and agents alike type what
+    /// they were shown, which is rarely the whole id.
+    static func resolveRecord(_ prefix: String, options: EngineOptions) async throws -> ProjectRecord? {
+        let projects = try await options.client().list().projects
+        let needle = prefix.lowercased()
+        let matches = projects.filter {
+            $0.id.hasPrefix(prefix) || $0.name.lowercased().hasPrefix(needle)
+        }
+        if matches.count == 1 { return matches[0].record }
+        if matches.isEmpty {
+            print("No project matching \"\(prefix)\".")
+        } else {
+            print("\"\(prefix)\" matches \(matches.count): \(matches.map(\.name).joined(separator: ", "))")
+        }
+        return nil
     }
 }
 

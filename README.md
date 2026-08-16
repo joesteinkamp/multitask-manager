@@ -248,11 +248,12 @@ Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/A
 │   ├── Detection/                # SessionDetector + the file-based detectors
 │   ├── Enrichment/               # AuditLogReader, WaveReader, WorktreeReader
 │   ├── Roster/                   # ~/.ai delegate + routing-table parsers
-│   ├── Engine/                   # DetectionEngine, Configuration, triage, notification policy
+│   ├── Store/                    # ProjectStore — projects as markdown + front matter
+│   ├── Engine/                   # DetectionEngine, ProjectAssembler, triage, notifications
 │   ├── Client/                   # EngineClient protocol + InProcessEngine
 │   └── Wire/                     # daemon protocol: envelope, codec, frame reader
 ├── Sources/mtm/                  # the CLI
-└── Tests/                        # 152 tests, incl. opt-in checks against real harness data
+└── Tests/                        # 199 tests, incl. opt-in checks against real harness data
 
 MultiTaskManager/                 # the macOS app
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
@@ -288,12 +289,20 @@ swift build --package-path Packages/MultiTaskCore -c release
 
 | Command | What it shows |
 | --- | --- |
-| `mtm status` | what's waiting on you, in triage order |
+| `mtm status` | every project and what each one needs — the default |
+| `mtm projects [--all] [--json]` | the same list, with one-liners; `--all` includes archived and parked |
+| `mtm show <project>` | one project: status, progress, sessions, next steps, success metrics |
+| `mtm projects add <name> [--path] [--ref]` | track a project — including one with no repository yet |
+| `mtm projects park <project> [--days]` | quiet it until a date, then let it come back on its own |
+| `mtm projects archive <project>` | stop it competing for attention, without deleting it |
 | `mtm ls [--json]` | every tracked session; `--json` is a versioned API |
 | `mtm watch` | streams status changes and notifications until interrupted |
 | `mtm waves [--all]` | orchestration waves under `~/.ai-context` |
 | `mtm roster` | delegates available, and how the routing table ranks them |
 | `mtm doctor` | which signals are readable, and how many sessions join precisely |
+
+Project arguments accept any unique id or name prefix — `mtm show multi` is
+enough.
 
 `mtm ls --json` is meant to be consumed by hooks, scripts and agents, so it
 carries a `payloadVersion` and its shape doesn't change casually.

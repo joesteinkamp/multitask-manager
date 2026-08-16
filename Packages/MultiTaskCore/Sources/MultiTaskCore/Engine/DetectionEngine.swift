@@ -20,6 +20,10 @@ public struct AuditSummary: Codable, Sendable, Equatable {
 
 /// Everything one refresh produced.
 public struct EngineSnapshot: Codable, Sendable, Equatable {
+    /// **The primary unit.** Sessions, waves and repositories are evidence about
+    /// these; a project is what a person actually manages, and it appears here
+    /// whether or not anything is running in it.
+    public var projects: [Project] = []
     public var sessions: [Session] = []
     public var waves: [Wave] = []
     public var repositories: [RepositoryState] = []
@@ -34,6 +38,23 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
     public var needsAttentionCount: Int {
         sessions.filter { $0.status == .needsAttention }.count
             + repositories.filter(\.needsAttention).count
+    }
+
+    /// Projects competing for attention — archived and parked ones excluded.
+    public var activeProjects: [Project] {
+        projects.filter { $0.record.lifecycle.isActive }
+    }
+
+    /// Which projects need you, most urgent first. The answer to the question
+    /// this app leads with.
+    public var projectsNeedingYou: [Project] {
+        activeProjects.filter { $0.status == .needsYou }
+    }
+
+    /// Quiet with nothing ready — the failure a many-project week produces, and
+    /// the one nothing else in the app would surface.
+    public var dormantProjects: [Project] {
+        activeProjects.filter { $0.status == .dormant }
     }
 
     /// Waiting sessions in triage order.
@@ -68,6 +89,9 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
     /// breaking.
     public var changeDigest: SnapshotDigest {
         SnapshotDigest(
+            projects: projects.map {
+                "\($0.id)|\($0.status.rawValue)|\($0.statusReason)|\($0.progress?.summary ?? "")|\($0.nextSteps.count)"
+            },
             sessions: sessions.map {
                 "\($0.id)|\($0.status.rawValue)|\($0.waiting?.rawValue ?? "")|\($0.reason ?? "")|\($0.isPinned)|\($0.title)|\($0.evidence.rawValue)"
             },
@@ -85,6 +109,7 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
 
 /// A snapshot reduced to the facts a subscriber reacts to.
 public struct SnapshotDigest: Equatable, Sendable {
+    public var projects: [String]
     public var sessions: [String]
     public var waves: [String]
     public var repositories: [String]
@@ -104,6 +129,8 @@ public actor DetectionEngine {
     private let auditReader: AuditLogReader
     private let waveReader: WaveReader
     private let worktreeReader: WorktreeReader
+    private let projectStore: ProjectStore
+    private let projectAssembler: ProjectAssembler
     /// Detectors the host supplies — `RunningAppsDetector` needs AppKit, so it
     /// lives in the app and is injected here.
     private let additionalDetectors: [SessionDetector]
@@ -117,13 +144,17 @@ public actor DetectionEngine {
                 contextReader: ProjectContextReader = ProjectContextReader(),
                 auditReader: AuditLogReader? = nil,
                 waveReader: WaveReader = WaveReader(),
-                worktreeReader: WorktreeReader = WorktreeReader()) {
+                worktreeReader: WorktreeReader = WorktreeReader(),
+                projectStore: ProjectStore = ProjectStore(),
+                projectAssembler: ProjectAssembler? = nil) {
         self.configurationProvider = configuration
         self.additionalDetectors = additionalDetectors
         self.contextReader = contextReader
         self.auditReader = auditReader ?? AuditLogReader(configuration: configuration.configuration)
         self.waveReader = waveReader
         self.worktreeReader = worktreeReader
+        self.projectStore = projectStore
+        self.projectAssembler = projectAssembler ?? ProjectAssembler(contextReader: contextReader)
     }
 
     // MARK: Refresh
@@ -179,6 +210,17 @@ public actor DetectionEngine {
             }
             snapshot.repositories = repositories
         }
+
+        // Projects last: they are assembled *from* everything above, and they are
+        // what the surfaces actually render.
+        snapshot.projects = projectAssembler.assemble(
+            records: projectStore.load(),
+            sessions: snapshot.sessions,
+            waves: snapshot.waves,
+            repositories: snapshot.repositories,
+            config: config,
+            now: now
+        )
 
         snapshot.refreshedAt = now
         return snapshot

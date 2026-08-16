@@ -228,11 +228,11 @@ public struct WaveReader: Sendable {
 
     /// Whether a path is specific enough to attribute a wave to.
     ///
-    /// The home directory is tracked as a "project" as soon as a session runs
-    /// there, but it isn't one, and neither is anything above it.
+    /// The home directory looks like a project as soon as a session runs there,
+    /// but it isn't one, and neither is anything above it. A project outside the
+    /// home directory is fine — see `FileSupport.isPlausibleProjectPath`.
     static func isAttributable(_ path: String) -> Bool {
-        let home = NSHomeDirectory()
-        return path != home && path.hasPrefix(home + "/")
+        FileSupport.isPlausibleProjectPath(path)
     }
 
     /// Absolute-path-looking tokens in a block of prose, with surrounding markdown

@@ -21,6 +21,22 @@ public enum FileSupport {
         return String(trimmed[trimmed.index(after: slash)...])
     }
 
+    /// Whether a directory is specific enough to be somebody's *project*.
+    ///
+    /// The home directory becomes a candidate the moment a session runs there,
+    /// and so does `/` — but neither is a project, and treating them as one
+    /// produces a row nobody can ever satisfy. Note the rule excludes the home
+    /// directory and its *ancestors* only: a project living at `/opt/work/repo`
+    /// or on an external volume is perfectly normal and must not be filtered out.
+    public static func isPlausibleProjectPath(_ path: String) -> Bool {
+        let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
+        guard trimmed != "/", !trimmed.isEmpty else { return false }
+        let home = homeDirectory.path
+        if trimmed == home { return false }
+        // An ancestor of home is a filesystem location, not a project.
+        return !home.hasPrefix(trimmed + "/")
+    }
+
     /// Expands a leading `~` against the real home directory.
     public static func expandingTilde(_ path: String) -> String {
         guard path == "~" || path.hasPrefix("~/") else { return path }
