@@ -3,25 +3,69 @@
 This is the *what* and *why*. For the *how* — design decisions, build order, and
 the things most likely to go wrong — see **[docs/PLAN.md](docs/PLAN.md)**.
 
+## The problem
+
+AI turned working on one thing into working on five. Every project now has
+agents doing parts of it and me doing others, and the state of all of it is
+spread across terminals, repos, and whatever tracker the project actually lives
+in. **Staying on top of the work has become harder than the work.**
+
+That's a multitasking problem, not an agent problem, and it doesn't get solved
+by a better agent. It gets solved by something that holds the whole picture and
+is always within reach.
+
 ## Where this is going
 
-MultiTask Manager starts as a menu bar app that *watches* agent sessions. It
-becomes an **agentOS**: the control plane for the work I hand to agents, built
-directly on top of my harness
-([`agent-global-instructions`](https://github.com/joesteinkamp/agent-global-instructions)).
+MultiTask Manager is a control plane for a **small set of projects I'm running
+in parallel with my agents**. It lives in the menu bar and the task bar so it is
+never more than a glance or a keystroke away, and it answers three questions
+continuously:
 
-The harness already decides *how* agents behave — instructions, guardrail hooks,
-the cross-tool orchestration contract, model routing, memory, `/loop` autonomy.
-What it doesn't have is a place to **see and drive** all of it. That's this
-project — one native Mac app with two surfaces, plus a CLI, over one engine:
+- **What's happening?** Across every project — my work and my agents' alike.
+- **What needs me?** Which session is blocked, on what, and for how long.
+- **What should I do next?** Not merely what's stuck — what's ready to pick up.
+
+The third question is the one that makes this a project manager rather than a
+session monitor. **Work here belongs to two kinds of actor: me and my agents.**
+A task is assigned to one or the other, and the app manages both queues.
+Sessions are how it *observes*; projects and tasks are what it *manages*.
+
+It's built directly on my harness
+([`agent-global-instructions`](https://github.com/joesteinkamp/agent-global-instructions)),
+which already decides *how* agents behave — instructions, guardrail hooks, the
+cross-tool orchestration contract, model routing, memory, `/loop` autonomy. What
+the harness has no place for is **seeing and driving all of it at once**.
+
+### The North Star
+
+**Agents answer their own prompts and move to the next task themselves**, and
+this app is what hands them that next piece of work — escalating to me only when
+a decision genuinely needs a human.
+
+Two things follow from that, and they shape everything downstream. The board has
+to be **addressable by agents**, not just by me, which is what the MCP server is
+for. And it has to reflect **everything a project actually needs**, not only what
+the app could infer from disk, which is what syncing from external trackers
+(Linear and friends) is for.
+
+### Surfaces
+
+One engine, four faces:
 
 | Surface | For |
 |---|---|
-| **Menu bar popover** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Menu bar / task bar popover** (macOS shipped) | Ambient awareness — what's running, what's stuck, what's next. Always at hand; if reaching it costs a context switch, the app has failed. |
 | **Main window** | The long-run view: every project, the task board, run history |
 | **CLI** (`mtm`) | Scripting, hooks, and agents themselves reading/writing state |
+| **MCP server** | Agents reading and updating the board directly — the surface the North Star runs on |
 
-And the arc of capability:
+### Platforms
+
+macOS and Windows get a native GUI; Linux is served by the CLI and desktop
+notifications. See **[docs/CROSS-PLATFORM.md](docs/CROSS-PLATFORM.md)** for the
+plan and the reasoning.
+
+### The arc
 
 **watch → understand → control → delegate → schedule**
 
@@ -29,13 +73,25 @@ Ending at: I describe an outcome, it gets broken into tasks, each task is routed
 to me or to an agent, and the agent ones run autonomously — on a schedule, in
 isolated worktrees, converging back — while I see the whole board at a glance.
 
+### Lineage
+
+This starts where `agent watch` did — knowing which sessions are live — and
+keeps going: from sessions to projects, from projects to tasks, from watching to
+driving. Tracking live sessions is the floor here, not the ceiling.
+
 ### Principles
 
-- **The harness is the source of truth.** Read what it already writes
-  (`~/.ai-logs/`, `~/.ai-context/`, `~/.ai/`, `ai/*` branches). Don't invent a
-  parallel state store where one exists; contribute conventions upstream instead.
+- **Two kinds of actor.** Every piece of work is assignable to me or to an
+  agent. Features that only make sense for one of the two are usually a sign of
+  a wrong abstraction.
+- **The harness is the source of truth for agent behaviour.** Read what it
+  already writes (`~/.ai-logs/`, `~/.ai-context/`, `~/.ai/`, `ai/*` branches).
+  Don't invent a parallel state store where one exists; contribute conventions
+  upstream instead. Tasks are the exception and are owned here, because no
+  harness file describes work that hasn't started.
 - **Local, no inference.** File reads and process control. Briefings stay
-  model-free. Nothing leaves the machine unless I explicitly wire it to.
+  model-free. Nothing leaves the machine except through an integration I
+  explicitly configure.
 - **Degrade gracefully.** Every signal is optional. Missing harness, missing
   hooks, missing CLIs → fewer features, never a broken app.
 - **Confirmation gates are inherited, not reimplemented.** Anything the harness
@@ -149,8 +205,15 @@ Stop being read-only. The app launches and steers agents.
 
 ## Phase 4 — Tasks
 
-The unit stops being "a session" and becomes "a piece of work" — which may
-outlive any one session, and may be mine or an agent's.
+**This is the phase where the app becomes what it's actually for.** Everything
+before it manages *sessions*, which are transient and belong to one tool. Here
+the unit becomes a piece of work that outlives any session, belongs to a
+project, and is assigned to me or to an agent. "What should I do next" only has
+a real answer once this exists — before it, the app can tell me what's stuck but
+not what's ready.
+
+It's also where the North Star becomes reachable: an agent can only take the
+next task itself once there is a next task to take, addressable from outside.
 
 - [ ] **Add a task model and a plain-file task store.**
       Title, outcome, project, assignee (me | delegate), state, dependencies,
@@ -169,11 +232,32 @@ outlive any one session, and may be mine or an agent's.
 - [ ] **Import roadmap checkboxes as tasks.**
       The `ROADMAP.md` / `TODO.md` items the briefing already reads become real
       tasks — this file included.
+- [ ] **Answer "what should I do next" explicitly.**
+      A ranked ready-list for *me*, not just an attention queue: tasks whose
+      dependencies are met, weighted by project, staleness, and how long
+      something has been blocked on me. The attention badge says I'm the
+      bottleneck; this says what to do about it.
 - [ ] **Open a real main window for the board.**
       The task graph, agent activity timeline, and run history across every
       project — the long-run view a menu bar popover structurally can't hold.
       Same app, same engine: the popover stays the ambient glance, the window is
       where I actually plan. Reachable from the popover and from `mtm open`.
+
+### Making the board addressable
+
+- [ ] **Expose an MCP server.**
+      The surface the North Star runs on. Agents read the board, claim the next
+      task, report progress, and close work out — without me relaying any of it.
+      Same engine, same confirmation gates: an agent asking to do something I'd
+      have to approve still stops and asks. Read-only tools first, per
+      *observe before you control*.
+- [ ] **Sync tasks from external trackers.**
+      A project's real task list often already lives in Linear, GitHub Issues,
+      or similar. Import them as tasks so the board reflects what a project
+      actually needs rather than only what the app could infer from disk.
+      One-way in by default, with the same show-me-the-diff rule that governs
+      writing back to a repo file — a sync that silently rewrites someone's
+      tracker is a bug, not a feature.
 
 ---
 
@@ -226,17 +310,28 @@ Ongoing, not last — pull items forward as the surface area grows.
 ## Non-goals
 
 - **Not a coding agent.** It orchestrates agents; it doesn't write the code.
-- **No cloud service.** No accounts, no telemetry, no data leaving the machine.
-- **No web app, no server.** *Considered and cut.* Its two jobs were the
-  long-run view and reaching the board from a phone. The first is a window in
-  the Mac app, not a second UI to build and keep in sync; the second isn't worth
-  a self-hosted server, auth, and tailnet binding for a tool whose agents all run
-  on this Mac anyway. The daemon's transport-agnostic IPC keeps this reversible
-  if remote access ever earns its place — the decision costs no architecture.
+- **No cloud service.** No accounts, no telemetry, no data leaving the machine
+  on its own. Outbound integrations — a Linear sync, say — exist only where I
+  explicitly configure one, and are opt-in per project.
+- **Not a *team* project manager.** This manages a small set of projects that
+  one person is running in parallel with their agents. Sprints, cross-team
+  assignment, capacity planning, reporting — all out. Note the distinction from
+  an earlier version of this line: personal project management is squarely *in*
+  scope and is the point of Phase 4. Syncing *from* a team tracker is in too,
+  because that is often where a project's real task list already lives.
+- **No web app, no server.** *Considered, cut, briefly reconsidered, and cut
+  again.* Its two jobs were the long-run view and reaching the board from a
+  phone. The first is a window in the native app, not a second UI to keep in
+  sync. The second isn't worth a self-hosted server and auth for a tool this
+  personal. It was reopened in Aug 2026 as a way to reach three platforms with
+  one UI, and rejected a second time on the interaction that matters most: the
+  popover has to appear instantly and correct, dozens of times a day, and that
+  is the thing a webview is worst at. The daemon's transport-agnostic IPC keeps
+  remote access reversible if it ever earns its place.
 - **Not a replacement for the harness.** The harness owns agent behavior and
   guardrails. Where this app needs new agent-side convention, that convention
   ships upstream in `agent-global-instructions`.
-- **Not a general project manager.** Jira-shaped features are out of scope. The
-  task graph exists to route work to agents, not to track a team.
 - **No AI in the briefing path.** Goal / Now / Next stay pure file reads —
-  fast, private, and correct.
+  fast, private, and correct. Decomposing an outcome into tasks *is* inference,
+  and is done by dispatching a delegate that writes task files, never by the app
+  calling a model itself.

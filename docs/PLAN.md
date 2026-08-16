@@ -1,11 +1,21 @@
 # Implementation plan
 
-[ROADMAP.md](../ROADMAP.md) says *what* and *why*. This says *how*: the design
-decisions, the order to build in, and the things most likely to go wrong.
+[ROADMAP.md](../ROADMAP.md) says *what* and *why*.
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) says how it reaches Windows and Linux.
+This says *how*: the design decisions, the order to build in, and the things
+most likely to go wrong.
 
 Each numbered item below is scoped to roughly one pull request — independently
 shippable, with the app working at every step. Item numbers match roadmap
 phases (P1.1 is the first item of Phase 1).
+
+**Keep the destination in view while reading the early phases.** Phases 1–3 are
+about sessions, which makes them look like a session monitor. They aren't the
+product; they're how the app earns a trustworthy picture of what's happening.
+The product is Phase 4 onward: work — mine and my agents' — tracked per project,
+with a next action for each actor, reachable by agents through MCP. Every
+decision in Phases 1–3 should be judged on whether it makes that easier, not on
+whether it makes a better session list.
 
 ---
 

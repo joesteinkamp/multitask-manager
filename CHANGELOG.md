@@ -9,6 +9,84 @@ did.
 
 ---
 
+## Restate what the project is for: parallel projects, two kinds of actor
+
+*(2026-08-16, Claude)*
+
+### What changed
+
+`ROADMAP.md`, `README.md`, `docs/PLAN.md` and `docs/CROSS-PLATFORM.md` now tell
+one story instead of four. The framing moves from "a control plane for the work
+I hand to agents" to **a control plane for a small set of projects run in
+parallel by one person and their agents**, and the docs say so consistently.
+
+Concretely: a new problem statement (AI turned working on one thing into working
+on five; staying on top of the work has become harder than the work); three
+standing questions the app answers, of which "what should I do next" is now
+first-class rather than a side effect of "what's blocked"; an explicit North
+Star; the MCP server added as a fourth surface; external tracker sync added to
+Phase 4; the cross-platform direction reconciled into the roadmap; and two
+non-goals rewritten.
+
+### The ask
+
+Two corrections in one conversation. First, that `ROADMAP.md` and
+`docs/CROSS-PLATFORM.md` disagreed about whether this is a Mac app or a
+multi-platform one. Second, and more fundamental: *"you don't really understand
+it's not simply for managing agents — it's for managing for humans and AI
+agents."*
+
+### Why this approach
+
+**The second correction is the load-bearing one, and it changes what the early
+phases are for.** The unit of work is not the session. Sessions are how the app
+*observes*; projects and tasks are what it *manages*. Written the old way, every
+feature decision in Phases 1–3 was being judged on whether it made a better
+session list — which is how the app quietly becomes a session monitor with
+ambitions. `docs/PLAN.md` now opens by saying Phases 1–3 exist to earn a
+trustworthy picture, and that the product starts at Phase 4.
+
+**"Two kinds of actor" is stated as a principle** because it is the test that
+catches the wrong abstraction early: a feature that only makes sense for a human
+or only for an agent is usually modelling the wrong thing.
+
+**The North Star is written down as a destination rather than a phase**, because
+two long-lead decisions hang off it. Agents answering their own prompts and
+taking the next task requires the board to be addressable *by agents* — hence
+MCP as a surface, not a plugin — and requires the board to reflect what a
+project actually needs rather than what the app could infer from disk — hence
+syncing from Linear and similar.
+
+**The lineage is named.** This starts where `agent watch` did, tracking live
+sessions, and that is recorded as the floor rather than the ceiling.
+
+### Considered and rejected
+
+**Keeping "agentOS" as the headline framing.** Dropped. It is a good phrase but
+it points at the wrong half of the product: the correction was explicitly that
+this is not simply for managing agents. It survives as the direction, not as the
+definition.
+
+**Leaving `docs/CROSS-PLATFORM.md` marked as a proposal** rather than reconciling
+it into the roadmap. Rejected on instruction — cross-platform is desired, so the
+roadmap now states it and the non-goals that assumed a single Mac were rewritten
+rather than left to contradict it.
+
+**Softening "not a general project manager" by deleting it.** Rejected in favour
+of narrowing it to *"not a **team** project manager"*, with a note that the line
+changed. Personal project management is now squarely in scope and is the point
+of Phase 4; what stays out is sprints, cross-team assignment and reporting. The
+distinction matters enough to leave a trail rather than quietly reverse.
+
+**Re-recording the web app as merely "cut".** Rejected. The non-goal now records
+that it was cut, reconsidered in Aug 2026 as a way to reach three platforms with
+one UI, and cut again on the interaction that matters most — the popover has to
+appear instantly and correct, dozens of times a day, which is what a webview is
+worst at. A decision reopened and re-closed should show both, or the next reader
+reopens it a third time.
+
+---
+
 ## Put every face of the app behind one engine interface, and build the daemon's message layer
 
 *(2026-08-16, Claude)*

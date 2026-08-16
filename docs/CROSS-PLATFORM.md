@@ -4,6 +4,12 @@
 for the six feature phases. This says how the same product reaches **Windows and
 the Linux command line** without becoming three products.
 
+The product this serves is a control plane for a small set of projects run in
+parallel by one person and their agents — so "reaching another platform" means
+reaching another *person's* desk, not another deployment target. That is why the
+popover is an acceptance criterion below rather than a feature: an ambient tool
+that costs a context switch to open is one that doesn't get opened.
+
 Item numbers are `W0`, `W1`… and are independent of the `P` phases; the two
 tracks interleave rather than block each other.
 

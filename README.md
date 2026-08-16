@@ -1,15 +1,24 @@
 # MultiTask Manager
 
-An **agentOS**: the control plane for the work you hand to AI agents. It turns a
-pile of parallel sessions into one board you can see and drive — starting with the
-thing you always need first, which agent has gone quiet and is waiting on you.
+**Stay on top of every project you're running in parallel with your AI agents.**
 
-Today that ships as a lightweight macOS **menu bar** app. It auto-detects ongoing
+AI turned working on one thing into working on five. Each project has agents
+doing parts of it and you doing others, and the state of all of it is scattered
+across terminals, repos, and trackers. Staying on top of the work has become
+harder than the work.
+
+MultiTask Manager is a control plane for that small set of parallel projects. It
+lives in your menu bar — always a glance or a keystroke away — and answers three
+questions continuously: **what's happening**, **what needs you**, and **what you
+should do next**. The work it tracks belongs to two kinds of actor, you and your
+agents, and it manages both queues.
+
+Today it ships as a lightweight macOS **menu bar** app that auto-detects ongoing
 sessions across Claude Code, Codex, the Claude/Codex desktop apps, and any folder
 you're actively working in; figures out which project each belongs to; and flags
-the ones that are **waiting on you**. Where it goes next — a task board, a CLI,
-and agents you can launch and schedule rather than just watch — is in
-[ROADMAP.md](ROADMAP.md).
+the ones that are **waiting on you**. Sessions are how it observes — projects and
+tasks are what it manages, and the task layer is where it's headed. Where it goes
+next is in [ROADMAP.md](ROADMAP.md).
 
 > **Status:** v1 shipped, and built to be compiled and run on your own Mac
 > (macOS 13+). The app is non-sandboxed and intended for personal/local use, not
@@ -42,26 +51,39 @@ and agents you can launch and schedule rather than just watch — is in
 
 ## Where this is going
 
-v1 *watches* agent sessions. The direction is to **drive** them — one native Mac
-app with two surfaces, plus a CLI, built on top of a portable AI harness
+v1 *watches* sessions. The direction is to **manage the work** — yours and your
+agents' — built on top of a portable AI harness
 ([`agent-global-instructions`](https://github.com/joesteinkamp/agent-global-instructions))
 that already owns how agents behave: instructions, guardrail hooks, the
 cross-tool orchestration contract, model routing, memory, long-autonomy loops.
 What it has no place for is seeing and steering all of it at once.
 
+**The North Star:** agents answer their own prompts and move to the next task
+themselves, and this app is what hands them that next piece of work — escalating
+to you only when a decision genuinely needs a human.
+
+One engine, four surfaces:
+
 | Surface | For |
 | --- | --- |
-| **Menu bar popover** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Menu bar / task bar popover** (macOS shipped) | Ambient awareness — what's running, what's stuck, what's next. If reaching it costs a context switch, the app has failed. |
 | **Main window** | The long-run view: every project, the task board, run history |
 | **CLI** (`mtm`) | Scripting and hooks; agents reading and writing state themselves |
+| **MCP server** | Agents reading and updating the board directly — the surface the North Star runs on |
 
-Deliberately **no web app** — everything stays in the Mac app. See
-[Non-goals](ROADMAP.md#non-goals) for why that was considered and cut.
+Native GUIs on macOS and Windows; Linux is served by the CLI and desktop
+notifications. Deliberately **no web app** — see
+[Non-goals](ROADMAP.md#non-goals) and
+[docs/CROSS-PLATFORM.md](docs/CROSS-PLATFORM.md) for the reasoning.
 
 The arc is **watch → understand → control → delegate → schedule**, ending at:
 describe an outcome, have it broken into tasks, route each to yourself or an
 agent, and let the agent ones run autonomously — scheduled, isolated in their own
 worktrees, converging back — while you watch the whole board.
+
+It starts where a tool like `agent watch` did, knowing which sessions are live,
+and keeps going: from sessions to projects, from projects to tasks, from
+watching to driving.
 
 Near-term work reads what the harness already writes to disk: the
 `~/.ai-logs/tool-calls.jsonl` audit log as a real activity signal, `~/.ai-context/`
