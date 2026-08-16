@@ -2,8 +2,8 @@ import Foundation
 
 /// A notification the app should post. The policy decides *whether* and *what*;
 /// the app owns `UNUserNotificationCenter` and the delivery.
-public struct PendingNotification: Sendable, Equatable {
-    public enum Kind: Sendable, Equatable {
+public struct PendingNotification: Codable, Sendable, Equatable {
+    public enum Kind: Codable, Sendable, Equatable {
         /// One session crossed into needing attention.
         case single(sessionId: String)
         /// Several crossed at once — one message instead of a burst.

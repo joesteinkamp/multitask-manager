@@ -1,15 +1,32 @@
 import Foundation
 
+/// How much the audit log contributed to this pass. Carried on the snapshot so a
+/// remote client can report health without a second round-trip and without
+/// needing its own reader — the reader is stateful, and two of them would each
+/// hold a partial view.
+public struct AuditSummary: Codable, Sendable, Equatable {
+    public var path: String = ""
+    public var recordsRead: Int = 0
+    /// Cumulative count of lines that failed to parse. Rising means concurrent
+    /// appends are interleaving.
+    public var malformedLines: Int = 0
+    public var sessionsIndexed: Int = 0
+    /// Sessions matched by harness session id rather than by directory — the
+    /// number that decides whether status is a fact or a guess.
+    public var preciseJoins: Int = 0
+
+    public init() {}
+}
+
 /// Everything one refresh produced.
-public struct EngineSnapshot: Sendable {
+public struct EngineSnapshot: Codable, Sendable, Equatable {
     public var sessions: [Session] = []
     public var waves: [Wave] = []
     public var repositories: [RepositoryState] = []
     /// Detectors and readers that couldn't do their job this pass. Shown in the UI
     /// so "nothing is running" and "I can't see anything" read differently.
     public var degraded: [DegradedReason] = []
-    /// Cumulative count of audit-log lines that failed to parse.
-    public var malformedAuditLines: Int = 0
+    public var audit = AuditSummary()
     public var refreshedAt: Date = .distantPast
 
     public init() {}
@@ -38,6 +55,40 @@ public struct EngineSnapshot: Sendable {
 
     public var activeWaves: [Wave] { waves.filter { !$0.isStale } }
     public var pastWaves: [Wave] { waves.filter(\.isStale) }
+
+    /// The parts of a snapshot whose change is worth waking a subscriber for.
+    ///
+    /// Plain equality is the wrong test: `lastActivity` advances on almost every
+    /// tick as files are touched, so two snapshots describing an identical
+    /// situation compare unequal and every subscriber gets pushed a full snapshot
+    /// every five seconds forever. A client renders "3m ago" from the
+    /// `lastActivity` it already holds and needs no new snapshot for its clock to
+    /// move; what it genuinely needs to hear about is a session appearing or
+    /// leaving, a status or wait-reason changing, a wave advancing, or a converge
+    /// breaking.
+    public var changeDigest: SnapshotDigest {
+        SnapshotDigest(
+            sessions: sessions.map {
+                "\($0.id)|\($0.status.rawValue)|\($0.waiting?.rawValue ?? "")|\($0.reason ?? "")|\($0.isPinned)|\($0.title)|\($0.evidence.rawValue)"
+            },
+            waves: waves.map {
+                "\($0.id)|\($0.progress ?? "")|\($0.doneCount)/\($0.delegates.count)|\($0.isStale)"
+            },
+            repositories: repositories.map {
+                "\($0.path)|\($0.conflictMarkers.joined(separator: ","))|"
+                + $0.worktrees.map { "\($0.branch ?? "-"):\($0.ahead)/\($0.behind)" }.joined(separator: ",")
+            },
+            degraded: degraded.map { "\($0.detectorId)|\($0.message)" }
+        )
+    }
+}
+
+/// A snapshot reduced to the facts a subscriber reacts to.
+public struct SnapshotDigest: Equatable, Sendable {
+    public var sessions: [String]
+    public var waves: [String]
+    public var repositories: [String]
+    public var degraded: [String]
 }
 
 /// The detection engine: runs detectors, enriches with every signal available, and
@@ -97,11 +148,19 @@ public actor DetectionEngine {
 
         let auditIndex = config.enableAuditLog ? auditReader.refresh(now: now) : AuditIndex()
         if let degraded = auditIndex.degraded { snapshot.degraded.append(degraded) }
-        snapshot.malformedAuditLines = auditIndex.malformedLines
 
         let enriched = config.enableProjectContext ? contextReader.attach(to: raw) : raw
         snapshot.sessions = merge(raw: enriched, overrides: overrides, audit: auditIndex,
                                   config: config, now: now)
+
+        snapshot.audit.path = config.auditLogPath
+        snapshot.audit.recordsRead = auditIndex.recordsRead
+        snapshot.audit.malformedLines = auditIndex.malformedLines
+        snapshot.audit.sessionsIndexed = auditIndex.bySession.count
+        snapshot.audit.preciseJoins = snapshot.sessions.filter { session in
+            guard let id = session.harnessSessionId else { return false }
+            return auditIndex.bySession[id] != nil
+        }.count
 
         let knownProjects = snapshot.sessions.compactMap(\.projectPath)
         if config.enableWaves {

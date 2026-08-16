@@ -225,9 +225,11 @@ Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/A
 │   ├── Detection/                # SessionDetector + the file-based detectors
 │   ├── Enrichment/               # AuditLogReader, WaveReader, WorktreeReader
 │   ├── Roster/                   # ~/.ai delegate + routing-table parsers
-│   └── Engine/                   # DetectionEngine, Configuration, triage, notification policy
+│   ├── Engine/                   # DetectionEngine, Configuration, triage, notification policy
+│   ├── Client/                   # EngineClient protocol + InProcessEngine
+│   └── Wire/                     # daemon protocol: envelope, codec, frame reader
 ├── Sources/mtm/                  # the CLI
-└── Tests/                        # 113 tests, incl. opt-in checks against real harness data
+└── Tests/                        # 152 tests, incl. opt-in checks against real harness data
 
 MultiTaskManager/                 # the macOS app
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
@@ -265,12 +267,51 @@ swift build --package-path Packages/MultiTaskCore -c release
 | --- | --- |
 | `mtm status` | what's waiting on you, in triage order |
 | `mtm ls [--json]` | every tracked session; `--json` is a versioned API |
+| `mtm watch` | streams status changes and notifications until interrupted |
 | `mtm waves [--all]` | orchestration waves under `~/.ai-context` |
 | `mtm roster` | delegates available, and how the routing table ranks them |
 | `mtm doctor` | which signals are readable, and how many sessions join precisely |
 
 `mtm ls --json` is meant to be consumed by hooks, scripts and agents, so it
 carries a `payloadVersion` and its shape doesn't change casually.
+
+`mtm watch` only prints when something you'd react to changes — a session
+appearing or leaving, a status or wait-reason changing, a wave advancing, a
+converge breaking. Activity timestamps drift on every tick and are deliberately
+not treated as changes.
+
+## One engine, several faces
+
+Every face of this app talks to the same `EngineClient` interface rather than to
+the detection engine directly:
+
+```
+        popover / window        mtm CLI
+                  \               /
+                   ▼             ▼
+                  EngineClient (protocol)
+                   │                    │
+        InProcessEngine            IPCClient → mtmd  ← not built yet
+                   │
+            DetectionEngine
+```
+
+`InProcessEngine` runs detection in the calling process and is what everything
+uses today. It owns three things the bare engine doesn't: the refresh loop, the
+user's overrides, and the notification policy.
+
+The notification policy lives there rather than in the UI because it is
+*stateful* — its whole job is remembering what it already told you about — so
+two evaluators would notify you twice about the same session. The engine
+decides; the app delivers.
+
+A daemon (`mtmd`) would be a second conformance behind the same interface, which
+is what keeps it an optimisation rather than a dependency. It isn't built:
+nothing about the CLI needed it, and the case for it rests on sharing stateful
+readers between processes and on Phase 5's scheduler, neither of which exists
+yet. The wire protocol it would speak — newline-delimited JSON, versioned
+envelope, frame reader — is implemented and tested, so the remaining work is the
+socket and the process lifecycle.
 
 ## Notes & limitations
 

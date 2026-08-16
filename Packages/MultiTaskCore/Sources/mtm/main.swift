@@ -13,7 +13,7 @@ struct MTM: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
-        subcommands: [Status.self, List.self, Waves.self, Roster.self, Doctor.self],
+        subcommands: [Status.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
 }
@@ -39,10 +39,13 @@ struct EngineOptions: ParsableArguments {
         return config
     }
 
-    func snapshot() async -> EngineSnapshot {
-        let config = configuration()
-        let engine = DetectionEngine(configuration: StaticConfiguration(config))
-        return await engine.refresh(overrides: OverridesStore().load())
+    /// The engine this invocation talks to.
+    ///
+    /// Everything below goes through `EngineClient` rather than reaching for
+    /// `DetectionEngine` directly, so the day a daemon exists this becomes a
+    /// connect-or-fall-back and not one line of command code changes.
+    func client() -> some EngineClient {
+        InProcessEngine(configuration: StaticConfiguration(configuration()))
     }
 }
 
@@ -56,11 +59,12 @@ struct Status: AsyncParsableCommand {
     @OptionGroup var options: EngineOptions
 
     func run() async throws {
-        let snapshot = await options.snapshot()
-        let waiting = snapshot.triageQueue()
+        let client = options.client()
+        let all = try await client.list()
+        let waiting = all.triageQueue()
 
         if waiting.isEmpty {
-            print("Nothing is waiting on you. \(snapshot.sessions.count) session(s) tracked.")
+            print("Nothing is waiting on you. \(all.sessions.count) session(s) tracked.")
         } else {
             print("\(waiting.count) waiting on you:\n")
             for session in waiting {
@@ -73,7 +77,7 @@ struct Status: AsyncParsableCommand {
             }
         }
 
-        let stalled = snapshot.repositories.filter(\.needsAttention)
+        let stalled = all.repositories.filter(\.needsAttention)
         if !stalled.isEmpty {
             print("\nConverge stalled:")
             for repo in stalled {
@@ -81,7 +85,7 @@ struct Status: AsyncParsableCommand {
             }
         }
 
-        for reason in snapshot.degraded {
+        for reason in all.degraded {
             FileHandle.standardError.write(Data("note: \(reason.message)\n".utf8))
         }
     }
@@ -101,7 +105,7 @@ struct List: AsyncParsableCommand {
     var json = false
 
     func run() async throws {
-        let snapshot = await options.snapshot()
+        let snapshot = try await options.client().list()
 
         guard json else {
             for session in snapshot.sessions {
@@ -145,7 +149,7 @@ struct Waves: AsyncParsableCommand {
     var all = false
 
     func run() async throws {
-        let snapshot = await options.snapshot()
+        let snapshot = try await options.client().list()
         let waves = all ? snapshot.waves : snapshot.activeWaves
 
         guard !waves.isEmpty else {
@@ -212,36 +216,63 @@ struct Doctor: AsyncParsableCommand {
     @OptionGroup var options: EngineOptions
 
     func run() async throws {
-        let config = options.configuration()
-        print("Audit log:      \(config.auditLogPath)")
+        let client = options.client()
+        let snapshot = try await client.list()
+        let health = try await client.health()
 
-        let auditReader = AuditLogReader(configuration: config)
-        let index = auditReader.refresh()
-        if let degraded = index.degraded {
-            print("                \(degraded.message)")
-        } else {
-            print("                \(index.recordsRead) records read, \(index.bySession.count) live session(s), \(index.malformedLines) malformed line(s)")
-        }
-
-        let snapshot = await options.snapshot()
-        print("Sessions:       \(snapshot.sessions.count)")
+        print("Audit log:      \(health.auditLogPath)")
+        print("                \(health.auditRecordsRead) records read, \(health.auditSessionsIndexed) live session(s), \(health.auditMalformedLines) malformed line(s)")
+        print("Sessions:       \(health.sessionCount)")
         print("Waiting on you: \(snapshot.needsAttentionCount)")
         print("Waves:          \(snapshot.activeWaves.count) active, \(snapshot.pastWaves.count) past")
         print("Repositories:   \(snapshot.repositories.count) scanned")
+        // How many sessions joined the audit log by session id rather than by
+        // directory — the number that decides whether status is a fact or a guess.
+        print("Precise joins:  \(health.preciseJoins) of \(health.sessionCount)")
 
-        // How many sessions could be joined precisely rather than by directory —
-        // the number that decides whether status is a fact or a guess.
-        let joined = snapshot.sessions.filter { session in
-            guard let id = session.harnessSessionId else { return false }
-            return index.bySession[id] != nil
-        }.count
-        print("Precise joins:  \(joined) of \(snapshot.sessions.count)")
-
-        if snapshot.degraded.isEmpty {
+        if health.degraded.isEmpty {
             print("\nNo degraded sources.")
         } else {
             print("\nDegraded:")
-            for reason in snapshot.degraded { print("  \(reason.detectorId): \(reason.message)") }
+            for reason in health.degraded { print("  \(reason.detectorId): \(reason.message)") }
+        }
+    }
+}
+
+// MARK: - watch
+
+struct Watch: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Stream status changes until interrupted."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    func run() async throws {
+        // A streaming command's output is worthless block-buffered: piped into
+        // `grep` or redirected to a file, nothing appears until the buffer fills,
+        // and a command that only ever ends by being interrupted never flushes at
+        // all. Line buffering is what makes `mtm watch | grep app` behave.
+        setvbuf(stdout, nil, _IOLBF, 0)
+
+        let engine = InProcessEngine(configuration: StaticConfiguration(options.configuration()))
+        await engine.primeNotifications()
+        await engine.start()
+
+        // Only changes arrive here — the engine suppresses a push when the new
+        // snapshot matches the last one sent, so a quiet machine stays quiet.
+        for await event in engine.subscribe() {
+            switch event {
+            case .snapshot(let snapshot):
+                let stamp = Format.time(snapshot.refreshedAt)
+                let waiting = snapshot.needsAttentionCount
+                print("\(stamp)  \(snapshot.sessions.count) session(s), \(waiting) waiting")
+                for session in snapshot.triageQueue() {
+                    print("          \(session.projectName.padded(to: 24)) \(session.waiting?.label ?? "Quiet")")
+                }
+            case .notify(let notification):
+                print("\(Format.time(Date()))  🔔 \(notification.title) — \(notification.body)")
+            }
         }
     }
 }
@@ -255,6 +286,13 @@ enum Format {
         if s < 3600 { return "\(s / 60)m" }
         if s < 86_400 { return "\(s / 3600)h" }
         return "\(s / 86_400)d"
+    }
+
+    static func time(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: date)
     }
 
     static func day(_ date: Date) -> String {
