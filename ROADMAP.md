@@ -179,10 +179,15 @@ model. Split the engine out before building on it, not after.
 
 Stop being read-only. The app launches and steers agents.
 
-- [ ] **Launch a session straight from a project row.**
+- [ ] **Start work — on a task, or just a new session.**
       Templated headless invocations following the orchestration playbook —
       `claude -p`, `codex exec --json`, `agy -p`, `agent -p`, `lm -p` — with the
-      roster and routing table picking the default delegate.
+      roster and routing table picking the default delegate. Two equally real
+      cases: run a task, or spin up another session because I want one. Starting
+      bare is not an escape hatch — plenty of real work begins before anyone
+      knows what the task is, and a bare session can be turned into a task
+      afterwards in one action, which is how that work stops falling off the
+      board. One task can also fan out into several sessions.
 - [ ] **Provision isolation in one click.**
       Create `../<repo>-<agent>` on `ai/<agent>`, seed
       `~/.ai-context/<repo>-<task>/` with `TASK.md` and an empty `STATE.md`, and
@@ -215,10 +220,14 @@ not what's ready.
 It's also where the North Star becomes reachable: an agent can only take the
 next task itself once there is a next task to take, addressable from outside.
 
-- [ ] **Add a task model and a plain-file task store.**
-      Title, outcome, project, assignee (me | delegate), state, dependencies,
-      provenance, and links to the sessions that worked it — under
-      `~/.multitaskmanager/tasks/`, git-friendly and readable without the app.
+- [ ] **Make projects real, and add a plain-file task store.**
+      A project stops being "whatever directory a session was running in" and
+      becomes a record with a name, an optional repo, and an optional external
+      reference — so a project filed from Linear before any work starts, with no
+      session and no checkout, is something the app can actually hold. Tasks
+      carry title, outcome, project, assignee (me | delegate), state,
+      dependencies, provenance, and links to the sessions that worked them —
+      under `~/.multitaskmanager/`, git-friendly and readable without the app.
 - [ ] **Break an outcome down into a task graph.**
       Interactive decomposition with dependencies explicit, so independent tasks
       fan out in parallel and dependent ones queue behind.
@@ -245,19 +254,30 @@ next task itself once there is a next task to take, addressable from outside.
 
 ### Making the board addressable
 
-- [ ] **Expose an MCP server.**
-      The surface the North Star runs on. Agents read the board, claim the next
-      task, report progress, and close work out — without me relaying any of it.
-      Same engine, same confirmation gates: an agent asking to do something I'd
-      have to approve still stops and asks. Read-only tools first, per
-      *observe before you control*.
-- [ ] **Sync tasks from external trackers.**
-      A project's real task list often already lives in Linear, GitHub Issues,
-      or similar. Import them as tasks so the board reflects what a project
-      actually needs rather than only what the app could infer from disk.
-      One-way in by default, with the same show-me-the-diff rule that governs
-      writing back to a repo file — a sync that silently rewrites someone's
-      tracker is a bug, not a feature.
+- [ ] **Expose an MCP server — readable *and* writable.**
+      The surface the North Star runs on, and the app's main input rather than
+      only an output. The shape I expect: a Claude session elsewhere, with Notion
+      and Linear also connected, works out what work exists and files it here.
+      So agents both take work off the board and put work on it — create
+      projects and tasks, claim the next one, report progress, close things out.
+      Every write carries provenance and an `external_ref` so a sweep that runs
+      twice updates rather than duplicates.
+      The gate line: **organising work is free, spending is gated.** Filing and
+      reprioritising tasks needs no approval; starting a run, touching a repo,
+      deleting work or writing outward stops and asks exactly as it would from a
+      terminal.
+- [ ] **Make agent-filed work visible and reversible.**
+      Once something else can write to the board, I need to see what arrived,
+      from which agent, against which project — and undo a bad sweep as a batch
+      rather than a row at a time.
+- [ ] ~~Sync tasks from external trackers.~~ **Cut — the agent does this.**
+      An agent with Notion and Linear connected can already read them and file
+      the results through MCP, which means no per-service client here, no
+      credentials in a keychain, and no outbound network path in the app at all.
+      More general too: anything with an MCP server works, including services I
+      haven't thought of. The trade is that a sync runs when an agent runs
+      instead of continuously — and since Phase 5 schedules agents anyway, a
+      scheduled sweep covers it.
 
 ---
 

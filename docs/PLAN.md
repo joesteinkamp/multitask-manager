@@ -343,14 +343,27 @@ Executable target using `swift-argument-parser`.
 **Objective:** the app launches and steers agents instead of only watching them.
 First phase with writes, so ground rules 3 and 4 start doing real work.
 
-### P3.1 Run a task
+### P3.1 Start work — on a task, or just a new session
 
-Originally written as "launch a session from a project row". **The unit is the
-task**, once P4.1 exists — a run is how a task gets done, and it attaches to
-one. Launching a bare session in a project stays available as the escape hatch,
-but it is the special case rather than the default, because a run with no task
-behind it produces an audit trail (P3.6) and a report (P5.4) that describe
-something nobody asked for.
+Two things people actually do, and both are first-class:
+
+- **Run a task.** Once tasks exist, this is the common case: a run is how a task
+  gets done, and it attaches to one. That attachment is what makes the audit
+  trail and the run report describe something somebody asked for.
+- **Start a session, with no task behind it.** Exploring, debugging, answering a
+  question, or just wanting another agent working alongside the ones already
+  going. This is not an escape hatch and shouldn't be modelled as one — a lot of
+  real work starts before anyone knows what the task is.
+
+**A session started bare can become a task afterwards.** The app already reads
+enough to propose one — the project, the first prompt, what the session touched
+— so "this turned out to be real work, keep it" should be a single action rather
+than a retype. That path matters more than it looks: it is how ad-hoc work stops
+disappearing from the board, which is exactly the leak this app exists to close.
+
+The reverse also holds: a task can spawn *more* sessions than one. Fan-out into
+several delegates is the orchestration-wave case, so the task-to-session
+relationship is one-to-many in both the model and the UI.
 
 - **Templated invocations** per the orchestration playbook: `claude -p`,
   `codex exec --json`, `agy -p`, `agent -p`, `lm -p`. The default delegate comes
@@ -430,10 +443,20 @@ outlives sessions and can be assigned to a person or an agent.
 of what is happening; this is where the app starts managing the work rather than
 reporting on it. Judge the earlier phases by whether they make this easier.
 
-### P4.1 Task model and store
+### P4.1 Project and task model, and their store
+
+**A project becomes a real record, not an inference.** Today a project is
+whatever directory a session happened to be running in. That works while every
+project has a live session and a repo, and it breaks the moment either is
+untrue — a project someone filed from Linear before any work started has no
+session and possibly no checkout, and the app currently cannot represent it at
+all. So: a project gets an id, a name, an optional repo path, an optional
+`external_ref`, and tasks hanging off it. Detected sessions attach to a project
+when their working directory matches one; otherwise they create it, as they
+effectively do now.
 
 One markdown file per task at `~/.multitaskmanager/tasks/<id>.md`, YAML front
-matter plus a body.
+matter plus a body, with projects stored the same way alongside them.
 
 **`assignee: me` is not a placeholder.** Roughly half the work in a project a
 person runs with agents is that person's, and a task assigned to a human has to
@@ -554,54 +577,83 @@ popover to a useful answer.
   popover is a single ordered answer to "what now" — blocked-on-me items and
   ready items interleaved by urgency, not two competing lists.
 
-### P4.8 MCP server
+### P4.8 MCP server — the board as something agents can write to
 
-The surface the North Star runs on: agents read the board, take the next task,
-report progress, and close work out without a human relaying any of it.
+The surface the North Star runs on, and **the app's main input, not just an
+output**. The intended shape is an agent elsewhere — a Claude session with
+Notion, Linear and this app all connected — working out what work exists and
+writing it here. That agent does the integrating; this app holds the board.
 
+That reframing has consequences, and they are the substance of this item.
+
+- **Write tools are required, not a later graduation.** Ground rule 3 still
+  applies to the *destructive* surface, but a read-only MCP server is useless for
+  the job described above: the whole point is that something outside puts work
+  on the board. Read tools (`list_projects`, `list_tasks`, `get_task`,
+  `next_task`, `project_status`) and creation tools (`create_project`,
+  `create_task`, `update_task`) ship together.
+- **Projects become first-class.** Today a project is implied by a session's
+  working directory. If an agent can say "there is a new project", a project has
+  to be a real record with an id, a name, an optional repo path, and tasks
+  hanging off it — including projects with **no** repo and no session yet, which
+  is a shape the app currently cannot represent at all. This is the largest model
+  change in the phase and it belongs to P4.1 rather than here.
+- **Idempotency is the thing that makes agent-driven sync work.** Every task and
+  project accepts an `external_ref` (`linear:ENG-412`, `notion:<page-id>`), and
+  create-with-an-existing-ref updates instead of inserting. Without it, an agent
+  that runs its sync twice doubles the board, and the second run is the one that
+  destroys trust in it.
+- **Provenance on every write.** Which agent, which session, which tool call,
+  when. Two reasons: `mtm` needs to show where a task came from, and a bad sweep
+  needs to be reviewable and reversible as a batch (see P4.9).
+- **The gate line, drawn precisely.** "Confirmation gates are inherited" cannot
+  mean every write prompts — an agent filing twelve tasks would produce twelve
+  dialogs and the feature would be turned off within a day. The line that holds:
+  **organising work is free; spending is gated.** Creating, updating and
+  reprioritising tasks needs no approval. Anything that starts a run, touches a
+  repository, deletes work, or writes outward stops and asks exactly as it would
+  from a terminal.
+- **Claiming needs a lease** — the same expiring lease as P5.2 — so two agents
+  can't take the same task, and a crashed agent's task returns to `ready` rather
+  than stranding.
 - **A second `EngineClient` consumer, not a second engine.** It sits beside the
   CLI and the UI over the same protocol. If MCP needs a capability the CLI can't
-  express, that is a sign the engine is missing it, not that MCP needs a private
-  path.
-- **Read-only tools first**, per ground rule 3: `list_tasks`, `get_task`,
-  `next_task`, `project_status`. Writes — `claim_task`, `update_task`,
-  `complete_task` — ship only after the read-only set has been in daily use.
-- **Claiming needs a lease**, the same expiring lease as P5.2, so two agents
-  can't take the same task and a crashed agent's task returns to `ready` rather
-  than stranding.
-- **Confirmation gates are inherited, not bypassed** (ground rule and roadmap
-  principle both). An agent asking through MCP for something that would require
-  my approval from a terminal still stops and asks. This is the single most
-  important line in this item: an MCP server is exactly the shape of thing that
-  quietly becomes a way around a gate.
-- **Transport.** stdio for a locally-spawned server is the simplest thing that
-  works and needs no port. Every tool call is audited per P3.6 — an agent acting
-  on the board is a control-plane action.
-- **Identity.** A task claimed by an agent should record *which* agent and which
-  session, so P4.4's cross-vendor review can route to a different one.
+  express, the engine is missing it; MCP doesn't get a private path.
+- **Transport.** stdio for a locally-spawned server is simplest and needs no
+  port. Every tool call is audited per P3.6 — an agent acting on the board is a
+  control-plane action.
 
-### P4.9 Sync tasks from external trackers
+### P4.9 See and trust what agents put on the board
 
-A project's real task list often already lives in Linear or GitHub Issues. Import
-so the board reflects what the project actually needs, not only what could be
-inferred from disk.
+**This replaces "sync tasks from external trackers", and the replacement is
+smaller.** If an agent with Notion and Linear connected can read those and write
+tasks here through P4.8, this app does not need its own tracker integrations:
+no per-service client, no credentials in the keychain, no outbound network path,
+no per-project integration config. The integration burden moves to the agent,
+which is both more general — anything with an MCP server works, including
+services nobody has thought of — and consistent with the rule the whole project
+runs on: **the app orchestrates, the delegate thinks.**
 
-- **One-way in by default.** Two-way sync between an external tracker and a local
-  store is a well-known source of lost edits, and the same reasoning that made
-  P4.5 one-way applies with more force here because the other side has other
-  people on it.
-- **Identity and re-import** work like P4.5: a stable external id plus a content
-  hash, so re-importing updates rather than duplicates.
-- **Writing back is opt-in, per project, and shows the diff** before it happens.
-- **Credentials** go to the system keychain, never to a file in the task store,
-  and a project with no integration configured makes no network calls at all —
-  this is the only outbound path in the app and it stays visibly off by default.
-- **This is the one place the app holds state the harness doesn't.** Ground rule
-  4 says don't invent a parallel store where one exists; no harness file
-  describes work that hasn't started, so tasks are owned here. Worth restating
-  because an imported Linear issue is the furthest thing in this app from
-  "something the harness wrote", and the boundary should be a decision rather
-  than a drift.
+The tradeoff, stated plainly: an agent-driven sync runs when an agent runs,
+where a built-in one runs continuously. Given Phase 5 schedules agents anyway, a
+scheduled sync agent covers it, and the generality is worth the latency.
+
+What genuinely remains is the human side of letting something else write to your
+board:
+
+- **An inbox for agent-created work.** Tasks arriving from outside land visibly
+  — what came in, from which agent, when, and against which project — rather
+  than silently appearing among things I wrote myself.
+- **Batch review and undo.** A sync that misfires creates dozens of rows at once,
+  so the unit of undo is the sweep, not the row.
+- **Provenance shown, always.** A task's origin is part of the task. "Filed by
+  the Linear sweep at 08:00" is context I need in order to trust or distrust it.
+- **A quality floor.** A task with no outcome in its body is noise. The app
+  should say so plainly rather than accumulate rows nobody can act on.
+
+**This is still the one place the app holds state the harness doesn't** — no
+harness file describes work that hasn't started — and that boundary stays a
+decision rather than a drift.
 
 ---
 
@@ -743,11 +795,15 @@ harnesses) and 97 real Claude Code transcripts.
    weighting is guesswork until it has been used for a fortnight. Expect the
    first version to be wrong in a way that is obvious in use and invisible in
    design.
-7. **Does the MCP server need write tools, or is read plus `mtm act` enough?**
-   Ground rule 3 says read-only ships first regardless. The real question is
-   whether an agent claiming and closing its own tasks turns out to be the thing
-   that makes the North Star work, or the thing that makes the board untrustworthy
-   because nothing a human recognises is happening to it.
+7. ~~**Does the MCP server need write tools?**~~ **Yes — settled, and it
+   reshaped the phase.** The intended use is an agent elsewhere, with Notion and
+   Linear also connected, deciding what work exists and writing it here. Writing
+   *is* the primary use, which makes the board an input surface rather than only
+   an output. Two consequences: projects have to become first-class records
+   (P4.1), and built-in tracker integrations become unnecessary (P4.9). The
+   remaining question is not whether but **how much can be written without
+   asking** — the current line is that organising work is free and spending is
+   gated, and it is unproven.
 8. **Where does an imported Linear issue live** relative to the harness's own
    files? Tasks are owned here by decision (P4.9), but a project synced from an
    external tracker is the furthest thing in this app from "something the harness
