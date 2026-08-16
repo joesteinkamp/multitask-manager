@@ -8,6 +8,8 @@ struct SettingsView: View {
                 .tabItem { Label("Detection", systemImage: "antenna.radiowaves.left.and.right") }
             ThresholdSettings()
                 .tabItem { Label("Status", systemImage: "timer") }
+            NotificationSettings()
+                .tabItem { Label("Notifications", systemImage: "bell") }
             DevFolderSettings()
                 .tabItem { Label("Dev Folders", systemImage: "folder") }
             AppSettings()
@@ -15,12 +17,115 @@ struct SettingsView: View {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 460, height: 360)
+        .frame(width: 480, height: 400)
+    }
+}
+
+/// Notification policy, the authorization state, and the mute list.
+///
+/// The authorization row is deliberately loud when notifications are blocked: a
+/// feature that silently does nothing is worse than one that isn't there.
+private struct NotificationSettings: View {
+    @ObservedObject private var prefs = Preferences.shared
+    @ObservedObject private var notifications = NotificationManager.shared
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Notify when a session needs you", isOn: $prefs.enableNotifications)
+                authorizationRow
+            }
+
+            Section("Frequency") {
+                Stepper(value: $prefs.notificationCooldown, in: 60.0...3600.0, step: 60) {
+                    HStack {
+                        Text("Don't repeat a session for")
+                        Spacer()
+                        Text("\(Int(prefs.notificationCooldown / 60))m")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Text("A crossing has to hold across two refreshes before it notifies, and three or more within 30 seconds arrive as a single summary.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Quiet hours") {
+                Toggle("Silence notifications overnight", isOn: $prefs.quietHoursEnabled)
+                if prefs.quietHoursEnabled {
+                    timeRow("From", value: $prefs.quietHoursStart)
+                    timeRow("Until", value: $prefs.quietHoursEnd)
+                    Text("Crossings during quiet hours are dropped, not queued — the badge carries them instead.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if !store.mutedProjectKeys.isEmpty {
+                Section("Muted projects") {
+                    ForEach(store.mutedProjectKeys, id: \.self) { key in
+                        HStack {
+                            Image(systemName: "bell.slash")
+                            Text((key as NSString).lastPathComponent)
+                            Spacer()
+                            Button("Unmute") { store.unmute(key: key) }
+                                .buttonStyle(.link)
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+        .onAppear { notifications.refreshAuthorization() }
+    }
+
+    @ViewBuilder
+    private var authorizationRow: some View {
+        HStack {
+            Label(
+                notifications.authorization.label,
+                systemImage: notifications.authorization == .denied
+                    ? "exclamationmark.triangle.fill"
+                    : "checkmark.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(notifications.authorization == .denied ? Color.orange : Color.secondary)
+
+            Spacer()
+
+            switch notifications.authorization {
+            case .denied:
+                Button("Open System Settings") { notifications.openSystemSettings() }
+                    .buttonStyle(.link)
+            case .notDetermined:
+                Button("Allow…") { notifications.requestAuthorization() }
+                    .buttonStyle(.link)
+            case .authorized, .provisional:
+                EmptyView()
+            }
+        }
+    }
+
+    private func timeRow(_ label: String, value: Binding<Double>) -> some View {
+        // Minutes from midnight, in half-hour steps, up to 23:30.
+        let range: ClosedRange<Double> = 0...1410
+        return Stepper(value: value, in: range, step: 30) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(QuietHours.format(Int(value.wrappedValue)))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
     }
 }
 
 private struct DetectorSettings: View {
     @ObservedObject private var prefs = Preferences.shared
+    @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         Form {
@@ -40,9 +145,57 @@ private struct DetectorSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("Harness audit log") {
+                Toggle("Use the tool-call log as an activity signal", isOn: $prefs.enableAuditLog)
+                TextField("Path (blank = $AI_TOOL_LOG, then ~/.ai-logs/tool-calls.jsonl)",
+                          text: $prefs.auditLogPath)
+                    .textFieldStyle(.roundedBorder)
+                    .disabled(!prefs.enableAuditLog)
+                if prefs.enableAuditLog {
+                    auditHealth
+                }
+                Text("Tool-call records give a truer pulse than file timestamps, and a SessionEnd record makes “finished” a fact rather than a guess. Set the path explicitly if $AI_TOOL_LOG is non-standard — a menu bar app doesn't inherit your shell environment.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()
+    }
+
+    /// Health, not statistics. `malformedLines` is the interesting number: it is
+    /// expected to be non-zero on a busy machine, because stock macOS has no
+    /// `flock` and parallel agents interleave their appends.
+    @ViewBuilder
+    private var auditHealth: some View {
+        if let health = store.auditHealth {
+            VStack(alignment: .leading, spacing: 2) {
+                if health.exists {
+                    Label(
+                        "\(health.sessionsTracked) sessions · \(health.recordsIndexed) records read",
+                        systemImage: "checkmark.circle"
+                    )
+                    .foregroundStyle(.secondary)
+                    if health.malformedLines > 0 {
+                        Label(
+                            "\(health.malformedLines) unparseable lines skipped (interleaved appends)",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.secondary)
+                    }
+                    if health.rotations > 0 {
+                        Text("Log rotated \(health.rotations) time(s) since launch")
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Label("No log at \(health.path) — running on timestamps alone.",
+                          systemImage: "questionmark.circle")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .font(.caption)
+        }
     }
 }
 
