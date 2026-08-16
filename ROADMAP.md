@@ -62,12 +62,12 @@ isolated worktrees, converging back — while I see the whole board at a glance.
 Everything here is **read-only** and reads artifacts the harness already
 produces. Highest value per unit of risk; no new infrastructure.
 
-- [ ] **Notify me when a session goes quiet and needs me.**
+- [x] **Notify me when a session goes quiet and needs me.**
       `UNUserNotificationCenter` on the transition into needs-attention, with
       per-project mute and a quiet-hours window. The badge only works when I'm
       already looking at it — the whole point of the app is telling me when I'm
       the bottleneck.
-- [ ] **Use the harness audit log as the activity signal, not file mtimes.**
+- [x] **Use the harness audit log as the activity signal, not file mtimes.**
       Read `~/.ai-logs/tool-calls.jsonl` (written by `log-tool.sh` on every tool
       event) for real per-session tool activity, harness/session id, and
       `SessionEnd` / `PreCompact` records — so "finished" stops being a guess.
@@ -86,12 +86,15 @@ produces. Highest value per unit of risk; no new infrastructure.
       show which delegates are installed and reachable (`lm list` for local
       endpoints), and note when the routing table is stale (> ~2 months) the way
       the orchestration playbook asks.
-- [ ] **Extend the hook status contract beyond working/needsAttention.**
+- [x] **Extend the hook status contract beyond working/needsAttention.**
       Add a short reason, the awaiting-input kind (approval gate vs. question
       vs. done), and a session id to `~/.multitaskmanager/status/*.json` so
       status attaches to a session rather than a whole project path. Ship the
       matching snippets upstream so `install-hooks.sh` wires them instead of me
       pasting JSON by hand.
+      *App side done — the reader accepts v2 and v1 alike. The upstream
+      `install-hooks.sh` snippets are still outstanding, and deliberately land
+      second so the two can never disagree.*
 
 ---
 

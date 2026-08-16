@@ -29,6 +29,18 @@ struct SessionRowView: View {
                                 Text(session.title)
                                     .font(.callout)
                                     .lineLimit(1)
+                                if let waiting = session.waiting {
+                                    Image(systemName: waiting.symbolName)
+                                        .font(.caption2)
+                                        .foregroundStyle(session.status.color)
+                                        .help(waiting.label)
+                                }
+                                if store.isMuted(session) {
+                                    Image(systemName: "bell.slash.fill")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                        .help("Notifications muted for this project")
+                                }
                             }
                             Text(subtitle)
                                 .font(.caption2)
@@ -97,8 +109,23 @@ struct SessionRowView: View {
         Date().timeIntervalSince(session.lastActivity) < Preferences.shared.activeThreshold
     }
 
+    /// Leads with whatever knows most about *why* the session is in this state:
+    /// a hook's reason, then the waiting kind, then a finished-run fact from the
+    /// audit log, then the tool it last ran — falling back to the plain status
+    /// label the app has always shown.
     private var subtitle: String {
-        "\(session.status.label) · \(session.source.label) · \(RelativeTime.string(from: session.lastActivity, status: session.status))"
+        let relative = RelativeTime.string(from: session.lastActivity, status: session.status)
+        return "\(leadingDetail) · \(session.source.label) · \(relative)"
+    }
+
+    private var leadingDetail: String {
+        if let reason = session.statusReason { return reason }
+        if let waiting = session.waiting { return waiting.label }
+        if session.audit?.hasEnded == true { return "Finished" }
+        if session.status == .working, let tool = session.audit?.lastToolName {
+            return "Running \(tool)"
+        }
+        return session.status.label
     }
 
     // MARK: Actions
@@ -107,6 +134,9 @@ struct SessionRowView: View {
         Menu {
             Button("Open / Reveal") { store.activate(session) }
             Button(session.isPinned ? "Unpin" : "Pin") { store.togglePin(session) }
+            Button(store.isMuted(session) ? "Unmute Notifications" : "Mute Notifications") {
+                store.toggleMute(session)
+            }
             Button("Rename…") {
                 renameText = session.title
                 isRenaming = true
@@ -212,7 +242,8 @@ enum RelativeTime {
         }
     }
 
-    private static func compact(_ seconds: TimeInterval) -> String {
+    /// Bare elapsed time — "3m", "2h". Also used for notification bodies.
+    static func compact(_ seconds: TimeInterval) -> String {
         if seconds < 60 { return "\(Int(seconds))s" }
         if seconds < 3600 { return "\(Int(seconds / 60))m" }
         if seconds < 86_400 { return "\(Int(seconds / 3600))h" }

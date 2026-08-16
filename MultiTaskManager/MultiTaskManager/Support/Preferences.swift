@@ -57,6 +57,44 @@ final class Preferences: ObservableObject {
         didSet { defaults.set(enableProjectContext, forKey: Keys.enableProjectContext) }
     }
 
+    // MARK: Audit log (P1.2)
+
+    /// Whether to read the harness audit log as an activity signal.
+    @Published var enableAuditLog: Bool {
+        didSet { defaults.set(enableAuditLog, forKey: Keys.enableAuditLog) }
+    }
+
+    /// Explicit path to the audit log, overriding `$AI_TOOL_LOG` and the default.
+    /// Empty means "resolve it". Needed because a GUI app launched from Finder
+    /// doesn't inherit the shell environment that sets `AI_TOOL_LOG`.
+    @Published var auditLogPath: String {
+        didSet { defaults.set(auditLogPath, forKey: Keys.auditLogPath) }
+    }
+
+    // MARK: Notifications (P1.1)
+
+    @Published var enableNotifications: Bool {
+        didSet { defaults.set(enableNotifications, forKey: Keys.enableNotifications) }
+    }
+
+    /// How long before the same session may notify again.
+    @Published var notificationCooldown: Double {
+        didSet { defaults.set(notificationCooldown, forKey: Keys.notificationCooldown) }
+    }
+
+    @Published var quietHoursEnabled: Bool {
+        didSet { defaults.set(quietHoursEnabled, forKey: Keys.quietHoursEnabled) }
+    }
+
+    /// Quiet-hours bounds as minutes from local midnight. Windows that wrap past
+    /// midnight are normal.
+    @Published var quietHoursStart: Double {
+        didSet { defaults.set(quietHoursStart, forKey: Keys.quietHoursStart) }
+    }
+    @Published var quietHoursEnd: Double {
+        didSet { defaults.set(quietHoursEnd, forKey: Keys.quietHoursEnd) }
+    }
+
     private init() {
         defaults.register(defaults: [
             Keys.activeThreshold: 20.0,
@@ -69,7 +107,14 @@ final class Preferences: ObservableObject {
             Keys.enableDevFolders: true,
             Keys.enableHooks: true,
             Keys.hideIdle: false,
-            Keys.enableProjectContext: true
+            Keys.enableProjectContext: true,
+            Keys.enableAuditLog: true,
+            Keys.auditLogPath: "",
+            Keys.enableNotifications: true,
+            Keys.notificationCooldown: 10.0 * 60.0,
+            Keys.quietHoursEnabled: false,
+            Keys.quietHoursStart: 22.0 * 60.0,
+            Keys.quietHoursEnd: 7.0 * 60.0
         ])
 
         activeThreshold = defaults.double(forKey: Keys.activeThreshold)
@@ -84,6 +129,15 @@ final class Preferences: ObservableObject {
         enableHooks = defaults.bool(forKey: Keys.enableHooks)
         hideIdle = defaults.bool(forKey: Keys.hideIdle)
         enableProjectContext = defaults.bool(forKey: Keys.enableProjectContext)
+
+        enableAuditLog = defaults.bool(forKey: Keys.enableAuditLog)
+        auditLogPath = defaults.string(forKey: Keys.auditLogPath) ?? ""
+
+        enableNotifications = defaults.bool(forKey: Keys.enableNotifications)
+        notificationCooldown = defaults.double(forKey: Keys.notificationCooldown)
+        quietHoursEnabled = defaults.bool(forKey: Keys.quietHoursEnabled)
+        quietHoursStart = defaults.double(forKey: Keys.quietHoursStart)
+        quietHoursEnd = defaults.double(forKey: Keys.quietHoursEnd)
 
         devFolders = defaults.stringArray(forKey: Keys.devFolders) ?? []
         bundleAllowlist = defaults.stringArray(forKey: Keys.bundleAllowlist) ?? Self.defaultBundleAllowlist
@@ -116,5 +170,22 @@ final class Preferences: ObservableObject {
         static let appNameKeywords = "appNameKeywords"
         static let hideIdle = "hideIdle"
         static let enableProjectContext = "enableProjectContext"
+        static let enableAuditLog = "enableAuditLog"
+        static let auditLogPath = "auditLogPath"
+        static let enableNotifications = "enableNotifications"
+        static let notificationCooldown = "notificationCooldown"
+        static let quietHoursEnabled = "quietHoursEnabled"
+        static let quietHoursStart = "quietHoursStart"
+        static let quietHoursEnd = "quietHoursEnd"
+    }
+
+    /// Whether quiet hours are in effect right now.
+    var isWithinQuietHours: Bool {
+        guard quietHoursEnabled else { return false }
+        return QuietHours.isActive(
+            at: Date(),
+            startMinutes: Int(quietHoursStart),
+            endMinutes: Int(quietHoursEnd)
+        )
     }
 }

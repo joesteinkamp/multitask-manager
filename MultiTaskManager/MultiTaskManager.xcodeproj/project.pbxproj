@@ -25,6 +25,10 @@
 		BF0000000000000000000010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000010 /* SettingsView.swift */; };
 		BF0000000000000000000011 /* ProjectContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000011 /* ProjectContext.swift */; };
 		BF0000000000000000000012 /* ProjectContextReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000012 /* ProjectContextReader.swift */; };
+		BF0000000000000000000013 /* AuditActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000013 /* AuditActivity.swift */; };
+		BF0000000000000000000014 /* AuditLogReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000014 /* AuditLogReader.swift */; };
+		BF0000000000000000000015 /* AttentionNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000015 /* AttentionNotifier.swift */; };
+		BF0000000000000000000016 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000016 /* NotificationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +53,10 @@
 		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FE0000000000000000000011 /* ProjectContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContext.swift; sourceTree = "<group>"; };
 		FE0000000000000000000012 /* ProjectContextReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContextReader.swift; sourceTree = "<group>"; };
+		FE0000000000000000000013 /* AuditActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditActivity.swift; sourceTree = "<group>"; };
+		FE0000000000000000000014 /* AuditLogReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuditLogReader.swift; sourceTree = "<group>"; };
+		FE0000000000000000000015 /* AttentionNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttentionNotifier.swift; sourceTree = "<group>"; };
+		FE0000000000000000000016 /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -99,6 +107,7 @@
 				FE0000000000000000000002 /* SessionStatus.swift */,
 				FE0000000000000000000003 /* Session.swift */,
 				FE0000000000000000000011 /* ProjectContext.swift */,
+				FE0000000000000000000013 /* AuditActivity.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -113,6 +122,7 @@
 				FE0000000000000000000008 /* DevFolderDetector.swift */,
 				FE0000000000000000000009 /* HookStatusReader.swift */,
 				FE0000000000000000000012 /* ProjectContextReader.swift */,
+				FE0000000000000000000014 /* AuditLogReader.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -122,6 +132,7 @@
 			children = (
 				FE000000000000000000000A /* UserOverrides.swift */,
 				FE000000000000000000000B /* SessionStore.swift */,
+				FE0000000000000000000015 /* AttentionNotifier.swift */,
 			);
 			path = Store;
 			sourceTree = "<group>";
@@ -131,6 +142,7 @@
 			children = (
 				FE000000000000000000000C /* Preferences.swift */,
 				FE000000000000000000000D /* LaunchAtLogin.swift */,
+				FE0000000000000000000016 /* NotificationManager.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -231,6 +243,10 @@
 				BF0000000000000000000010 /* SettingsView.swift in Sources */,
 				BF0000000000000000000011 /* ProjectContext.swift in Sources */,
 				BF0000000000000000000012 /* ProjectContextReader.swift in Sources */,
+				BF0000000000000000000013 /* AuditActivity.swift in Sources */,
+				BF0000000000000000000014 /* AuditLogReader.swift in Sources */,
+				BF0000000000000000000015 /* AttentionNotifier.swift in Sources */,
+				BF0000000000000000000016 /* NotificationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
