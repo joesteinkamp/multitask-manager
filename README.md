@@ -1,13 +1,19 @@
 # MultiTask Manager
 
-A lightweight macOS **menu bar** app for keeping track of all the AI coding/agent
-sessions you're juggling across projects — Claude Code, Codex, the Claude/Codex
-desktop apps, and any folder you're actively working in. It auto-detects ongoing
-sessions, figures out which project each belongs to, and — most importantly —
-flags the ones that have **gone quiet and are waiting on you**.
+An **agentOS**: the control plane for the work you hand to AI agents. It turns a
+pile of parallel sessions into one board you can see and drive — starting with the
+thing you always need first, which agent has gone quiet and is waiting on you.
 
-> **Status:** v1. Built to be compiled and run on your own Mac (macOS 13+). The app
-> is non-sandboxed and intended for personal/local use, not the Mac App Store.
+Today that ships as a lightweight macOS **menu bar** app. It auto-detects ongoing
+sessions across Claude Code, Codex, the Claude/Codex desktop apps, and any folder
+you're actively working in; figures out which project each belongs to; and flags
+the ones that are **waiting on you**. Where it goes next — a task board, a CLI,
+and agents you can launch and schedule rather than just watch — is in
+[ROADMAP.md](ROADMAP.md).
+
+> **Status:** v1 shipped, and built to be compiled and run on your own Mac
+> (macOS 13+). The app is non-sandboxed and intended for personal/local use, not
+> the Mac App Store.
 
 ## What it does
 
@@ -33,6 +39,41 @@ flags the ones that have **gone quiet and are waiting on you**.
   and private. See *Project briefings* below.
 - **Manual control.** Add your own items, remove auto-detected ones (they stay
   removed), rename, and pin. All of this persists across relaunches.
+
+## Where this is going
+
+v1 *watches* agent sessions. The direction is to **drive** them — one native Mac
+app with two surfaces, plus a CLI, built on top of a portable AI harness
+([`agent-global-instructions`](https://github.com/joesteinkamp/agent-global-instructions))
+that already owns how agents behave: instructions, guardrail hooks, the
+cross-tool orchestration contract, model routing, memory, long-autonomy loops.
+What it has no place for is seeing and steering all of it at once.
+
+| Surface | For |
+| --- | --- |
+| **Menu bar popover** (shipped) | Ambient awareness — what's running, what's stuck, what's next |
+| **Main window** | The long-run view: every project, the task board, run history |
+| **CLI** (`mtm`) | Scripting and hooks; agents reading and writing state themselves |
+
+Deliberately **no web app** — everything stays in the Mac app. See
+[Non-goals](ROADMAP.md#non-goals) for why that was considered and cut.
+
+The arc is **watch → understand → control → delegate → schedule**, ending at:
+describe an outcome, have it broken into tasks, route each to yourself or an
+agent, and let the agent ones run autonomously — scheduled, isolated in their own
+worktrees, converging back — while you watch the whole board.
+
+Near-term work reads what the harness already writes to disk: the
+`~/.ai-logs/tool-calls.jsonl` audit log as a real activity signal, `~/.ai-context/`
+dirs as single orchestration waves instead of N unrelated rows, `ai/*` worktrees
+and their converge conflicts, and the `~/.ai/` delegate roster.
+
+Phases and rationale: **[ROADMAP.md](ROADMAP.md)**. Design decisions and build
+order: **[docs/PLAN.md](docs/PLAN.md)**.
+
+Everything stays local and inference-free; the harness stays the source of truth
+(new agent-side conventions ship upstream there, not here); and confirmation
+gates are inherited rather than reimplemented.
 
 ## How status works
 
@@ -112,6 +153,11 @@ README (or a dedicated `GOAL.md`) and track work as markdown checkboxes in
 - [ ] Add per-project briefings   ← shown as "Next"
 - [ ] Notarize and distribute
 ```
+
+Because the parser is line-based and truncates each item at 160 characters, write
+each task so its **first line stands on its own** and put the detail on
+continuation lines. This repo's own [ROADMAP.md](ROADMAP.md) is written that way —
+the app reads it like any other project.
 
 ## Build & run
 
