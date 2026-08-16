@@ -558,16 +558,52 @@ be granted.
 
 ## Open questions
 
-1. **Does the audit log's `session` match detector session ids?** Settles
-   whether P1.2 joins precisely or falls back to `cwd`. Spike first.
-2. **Does the Codex detector's session id survive its format changes?** Affects
-   the same join and P6.3's fixture strategy.
+**1 and 2 are now settled** — the spike ran on 2026-08-16 against a real
+35 MB `~/.ai-logs/tool-calls.jsonl` (24,585 records, 161 sessions, four
+harnesses) and 97 real Claude Code transcripts.
+
+1. ~~**Does the audit log's `session` match detector session ids?**~~
+   **Yes — join precisely.** 95 of 97 Claude Code transcript ids (97.9%)
+   appear verbatim as `session` values. The two misses are transcripts that
+   predate the logging hook, not mismatches. `cwd` remains implemented as the
+   fallback, but it is a fallback rather than the common path.
+2. ~~**Does the Codex detector's session id survive its format changes?**~~
+   **Yes, and better than expected.** The rollout filename
+   (`rollout-<timestamp>-<uuid>.jsonl`) ends with exactly the uuid the log
+   records: 3 of 3 local Codex sessions join. Both detectors now carry
+   `harnessSessionId`, so the precise join covers both harnesses. Note the
+   uuid must be matched on its 8-4-4-4-12 shape from the end, because the
+   timestamp ahead of it also contains dashes.
 3. **How much does the git shelling in P1.4 actually cost** across ~20 repos?
-   If it's worse than expected, the 30s cadence becomes on-demand-only.
+   Still open. Implemented on a 30s cadence with a `.git`-mtime skip, which
+   should make the common case free; unmeasured at real repo counts.
 4. **Is `forkpty` (P3.4) worth it,** or is "open in Terminal" enough in
    practice? Answerable only after using P3.1 for a week.
 5. **Does the daemon earn its complexity** before Phase 5, or should P2.2 ship
    as in-process-only with the daemon deferred until scheduling needs it?
+   Leaning deferred: `mtm` shipped against an in-process engine and needed
+   nothing the daemon would have provided.
+
+### What the real log taught us that this plan didn't say
+
+Three things the appendix-A record shape didn't capture, all now handled:
+
+- **Event names arrive in more than one casing, under the same harness.**
+  `preToolUse`/`postToolUse` appear alongside `PreToolUse`/`PostToolUse` in
+  529 records written by `claude`. Matching is case-insensitive over a known
+  set.
+- **Cursor uses a different vocabulary entirely** — `beforeShellExecution`,
+  `afterFileEdit`. Rather than enumerate every harness's names, any
+  unrecognised event still counts as activity: an unknown event still proves
+  the agent was alive at that timestamp, which is the signal that matters.
+- **`cwd` is absent from several hundred records** (557 `claude`, 31
+  `cursor`), so the fallback index genuinely can miss. Appendix A says "most
+  records", which is right; the reader must not assume otherwise.
+
+Also worth recording: **zero of 24,585 lines were unparseable** on Linux,
+where `flock` exists. The interleaving tolerance is still correct — it is a
+macOS concern — but the malformed-line counter is the thing that will tell us
+whether it ever actually bites, which is why it surfaces in Settings.
 
 ---
 

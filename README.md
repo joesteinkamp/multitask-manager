@@ -77,9 +77,8 @@ gates are inherited rather than reimplemented.
 
 ## How status works
 
-Each session has a *last activity* timestamp (the modification time of its
-transcript/log, or the newest edited file in a dev folder). Status is derived from
-how long ago that was:
+Each session has a *last activity* timestamp. Status is derived from how long ago
+that was:
 
 | Status | Meaning | Default timing |
 | --- | --- | --- |
@@ -88,6 +87,24 @@ how long ago that was:
 | ⚪️ Idle | long quiet / finished | ≥ 30m |
 
 All thresholds and the refresh cadence are adjustable in **Settings → Status**.
+
+Where that timestamp comes from is decided by precedence, strongest first. Each
+step is optional; with none of them available the app behaves exactly as it did
+when the transcript's modification time was the only signal.
+
+1. **A hook status file** — the harness told us outright.
+2. **A `SessionEnd` record in the harness audit log** — the run is definitively
+   over. This is the one signal that makes "finished" a fact rather than an
+   inference.
+3. **The age of the session's last audit-log event** — the agent's own tool
+   calls, which keep ticking through a long operation that never writes to the
+   transcript.
+4. **The transcript's modification time** — the original heuristic, still the
+   floor.
+
+Steps 2 and 3 read `~/.ai-logs/tool-calls.jsonl` (override with `$AI_TOOL_LOG`)
+and join to a session by the harness's own session id. Run `mtm doctor` to see
+how many of your sessions join precisely.
 
 ### Optional: precise signals via hooks
 
@@ -120,6 +137,31 @@ a project as waiting when the agent finishes:
 
 The app reads these when the **Hook status files** detector is enabled. It works
 fully without any hooks configured.
+
+#### Contract v2
+
+A record can say more, which is what makes triage possible — an approval gate
+genuinely outranks a finished run, and only the hook knows which it is:
+
+```json
+{ "schemaVersion": 2,
+  "projectPath": "/Users/you/dev/app", "project": "app",
+  "sessionId": "f9f9b53d-1831-4798-966e-45eddd79dd68",
+  "status": "needsAttention",
+  "waiting": "approval",
+  "reason": "Bash(rm -rf build/)",
+  "updatedAt": 1719240000 }
+```
+
+- `waiting` is one of `approval`, `question`, `done`, `error`, and orders the
+  attention queue.
+- `reason` is short free text, shown on the row and used as the notification body.
+- `sessionId` is the harness's own session id (for Claude Code, the transcript
+  filename's uuid). Without it a hook can only address a *project*, so a project
+  running two sessions gets its status attached to whichever was found first.
+
+A record with no `schemaVersion` parses exactly as it always did, so there's no
+rush to upgrade a working hook.
 
 ## Project briefings
 
@@ -177,17 +219,58 @@ allow it.
 ## Project layout
 
 ```
-MultiTaskManager/
+Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/AppKit
+├── Sources/MultiTaskCore/
+│   ├── Models/                   # Session, SessionStatus, ProjectContext, UserOverrides
+│   ├── Detection/                # SessionDetector + the file-based detectors
+│   ├── Enrichment/               # AuditLogReader, WaveReader, WorktreeReader
+│   ├── Roster/                   # ~/.ai delegate + routing-table parsers
+│   └── Engine/                   # DetectionEngine, Configuration, triage, notification policy
+├── Sources/mtm/                  # the CLI
+└── Tests/                        # 113 tests, incl. opt-in checks against real harness data
+
+MultiTaskManager/                 # the macOS app
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
-├── Models/                       # Session, SessionStatus, SessionSource, ProjectContext
-├── Detection/                    # SessionDetector protocol + 5 detectors + ProjectContextReader
-├── Store/                        # SessionStore (merge + heuristic), UserOverrides
+├── Models/ Detection/ Store/     # ← still the app's own copies; see below
 ├── Support/                      # Preferences, LaunchAtLogin
-└── Views/                        # MenuContentView, SessionRowView (+ ProjectBriefView), SettingsView
+└── Views/                        # MenuContentView, SessionRowView, SettingsView
 ```
 
-Detectors conform to `SessionDetector` and are easy to add — implement `detect()`
-and register it in `SessionStore.makeDetectors()`.
+The engine lives in `MultiTaskCore` so the popover, a window, `mtm` and a future
+daemon can be faces of one implementation rather than four. Because the core
+imports Foundation only, it builds and tests on Linux — which is what makes the
+detection logic verifiable in CI on every push instead of only on a Mac.
+
+**The app has not yet been migrated onto the package.** `MultiTaskManager/`
+still contains its original copies of the models and detectors, and building the
+app uses those. Moving it over means editing `project.pbxproj` to add the
+package dependency and drop the duplicated files — a step that can only be
+verified by compiling on a Mac, and one the implementation plan is explicit
+should land in a single tested change rather than half-done.
+
+Detectors conform to `SessionDetector` — implement `detect()` and register it in
+`DetectionEngine.makeDetectors()`, or inject it when the detector needs AppKit
+(as `RunningAppsDetector` does).
+
+## The `mtm` CLI
+
+The same engine, without the menu bar. Useful on its own, and the cheapest way to
+check what the app can actually see on a given machine.
+
+```
+swift build --package-path Packages/MultiTaskCore -c release
+```
+
+| Command | What it shows |
+| --- | --- |
+| `mtm status` | what's waiting on you, in triage order |
+| `mtm ls [--json]` | every tracked session; `--json` is a versioned API |
+| `mtm waves [--all]` | orchestration waves under `~/.ai-context` |
+| `mtm roster` | delegates available, and how the routing table ranks them |
+| `mtm doctor` | which signals are readable, and how many sessions join precisely |
+
+`mtm ls --json` is meant to be consumed by hooks, scripts and agents, so it
+carries a `payloadVersion` and its shape doesn't change casually.
 
 ## Notes & limitations
 

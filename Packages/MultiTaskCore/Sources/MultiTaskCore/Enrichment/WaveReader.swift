@@ -192,9 +192,11 @@ public struct WaveReader: Sendable {
     /// projects we already know about, then by any known project path mentioned in
     /// `TASK.md`, and otherwise left unattributed rather than guessed.
     static func resolveProject(waveId: String, taskText: String?, knownProjects: [String]) -> String? {
+        let candidates = knownProjects.filter(isAttributable)
+
         var best: String?
         var bestLength = 0
-        for project in knownProjects {
+        for project in candidates {
             let name = FileSupport.lastComponent(of: project)
             guard !name.isEmpty else { continue }
             guard waveId == name || waveId.hasPrefix(name + "-") else { continue }
@@ -205,12 +207,42 @@ public struct WaveReader: Sendable {
         }
         if let best { return best }
 
-        // Fall back to a repo path named inside the brief.
-        if let taskText {
-            for project in knownProjects where taskText.contains(project) {
-                return project
+        // Fall back to a repo path named inside the brief. This matches on whole
+        // path tokens rather than on substrings: a plain `contains` check attributes
+        // the wave to *any* ancestor directory that happens to be tracked, so a
+        // brief mentioning `/home/me/projects/memory-os` would be claimed by
+        // `/home/me` the moment a session had run there.
+        guard let taskText else { return nil }
+        var bestMention: String?
+        var bestMentionLength = 0
+        for token in pathTokens(in: taskText) {
+            for project in candidates where token == project || token.hasPrefix(project + "/") {
+                if project.count > bestMentionLength {
+                    bestMention = project
+                    bestMentionLength = project.count
+                }
             }
         }
-        return nil
+        return bestMention
+    }
+
+    /// Whether a path is specific enough to attribute a wave to.
+    ///
+    /// The home directory is tracked as a "project" as soon as a session runs
+    /// there, but it isn't one, and neither is anything above it.
+    static func isAttributable(_ path: String) -> Bool {
+        let home = NSHomeDirectory()
+        return path != home && path.hasPrefix(home + "/")
+    }
+
+    /// Absolute-path-looking tokens in a block of prose, with surrounding markdown
+    /// and sentence punctuation trimmed off.
+    static func pathTokens(in text: String) -> [String] {
+        text.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
+            .map { token in
+                String(token).trimmingCharacters(in: CharacterSet(charactersIn: "`'\"(),;:*_[]<>"))
+            }
+            .filter { $0.hasPrefix("/") }
+            .map { $0.hasSuffix("/") && $0.count > 1 ? String($0.dropLast()) : $0 }
     }
 }

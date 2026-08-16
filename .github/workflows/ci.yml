@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The core imports Foundation only, so it builds and tests on Linux. This job is
+  # the fast one — it runs on every push in well under a minute and catches almost
+  # everything, because almost all of the logic lives in the core.
+  core:
+    name: MultiTaskCore (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Test
+        working-directory: Packages/MultiTaskCore
+        run: swift test
+
+  # The app can only be built on macOS. It is the slower, scarcer runner, so it
+  # runs second and only builds — the behaviour it would test already ran above.
+  app:
+    name: MultiTaskManager (macOS)
+    runs-on: macos-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the core on macOS too
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Build the app
+        working-directory: MultiTaskManager
+        run: |
+          xcodebuild \
+            -project MultiTaskManager.xcodeproj \
+            -scheme MultiTaskManager \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          # No-op until the repo ships shell; wired up now so the first script
+          # added is linted rather than remembered about later.
+          scripts=$(git ls-files '*.sh')
+          if [ -z "$scripts" ]; then
+            echo "no shell scripts to check"
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          # shellcheck disable=SC2086
+          shellcheck $scripts

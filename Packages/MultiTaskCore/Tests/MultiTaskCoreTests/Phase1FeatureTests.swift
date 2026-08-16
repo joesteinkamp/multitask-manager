@@ -168,6 +168,11 @@ struct WaveReaderTests {
         #expect(wave.doneCount == 1)
     }
 
+    /// Attribution only considers paths under the real home directory, so these
+    /// build their fixtures from it rather than hard-coding someone else's.
+    private static let home = NSHomeDirectory()
+    private static func project(_ name: String) -> String { "\(home)/projects/\(name)" }
+
     @Test("Attributes a wave to the longest matching project name")
     func longestPrefixWins() {
         // "memory-os-verify" is ambiguous: it could be repo `memory` + slug
@@ -175,19 +180,42 @@ struct WaveReaderTests {
         let resolved = WaveReader.resolveProject(
             waveId: "memory-os-verify",
             taskText: nil,
-            knownProjects: ["/home/user/projects/memory", "/home/user/projects/memory-os"]
+            knownProjects: [Self.project("memory"), Self.project("memory-os")]
         )
-        #expect(resolved == "/home/user/projects/memory-os")
+        #expect(resolved == Self.project("memory-os"))
     }
 
     @Test("Falls back to a repo path named inside the brief")
     func fallsBackToTaskText() {
         let resolved = WaveReader.resolveProject(
             waveId: "unrecognisable-slug",
-            taskText: "Work in /home/user/projects/app and don't touch build/.",
-            knownProjects: ["/home/user/projects/app"]
+            taskText: "Work in \(Self.project("app")) and don't touch build/.",
+            knownProjects: [Self.project("app")]
         )
-        #expect(resolved == "/home/user/projects/app")
+        #expect(resolved == Self.project("app"))
+    }
+
+    @Test("A path mentioned in the brief attributes to the deepest project, not an ancestor")
+    func ancestorDoesNotClaimTheWave() {
+        // The home directory becomes a tracked "project" as soon as a session runs
+        // there. A substring match would let it claim every wave whose brief names
+        // any path at all.
+        let resolved = WaveReader.resolveProject(
+            waveId: "memory-os-verify",
+            taskText: "Grade the increment in \(Self.project("memory-os")).",
+            knownProjects: [Self.home, Self.project("memory-os")]
+        )
+        #expect(resolved == Self.project("memory-os"))
+    }
+
+    @Test("The home directory never claims a wave, even as the only candidate")
+    func homeIsNotAProject() {
+        let resolved = WaveReader.resolveProject(
+            waveId: "memory-os-verify",
+            taskText: "Work under \(Self.home)/projects/memory-os.",
+            knownProjects: [Self.home]
+        )
+        #expect(resolved == nil)
     }
 
     @Test("Leaves a wave unattributed rather than guessing")
@@ -195,9 +223,16 @@ struct WaveReaderTests {
         let resolved = WaveReader.resolveProject(
             waveId: "something-else",
             taskText: "no paths here",
-            knownProjects: ["/home/user/projects/app"]
+            knownProjects: [Self.project("app")]
         )
         #expect(resolved == nil)
+    }
+
+    @Test("Trims markdown and punctuation off path tokens")
+    func pathTokenTrimming() {
+        let tokens = WaveReader.pathTokens(in: "See `/home/u/app`, and /home/u/other/ (also).")
+        #expect(tokens.contains("/home/u/app"))
+        #expect(tokens.contains("/home/u/other"))
     }
 
     @Test("A wave untouched for more than a week collapses into past waves")
