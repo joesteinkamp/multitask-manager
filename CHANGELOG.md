@@ -9,6 +9,108 @@ did.
 
 ---
 
+## Put every face of the app behind one engine interface, and build the daemon's message layer
+
+*(2026-08-16, Claude)*
+
+### What changed
+
+New `Client/` and `Wire/` directories in `MultiTaskCore`.
+
+`EngineClient` is now the single interface the popover and the CLI both talk
+to — `list`, `get`, `health`, `subscribe`, `act`. `InProcessEngine` is the
+conformance in use: it runs detection in the calling process and owns the three
+things a bare `DetectionEngine` doesn't — the refresh loop, the user's
+overrides, and the notification policy.
+
+`Wire/` holds what a daemon would speak: a versioned envelope that rejects an
+unknown major by name, a codec, and a frame reader. No socket, no daemon
+process.
+
+`mtm` now goes through `EngineClient` instead of reaching for `DetectionEngine`
+directly, and gains `mtm watch`, which streams changes and notifications.
+`EngineSnapshot` grew an `AuditSummary` so a client can report health without
+running a second audit-log reader of its own.
+
+Two bugs, both found by running `watch` rather than by testing it:
+
+- Its output vanished entirely when piped or redirected. stdout is
+  block-buffered to a non-TTY, and a command that only ever ends by being
+  interrupted never flushes. Now line-buffered.
+- Snapshots were pushed on every tick despite a "suppress identical" guard,
+  because `lastActivity` drifts constantly and plain equality therefore always
+  reported a change. Replaced with a change digest. Verified live: one push in
+  22 seconds where there had been four.
+
+### The ask
+
+"Do step one now" — the first of three steps proposed for the daemon and IPC
+work (P2.2, P2.3): define the interface, ship the in-process conformance, and
+build the message layer, holding the socket and the resident process until
+something needs them.
+
+### Why this approach
+
+**The interface comes first because that's what keeps the daemon optional.**
+With `EngineClient` in place, a daemon is a second conformance rather than a
+dependency — and a machine with no `mtmd`, or one whose daemon just died, loses
+the shared-state and cold-start benefits without losing the feature. Building
+the daemon first would have inverted that: the interface would have been
+shaped by the socket instead of the other way round.
+
+**The notification policy moved into the engine because it is stateful.** Its
+whole job is remembering what it has already told you about, so two evaluators
+would notify twice about the same session. The engine decides; the app
+delivers. This also settles a question the plan never addressed, and it is what
+makes always-on notification possible once a daemon exists.
+
+**The wire layer is transport-free so every case is testable without a file
+descriptor** — partial frames, byte-at-a-time delivery, multi-byte characters
+split across reads, oversized frames, and resync after one is dropped. These
+are exactly the cases that are miserable to debug against a live socket and
+trivial to pin down against a byte buffer.
+
+**`act` covers only the override mutations the app already performs.** Phase
+3's launch and steer actions are deliberately absent, with a note where they
+will go: their confirmation gates belong behind the action handling, not in the
+UI that calls it, or the engine becomes a way around the gate.
+
+**Subscribers are woken by a change digest, not by snapshot equality.** A
+client renders "3m ago" from the `lastActivity` it already holds and needs no
+new snapshot for its clock to move. What it genuinely needs to hear about is a
+session appearing or leaving, a status or wait reason changing, a wave
+advancing, or a converge breaking.
+
+### Considered and rejected
+
+**Network.framework for the transport.** Rejected — and this replaces the
+reasoning in the implementation plan, which called it "surface for no gain."
+That undersells it: `NWListener` would genuinely handle framing and
+backpressure. The decisive problem is that it is Darwin-only, and this
+package's whole value is that it builds and tests on Linux in CI. A transport
+written against it could only be tested on the scarce macOS runner. POSIX
+sockets keep the framing tests running on every push, which is worth more than
+the framing help.
+
+**Building the socket and the daemon in this step.** Rejected, consistent with
+the previous entry's finding that the CLI needed neither. This step refines
+rather than reverses that call: the message layer is worth having now because
+it is what the interface is designed against, while the resident process still
+waits on a second concurrent consumer or Phase 5's scheduler.
+
+**Diff-based subscription events.** Rejected in favour of whole snapshots plus
+the change digest. A snapshot here is tens of sessions, so the bandwidth
+argument is theoretical, while a subtly wrong diff shows a stale list — the
+exact failure this app exists to prevent. Worth revisiting only if a real
+workload complains.
+
+**Registering subscribers lazily so `subscribe()` could stay synchronous.**
+Rejected in favour of replaying the latest snapshot to a new subscriber
+immediately. It removes a race from the tests and means a newly-opened popover
+draws at once instead of waiting a full refresh cadence.
+
+---
+
 ## Extract the detection engine into MultiTaskCore, and read the harness audit log
 
 *(2026-08-16, Claude)*
