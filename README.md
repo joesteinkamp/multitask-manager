@@ -40,7 +40,7 @@ next is in [ROADMAP.md](ROADMAP.md).
   configurable window is flagged as **waiting for you** (orange), versus actively
   **working** (green) or long-**idle** (gray). See *How status works* below.
 - **Per-project briefings.** Expand any session row to see, at a glance:
-  - **Goal** — what the project is for, read from its description docs.
+  - **Goal** — what the project is for, from its product brief where it has one.
   - **Now** — what the live session is working on this moment (its latest prompt).
   - **Next** — what to pick up when it's waiting on you (your roadmap/todo).
 
@@ -195,7 +195,7 @@ inference**; it just reads files that are already in your repo:
 
 | Line | Where it comes from |
 | --- | --- |
-| 🎯 **Goal** | First real paragraph of the first of these that exists: `README.md`, `CLAUDE.md`, `AGENTS.md`, `PROJECT.md`, `PRODUCT.md`, `GOAL.md` |
+| 🎯 **Goal** | The **One-liner** from `PRODUCT.md` when the project has a brief. Otherwise the first real paragraph of the first of these that exists: `README.md`, `CLAUDE.md`, `AGENTS.md`, `PROJECT.md`, `GOAL.md` |
 | 〰️ **Now** | The most recent user prompt in the live session transcript (Claude Code / Codex). Reads only the tail of the file, so it's cheap |
 | ➡️ **Next** | The first unchecked task(s) — `- [ ] …` — in `ROADMAP.md`, then `TODO.md` |
 

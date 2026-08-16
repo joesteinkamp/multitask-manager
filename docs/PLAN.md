@@ -41,6 +41,54 @@ These constrain every phase, so they're stated once.
    inputs and responses — best-effort redacted, not guaranteed. Never re-log it,
    never copy it into app state that gets written elsewhere, never display it
    beyond what the user explicitly opens.
+6. **A project has a brief, or the app is guessing.** Tracked projects are
+   expected to carry the briefs
+   [`project-starter-pack`](https://github.com/joesteinkamp/project-starter-pack)
+   generates — `PRODUCT.md` at minimum. See below.
+
+---
+
+## Project briefs are the context layer
+
+The app is built on top of `project-starter-pack`, which walks a project through
+three briefs and leaves them at the repo root:
+
+| File | What it gives this app |
+|---|---|
+| `PRODUCT.md` | **The one-liner** — a single sentence a stranger could repeat. Also users, jobs-to-be-done, product purpose, success metrics, design principles, anti-references. |
+| `DESIGN.md` + `DESIGN.json` | The UX foundation and machine-readable design tokens. |
+| `CODE.md` | Stack, architecture, conventions, testing, performance, security. |
+| `AGENTS.md` / `CLAUDE.md` | The router pointing agents at the brief that owns each kind of work. |
+
+**Why this matters more than it looks.** Everything the app currently knows
+about a project is scraped: a goal guessed from the first paragraph of a README,
+next steps guessed from checkbox syntax. A brief is *stated* context, in known
+sections, written deliberately. That difference is what makes the difference
+between listing what is stuck and suggesting what to do next.
+
+Three concrete consequences, all pure file reads with no inference:
+
+- **The one-liner is the canonical Goal**, not the first paragraph of anything.
+  Today `ProjectContextReader` ranks `PRODUCT.md` fifth and reads its opening
+  paragraph, which in a generated brief is the **Register** section — so a
+  starter-pack project currently shows "product — a daily-use reading tool where
+  earned familiarity beats novelty" where it should show the one-liner. That is
+  a live bug for exactly the projects this app is meant to serve best.
+- **Jobs-to-be-done and success metrics say what "done" looks like.** They are
+  the closest thing on disk to an acceptance criterion, and they are what a
+  proposed next action should be judged against.
+- **Design principles and anti-references are review context.** When a task
+  dispatches a cross-vendor review, the reviewer should be handed the project's
+  own principles rather than generic ones.
+
+**Where a project has no brief**, the app says so plainly and offers to fix it:
+`setup` for a new project, `extract` for a brownfield one — both flows the pack
+already ships. It does not silently degrade to guessing, because a project
+without a brief is precisely the project whose "next action" suggestions would
+be worthless.
+
+**This repository does not yet have its own briefs**, which needs fixing before
+the app requires them of anyone else. `extract` exists for exactly this case.
 
 ---
 
@@ -555,10 +603,32 @@ every project.
 
 ### P4.7 "What should I do next"
 
-The question the product exists to answer, and the one that has no answer until
-P4.1 exists. Distinct from P3.5 triage: **triage ranks what is blocked, this
-ranks what is available.** A day with nothing blocked should still open the
-popover to a useful answer.
+The question the product exists to answer. Distinct from P3.5 triage: **triage
+ranks what is blocked, this ranks what is available.** A day with nothing
+blocked should still open the popover to a useful answer.
+
+**Start with suggestion, not with ranking.** The full version needs the task
+graph, but a useful first version does not: a project with a brief is already
+well enough understood to propose a next action from. One-liner, purpose,
+jobs-to-be-done, success metrics, design principles, plus the unchecked roadmap
+items and what the last session was doing — that is a genuinely good prompt, and
+it produces something worth reading on day one rather than after the task store
+is populated.
+
+- **The app doesn't do the suggesting** (ground rule 2). It dispatches a
+  delegate with the brief as context, into a context dir, and reads back the
+  proposal as a task file. Identical mechanism to P4.2 decomposition, smaller
+  scope: one next action rather than a graph.
+- **A suggestion is a proposal, not a task.** It lands in the same inbox as
+  agent-filed work (P4.9), where I accept, edit or reject it. Auto-committing
+  suggestions to the board is how a board fills with things nobody chose.
+- **Cheap to refresh, expensive to spam.** Regenerate when the project's brief
+  or roadmap changes, or on demand — not on a timer. A suggestion that changes
+  every five minutes is noise, and each one costs a delegate run.
+- **It degrades honestly.** No brief means no suggestion, and the app says which
+  brief is missing rather than guessing from a README.
+
+Then the ranked version, once tasks exist:
 
 - **The ready set** is tasks assigned to me whose dependencies are all `done`,
   which is the same topological computation P5.2 runs for agents — one

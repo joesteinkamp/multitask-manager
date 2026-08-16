@@ -89,6 +89,13 @@ driving. Tracking live sessions is the floor here, not the ceiling.
   Don't invent a parallel state store where one exists; contribute conventions
   upstream instead. Tasks are the exception and are owned here, because no
   harness file describes work that hasn't started.
+- **A project has a brief, or this app is guessing.** Tracked projects carry the
+  briefs [`project-starter-pack`](https://github.com/joesteinkamp/project-starter-pack)
+  generates — `PRODUCT.md` at minimum, ideally `DESIGN.md`/`DESIGN.json` and
+  `CODE.md` too. A brief is *stated* context in known sections; a README is
+  scraped context. That difference is the whole difference between telling me
+  what's stuck and telling me what to do next. A project without one gets said
+  so, and an offer to run `setup` or `extract` — not a silent guess.
 - **Local, no inference.** File reads and process control. Briefings stay
   model-free. Nothing leaves the machine except through an integration I
   explicitly configure.
@@ -242,10 +249,14 @@ next task itself once there is a next task to take, addressable from outside.
       The `ROADMAP.md` / `TODO.md` items the briefing already reads become real
       tasks — this file included.
 - [ ] **Answer "what should I do next" explicitly.**
-      A ranked ready-list for *me*, not just an attention queue: tasks whose
-      dependencies are met, weighted by project, staleness, and how long
-      something has been blocked on me. The attention badge says I'm the
-      bottleneck; this says what to do about it.
+      Starts simple: a project with a brief is already well enough understood to
+      **suggest** a next action from — one-liner, purpose, jobs-to-be-done,
+      success metrics, plus the unchecked roadmap items and what the last session
+      was doing. A delegate writes the proposal, I accept or reject it; the app
+      does no inference itself. Then the ranked version once tasks exist: a
+      ready-list weighted by project, staleness, and how long something has been
+      blocked on me. The attention badge says I'm the bottleneck; this says what
+      to do about it.
 - [ ] **Open a real main window for the board.**
       The task graph, agent activity timeline, and run history across every
       project — the long-run view a menu bar popover structurally can't hold.

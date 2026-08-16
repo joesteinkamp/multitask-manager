@@ -363,8 +363,20 @@ rather than discovering as a scramble. **Decide at the end of W0**, when the CI
 matrix has evidence, not halfway through W3.
 
 **Feature-parity drift between two UIs** is smaller than it was at three, but
-real. The controls are the no-logic-in-the-UI rule and the written per-screen
-spec in W5.
+real. Three controls, in increasing order of how much work they do:
+
+- **No logic in any UI.** Status, triage, ordering and notification decisions
+  stay engine-side, so a face is a renderer.
+- **`DESIGN.json`** — the machine-readable token file `project-starter-pack`
+  generates. This is a better parity control than the per-screen spec originally
+  planned here, because it is *executable*: colour, type, spacing, radius and
+  motion values are generated into SwiftUI constants and XAML resources from one
+  source rather than transcribed twice. Visual drift stops being a discipline
+  problem and becomes a build step. This project needs to write its own
+  `DESIGN.md`/`DESIGN.json` before the second UI starts, or the second UI will
+  be matched against the first one by eye.
+- **A written per-screen spec** for the behaviour tokens can't carry — what a row
+  shows, what an empty state says, what happens on Esc.
 
 **The protocol is unproven across a language boundary** until the Python
 reference client in W2 exists. That is precisely why it is in W2 and not
