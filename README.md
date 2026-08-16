@@ -69,7 +69,8 @@ dirs as single orchestration waves instead of N unrelated rows, `ai/*` worktrees
 and their converge conflicts, and the `~/.ai/` delegate roster.
 
 Phases and rationale: **[ROADMAP.md](ROADMAP.md)**. Design decisions and build
-order: **[docs/PLAN.md](docs/PLAN.md)**.
+order: **[docs/PLAN.md](docs/PLAN.md)**. Reaching Windows and Linux:
+**[docs/CROSS-PLATFORM.md](docs/CROSS-PLATFORM.md)**.
 
 Everything stays local and inference-free; the harness stays the source of truth
 (new agent-side conventions ship upstream there, not here); and confirmation
