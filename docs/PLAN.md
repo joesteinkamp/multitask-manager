@@ -92,6 +92,78 @@ the app requires them of anyone else. `extract` exists for exactly this case.
 
 ---
 
+## Prior art: what `mission-control` learned the hard way
+
+`~/mission-control` is an abandoned Next.js + SQLite orchestration layer for a
+fully autonomous agent team — a Chief-of-Staff agent generating tasks, waking
+specialists on cron, quality-gating their output. Last commit 2026-05-28; the
+final entries in its decision log are the author disabling every agent one at a
+time. Its own `PROJECT.md` says plainly: *"Only one agent has ever completed a
+task autonomously… The scheduled autonomous cycle has never fully worked from
+start to finish."*
+
+**Its premise was that agents work and the human is removed from the loop. Ours
+is the correction, not a variant** — the human is a first-class actor and the
+app's job is knowing where to look. That difference is why most of it is not
+reusable. But it ran for four months and left an unusually honest record, and
+three things in it are worth taking.
+
+### Worth taking
+
+- **A decision log, separate from the event feed.** A closed category vocabulary
+  (`task_created`, `task_escalated`, `quality_rejected`, `direction_blocked`, …)
+  plus a one-line human-readable summary of *why*. It is the only thing in that
+  repo that still answers "what happened here" months later, and it is exactly
+  the shape of the "what's happening" question this app leads with. Distinct
+  from an audit log, which records that a thing occurred; this records why.
+- **One call that returns everything needed to decide.** Its heartbeat endpoint
+  returned, in a single round-trip, assigned work, blocked work *partitioned
+  server-side by whether the blockers were done*, review requests, and current
+  workload. `EngineSnapshot` already has this shape, which is reassuring; the
+  detail worth copying is that partitioning happens engine-side, so no client
+  reimplements "is this actually blocked".
+- **Deriving what a session actually did from its transcript** — see P1.7 below.
+  This is the highest-leverage idea in the repo and it needs no cooperation from
+  anything.
+
+### Failures worth designing against
+
+- **The un-killable task.** For two days its orchestrator logged, roughly hourly,
+  that one task "continues to persist in the inbox despite multiple deletion
+  attempts". It burned an entire cycle-day on a single stuck row while the log
+  looked busy. **Anything that proposes work needs an explicit terminal state —
+  give up, snooze, hand to a human — or it will spend its whole budget on the
+  one thing it cannot finish.**
+- **Missing acceptance criteria was the top quality failure**, cited over and
+  over in its rejections — and its task model had no field for them. They were
+  expected to live in free-text. Ours should not repeat that (P4.1).
+- **Duplicate proposals.** Agents re-proposed the same work every cycle because
+  they could not see their own history. A suggestion mechanism needs to know
+  what it has already suggested *and what was rejected*.
+- **The feed drowned in noise** — 77% of 11,721 rows were status changes.
+  Meaningful state changes have to be separated from churn *at write time*, not
+  filtered later. The subscription change-digest already applies this reasoning
+  to the live stream; a persistent log needs the same split.
+- **Hardcoded per-agent config forced a rebuild** to add an agent, until it moved
+  to a drop-in file in the agent's own workspace. **Per-project configuration
+  belongs in the project, not in a table inside this app** — which is the same
+  conclusion the brief decision above reaches from a different direction.
+- **The overhead ratio is sobering:** 760 wake decisions produced 358
+  completions, and ~40% of completions were rejected. Two wakes per finished
+  task. Worth holding against Phase 5's optimism before building a scheduler.
+
+### Deliberately not taking
+
+Its autonomy machinery — the generate-and-wake cycle, the wake queue, the
+watchdog — is where all its atomicity bugs lived and it never worked end to end.
+Its org-chart metaphor (`LEAD`/`INT`/`SPC` roles, teams, cross-review rules that
+were defined but never enforced) is overhead for one person and a few projects.
+And its four-status task model had no `blocked`, no `waiting on human` and no
+`snoozed`: escalation was a magic string inside a tags array. **For an app whose
+core question is "what needs me", that must be a column, not a tag.**
+
+---
+
 ## Sequencing
 
 ### Already done
@@ -304,6 +376,39 @@ Current file: `{projectPath, project, status, updatedAt}`. Add
   separate repo, and it should land *after* this app can read v2, so the two
   never disagree.
 
+### P1.7 What a session actually did
+
+Borrowed from `mission-control`, which derived this and got more value from it
+than from anything else it built.
+
+The transcript already read for the "Now" line contains every tool call the
+agent made. Walking its `tool_use` blocks for `Write` and `Edit`, and keeping
+those whose `file_path` falls inside the project, yields **the files a session
+created or changed** — the difference between "this session is quiet" and "this
+session wrote four files and edited nine, then went quiet". That is the "what's
+happening" question answered concretely, from a file the app is already opening.
+
+- **No cooperation required.** No hook, no agent convention, no harness support.
+  It reads what Claude Code writes anyway, which makes it the cheapest real
+  signal available and one that cannot silently stop working when an agent
+  forgets a convention.
+- **Also gives duration and shape**: first prompt, started-at, last-activity,
+  message count, and a tool histogram — a session that has made forty `Read`
+  calls and no edits is exploring; forty `Edit` calls is a rewrite. Same parse.
+- **Bounded like everything else.** Tail-window read, capped counts, and a cache
+  keyed on transcript mtime — this runs on the refresh tick.
+- **Privacy line.** File *paths* inside the project are what gets kept; tool
+  inputs and outputs are not retained, consistent with ground rule 5. A path can
+  still be sensitive, so this shows what the popover shows and nothing is copied
+  into app state that gets written elsewhere.
+- **Feeds the task layer later.** When a run attaches to a task, "what changed"
+  is most of a run report (P5.4) already assembled — and it is assembled, not
+  summarised, so no inference is involved.
+
+The Codex transcript shape differs and should be handled the same way it is for
+the "Now" line: same extraction, tolerant of both layouts, absent rather than
+wrong when a format moves.
+
 ---
 
 ## Phase 2 — Extract the core
@@ -506,6 +611,24 @@ effectively do now.
 One markdown file per task at `~/.multitaskmanager/tasks/<id>.md`, YAML front
 matter plus a body, with projects stored the same way alongside them.
 
+**Three fields that exist because their absence is what broke the prior art:**
+
+- **`acceptance` — what "done" means for this task.** Missing acceptance
+  criteria was `mission-control`'s single most-cited quality failure, and its
+  model had no field for them; they were expected to live in free text and so
+  routinely didn't. A task with no acceptance criteria is a task that will be
+  delivered wrong and rejected, which costs more than asking for it up front.
+  The project's success metrics and jobs-to-be-done are the reference this is
+  written against.
+- **`waiting` — what this task needs from a human**, as a column, not a tag.
+  The prior art expressed escalation by writing the string `escalated` into a
+  tags array and grepping for it. For an app whose central question is "what
+  needs me", that state is the product and belongs in the schema. Same
+  vocabulary as the session-level `waiting`: approval, question, done, error.
+- **`snoozed_until` — an explicit terminal state for work that can't proceed.**
+  See P4.7: something that cannot be finished and cannot be dismissed will
+  consume every cycle it is offered.
+
 **`assignee: me` is not a placeholder.** Roughly half the work in a project a
 person runs with agents is that person's, and a task assigned to a human has to
 be as complete a citizen as one assigned to a delegate: it appears in the ready
@@ -627,6 +750,19 @@ is populated.
   every five minutes is noise, and each one costs a delegate run.
 - **It degrades honestly.** No brief means no suggestion, and the app says which
   brief is missing rather than guessing from a README.
+- **It knows what it already suggested, and what was rejected.** The prior art's
+  agents re-proposed identical work every cycle because they couldn't see their
+  own history. A rejected suggestion is a fact about this project, and it goes
+  into the prompt for the next one.
+
+**Every item offered needs an exit.** `mission-control` spent two days logging,
+roughly hourly, that a single task "continues to persist in the inbox despite
+multiple deletion attempts" — one stuck row consumed an entire cycle-day while
+the log looked busy. So: anything the ready list surfaces can be **done,
+snoozed until a date, handed to an agent, or dismissed with a reason** — and
+dismissal is recorded rather than silent, because the reason is what stops it
+being suggested again tomorrow. A list you can only complete is a list that
+eventually shows you one impossible thing forever.
 
 Then the ranked version, once tasks exist:
 
@@ -692,6 +828,25 @@ That reframing has consequences, and they are the substance of this item.
 - **Transport.** stdio for a locally-spawned server is simplest and needs no
   port. Every tool call is audited per P3.6 — an agent acting on the board is a
   control-plane action.
+- **`suggest` is a different verb from `create`.** Same underlying write, but a
+  suggestion lands in the reviewable lane with its proposer recorded, rather
+  than in the trusted pipeline. Taken from the prior art, where it was the one
+  guard that kept agent-generated work separable from the real thing.
+- **Tool descriptions read as procedures, not API docs.** Agents follow numbered
+  steps far more reliably than they infer a workflow from parameter lists — the
+  prior art's agent-facing skill doc opened with "Workflow for Specialist
+  Agents" and a numbered list, and that is the register to write in.
+- **Small affordances that matter more than they look**, all from watching real
+  agents use the prior art's CLI: accept any unique **id prefix** wherever a full
+  id is expected, because agents copy what they were shown; accept a **file path
+  in place of an inline payload** for anything document-shaped, because
+  otherwise an agent tries to shell-quote a markdown document; and return **one
+  dense line per task** in listings rather than pretty multi-line records, which
+  is what a model skimming a list actually reads well.
+- **Bounded retries with visible abandonment.** Where the server retries
+  anything, cap it, then move to a distinctly-marked terminal state and emit one
+  escalation — never an unbounded retry. The prior art's wake loop silently
+  retried forever until it was capped at four attempts.
 
 ### P4.9 See and trust what agents put on the board
 
@@ -731,6 +886,22 @@ decision rather than a drift.
 
 **Objective:** agent-assigned tasks run without being started by hand, bounded
 and reviewable.
+
+> **Read the prior-art section before starting this phase.** `mission-control`
+> built essentially this — generate tasks, wake agents on a schedule, gate the
+> output — and it never worked end to end, by its author's own account. Its
+> numbers: 760 wake decisions produced 358 completions, of which about 40% were
+> then rejected. Two wakes per finished task, and the most common failure was
+> work delivered against criteria nobody had written down.
+>
+> That is not an argument against this phase. It is an argument about ordering:
+> **the value is in the queue and the reports, not in the waking.** A ready list
+> a human drains, with runs that produce reviewable reports, delivers most of
+> the benefit and none of the failure mode. Automatic scheduling should be the
+> last thing built here, gated on acceptance criteria being routinely present
+> (P4.1) and on run reports being good enough to review at a glance (P5.4) —
+> because unattended runs against vague criteria is precisely the combination
+> that produced a 40% rejection rate.
 
 ### P5.1 Scheduling
 

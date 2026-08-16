@@ -149,6 +149,12 @@ produces. Highest value per unit of risk; no new infrastructure.
       show which delegates are installed and reachable (`lm list` for local
       endpoints), and note when the routing table is stale (> ~2 months) the way
       the orchestration playbook asks.
+- [ ] **Show what a session actually did, not just that it's quiet.**
+      The transcript already read for the "Now" line records every tool call.
+      Walking it for writes and edits inside the project yields the files a
+      session created and changed — "wrote four files, edited nine, then went
+      quiet" instead of "quiet". No hook, no convention, no cooperation from
+      anything; it reads what Claude Code writes anyway.
 - [ ] **Extend the hook status contract beyond working/needsAttention.**
       Add a short reason, the awaiting-input kind (approval gate vs. question
       vs. done), and a session id to `~/.multitaskmanager/status/*.json` so
@@ -281,6 +287,11 @@ next task itself once there is a next task to take, addressable from outside.
       Once something else can write to the board, I need to see what arrived,
       from which agent, against which project — and undo a bad sweep as a batch
       rather than a row at a time.
+- [ ] **Keep a decision log — what happened, and why.**
+      Separate from the audit trail, which records that a thing occurred. This
+      records the reasoning: a closed set of categories and one human-readable
+      line each. Borrowed from `mission-control`, where it turned out to be the
+      only record that still answered "what happened here" months later.
 - [ ] ~~Sync tasks from external trackers.~~ **Cut — the agent does this.**
       An agent with Notion and Linear connected can already read them and file
       the results through MCP, which means no per-service client here, no
