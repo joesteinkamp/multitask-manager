@@ -596,6 +596,79 @@ outlives sessions and can be assigned to a person or an agent.
 of what is happening; this is where the app starts managing the work rather than
 reporting on it. Judge the earlier phases by whether they make this easier.
 
+### What "project management tool" means concretely
+
+The rest of this plan can be read as session plumbing, so this states the thing
+it is all in service of. Managing five parallel projects means being able to
+answer, in one glance, five questions — and every item below exists to answer
+one of them:
+
+| Question | Answered by |
+|---|---|
+| Which of my projects needs me right now? | project status, computed |
+| What's the state of *this* project? | the project view |
+| How far along is it? | progress, from the roadmap and the task list |
+| What should I do next, here or anywhere? | the ready list and suggestions |
+| What moved since I last looked? | the overview, and the decision log |
+
+**The single most important change is what the popover's primary unit is.**
+Today it lists sessions and groups them under a project *name* — a string
+derived from a directory. That is a session monitor with a grouping feature. In
+this phase the primary unit becomes the **project**, and sessions become detail
+underneath it. A project with no live session at all still appears, because a
+project with nothing running is often the one that needs attention most.
+
+### P4.0 Projects: record, status, progress, lifecycle
+
+Four things that turn a derived string into something manageable.
+
+**The record** — covered in P4.1. Id, name, one-liner from the brief, optional
+repo path, optional external ref, and the tasks hanging off it.
+
+**Status, computed and explainable.** No inference; a fixed ladder, first match
+wins, and the UI can always say which rung it landed on:
+
+| Status | Means |
+|---|---|
+| `needsYou` | a task is waiting on you, a session needs attention, or a converge has stalled |
+| `working` | a session is live or an agent task is running |
+| `ready` | nothing is blocked and there is at least one task you could start |
+| `blocked` | remaining work is all waiting on dependencies or on someone else |
+| `dormant` | no activity for N days and nothing ready — the quiet failure a multi-project week produces |
+| `unbriefed` | no `PRODUCT.md`; the app can watch it but can't help with it |
+
+`dormant` is the one worth building for. A project that's stuck screams; a
+project everyone forgot goes silent, and silence reads identically to "fine".
+
+**Progress, from what's already parsed.** The roadmap checkbox ratio is free —
+the reader already distinguishes `- [ ]` from `- [x]`, and today throws away the
+checked ones. "12 of 30" per project is a real progress signal with no inference
+and no new file format. Task completion gives a second, and the brief's success
+metrics give the qualitative target neither number captures.
+
+**Lifecycle.** Create a project *before* there's a repo or a session — an idea
+with a brief is a project. Archive one so it stops competing for attention
+without being deleted. Park one until a date, the project-level form of snooze.
+Right now projects only come into existence by an agent happening to run
+somewhere, which means the app can only manage work that has already started.
+
+### P4.0b The project view, and the overview
+
+**The project view** is the screen this app is for, and it did not previously
+exist in this plan. One project: its one-liner, its status and why, what's
+happening now (live sessions and what they actually changed, per P1.7), what
+needs you, what's next, recent decisions, and progress. It is reachable from the
+popover row and is the drill-down the popover deliberately can't hold.
+
+**The overview** answers "what moved since I last looked" across everything —
+every project with its status, what needs you first, and what changed since
+yesterday. Not a generated report on a schedule: a view, computed on open, so it
+is never stale and never arrives when you aren't reading. `mission-control`
+generated daily reports on cron and they were read once.
+
+Both are the same data at two altitudes, and both must survive the popover being
+the only surface — the window makes them roomier, not possible.
+
 ### P4.1 Project and task model, and their store
 
 **A project becomes a real record, not an inference.** Today a project is
@@ -713,8 +786,10 @@ Reuse `extractNextSteps` without the 3-item limit to import `- [ ]` items from
 
 ### P4.6 Board window
 
-A real `Window` scene: task graph, agent activity timeline, run history across
-every project.
+A real `Window` scene. **Projects first, task graph second** — the earlier
+version of this item led with the task graph, which is the drill-down rather than
+the thing you open it to see. A row per project with status, what's next, and
+who's on it; the graph, the agent timeline and run history hang off that.
 
 - **Activation policy.** The app is `LSUIElement` (accessory) with no Dock icon.
   Opening a real window requires switching `NSApp.setActivationPolicy` to

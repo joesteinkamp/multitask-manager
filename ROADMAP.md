@@ -233,6 +233,34 @@ not what's ready.
 It's also where the North Star becomes reachable: an agent can only take the
 next task itself once there is a next task to take, addressable from outside.
 
+- [ ] **Make the project the primary unit, not the session.**
+      Today the popover lists sessions and groups them under a project *name* —
+      a string from a directory. That's a session monitor with a grouping
+      feature. The project becomes the thing I look at, with sessions as detail
+      underneath, and **a project with nothing running still appears** — because
+      that's often the one that needs me most.
+- [ ] **Give each project a status I can scan, and a reason for it.**
+      Needs you · working · ready · blocked · dormant · unbriefed. Computed by a
+      fixed ladder, never inferred, and the app can always say which rung it
+      landed on. `dormant` is the one worth building for: a stuck project
+      screams, a forgotten one goes quiet, and quiet reads exactly like fine.
+- [ ] **Show how far along each project is.**
+      The roadmap checkbox ratio is free — I already parse `- [ ]`, I just throw
+      the `- [x]` away. "12 of 30" per project, plus tasks completed, plus the
+      brief's success metrics as the target neither number captures.
+- [ ] **Let a project exist before the work does — and let it be parked.**
+      Create one from an idea and a brief, with no repo and no session. Archive
+      it so it stops competing for attention. Park it until a date. Right now a
+      project only exists because an agent happened to run somewhere, which
+      means I can only manage work that has already started.
+- [ ] **Build the project view.**
+      One project: one-liner, status and why, what's happening now, what needs
+      me, what's next, recent decisions, progress. This is the screen the app is
+      for, reachable from the popover row.
+- [ ] **Build the overview — what moved since I last looked.**
+      Every project with its status, what needs me first, and what changed since
+      yesterday. A view computed on open, not a report generated on a schedule:
+      never stale, and never arriving when I'm not reading.
 - [ ] **Make projects real, and add a plain-file task store.**
       A project stops being "whatever directory a session was running in" and
       becomes a record with a name, an optional repo, and an optional external
@@ -264,8 +292,10 @@ next task itself once there is a next task to take, addressable from outside.
       blocked on me. The attention badge says I'm the bottleneck; this says what
       to do about it.
 - [ ] **Open a real main window for the board.**
-      The task graph, agent activity timeline, and run history across every
-      project — the long-run view a menu bar popover structurally can't hold.
+      Projects first, task graph second: a row per project with status, what's
+      next and who's on it, with the graph, agent timeline and run history
+      hanging off it — the long-run view a menu bar popover structurally can't
+      hold.
       Same app, same engine: the popover stays the ambient glance, the window is
       where I actually plan. Reachable from the popover and from `mtm open`.
 
