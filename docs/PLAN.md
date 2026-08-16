@@ -46,30 +46,72 @@ These constrain every phase, so they're stated once.
 
 ## Sequencing
 
+### Already done
+
+Landed 2026-08-16 in `Packages/MultiTaskCore`, with 152 tests: **P6.1** (tests,
+written first), **P2.1** (core extracted), the Foundation-only logic of
+**P1.1–P1.6**, **P3.5** (triage), **P2.4** (the `mtm` CLI), and **P6.2** (CI).
+The macOS app has *not* been migrated onto the package — that is the outstanding
+piece of P2.1 and needs a Mac to verify.
+
+The P1.2 spike is settled: the audit log's `session` matches 95 of 97 local
+Claude Code transcript ids and every Codex rollout, so the join is precise and
+`cwd` is a genuine fallback. See *Open questions* for what the real log taught us.
+
+### What remains
+
 ```
-P1 (independent, ship in any order) ─────────┐
-                                             ├──> P3 ──> P4 ──> P5
-P6.1 tests ──> P2 (core + daemon + IPC) ─────┘
-P6.2-6.5 hardening: continuous
+P1 UI surfaces (macOS) ──┐
+                         ├──> P4.1 tasks ──> P4.7 next ──> P4.8 MCP ──> P5
+P2.2/2.3 daemon + IPC ───┘                        │
+                                                  └──> P3 control ──> P3.4
+W0-W5 cross-platform: interleaves, see CROSS-PLATFORM.md
+P6.3-6.5 hardening: continuous
 ```
 
-Two deliberate reorderings:
+**The one reordering that matters: tasks move ahead of control.**
 
-- **Pull P6.1 (tests) in front of P2.** Phase 2 moves nearly every file in the
-  project. Doing that without tests on `ProjectContextReader` and
-  `SessionStore.merge` is a blind rewrite — those two are the only places with
-  real logic, and they have zero coverage today. Write the tests against the
-  *current* code, then refactor until they pass again.
-- **Spike P1.2's schema join before anything depends on it.** The audit log is
-  the backbone of Phases 1, 3 and 5. Its record shape is now known (appendix A),
-  but whether its `session` value matches the session ids the Claude Code and
-  Codex detectors derive from transcript filenames is **unverified**. A
-  half-day spike against a real `~/.ai-logs/tool-calls.jsonl` settles it. If the
-  ids don't match, the join falls back to `cwd` → project path, which is
-  coarser but always present — design for both from the start.
+The original plan ran P3 (launch and steer sessions) before P4 (tasks). That
+order made sense when the app was understood as a session control plane. It is
+wrong now. The task layer is what makes this a project manager rather than a
+session monitor, and three things follow from putting it first:
 
-Within Phase 1, P1.1 (notifications) has no dependencies and delivers the
-single biggest daily improvement. Start there.
+- **"What should I do next" has no answer without it.** Until tasks exist, the
+  app can say what is stuck but not what is ready — and the second is the
+  question the product is actually for.
+- **P3.1 changes shape.** Launching becomes "run *this task*" rather than "start
+  a session in this project". A run attaches to a task, which is what makes
+  P3.6's audit trail and P5.4's run reports mean anything.
+- **The North Star needs a queue before it needs a driver.** An agent can only
+  take its own next task once there is a next task to take and a way to reach it
+  (P4.8). Steering (P3.4) — the riskiest item in the whole plan — is what you
+  need when an agent *can't* proceed alone, so it belongs after, not before.
+
+P4.1 is also cheap and low-risk: markdown files, front matter, a watcher. It
+gates far more than it costs.
+
+**P3.4 (steer a running session) moves to the end of Phase 3** for the same
+reason. It is the item most likely to consume a week and produce something that
+demos well and fails in use, and every hour spent on it is an hour not spent on
+the layer the app exists for.
+
+### Still true from the original ordering
+
+- **P6.1 before any refactor.** Held, and it paid: the first test written
+  against `extractGoal` found a live bug where a README opening with a code
+  fence presented shell commands as the project's goal.
+- **P1.1 (notifications) is the single biggest daily improvement** and has no
+  dependencies. Its policy is built and tested; only the macOS delivery wiring
+  remains.
+
+### Where cross-platform fits
+
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) runs W0–W5 alongside these phases rather
+than after them. Two couplings to keep in mind: **W0 (core portability) should
+land before P4.1**, because a task store written with Unix path assumptions is a
+thing to redo rather than port; and **P2.2/P2.3 (daemon + IPC) are W2**, which
+is where the daemon stops being optional, because a C# UI on Windows cannot host
+a Swift engine.
 
 ---
 
@@ -301,7 +343,14 @@ Executable target using `swift-argument-parser`.
 **Objective:** the app launches and steers agents instead of only watching them.
 First phase with writes, so ground rules 3 and 4 start doing real work.
 
-### P3.1 Launch a session from a project row
+### P3.1 Run a task
+
+Originally written as "launch a session from a project row". **The unit is the
+task**, once P4.1 exists — a run is how a task gets done, and it attaches to
+one. Launching a bare session in a project stays available as the escape hatch,
+but it is the special case rather than the default, because a run with no task
+behind it produces an audit trail (P3.6) and a report (P5.4) that describe
+something nobody asked for.
 
 - **Templated invocations** per the orchestration playbook: `claude -p`,
   `codex exec --json`, `agy -p`, `agent -p`, `lm -p`. The default delegate comes
@@ -377,10 +426,25 @@ don't display.
 **Objective:** the unit of work stops being a session and becomes a task that
 outlives sessions and can be assigned to a person or an agent.
 
+**This is the phase the app exists for.** Phases 1–3 earn a trustworthy picture
+of what is happening; this is where the app starts managing the work rather than
+reporting on it. Judge the earlier phases by whether they make this easier.
+
 ### P4.1 Task model and store
 
 One markdown file per task at `~/.multitaskmanager/tasks/<id>.md`, YAML front
 matter plus a body.
+
+**`assignee: me` is not a placeholder.** Roughly half the work in a project a
+person runs with agents is that person's, and a task assigned to a human has to
+be as complete a citizen as one assigned to a delegate: it appears in the ready
+list (P4.7), it blocks agent tasks that depend on it, it accrues time-in-state,
+and it can be completed from the popover in one action. A model that treats
+human tasks as untracked context around the real (agent) work reproduces exactly
+the problem this app is meant to solve. The practical test: every field below
+must mean something for a human assignee, and where one genuinely doesn't
+(`privacy`, delegate routing) that should be visible as an absence rather than a
+field showing `n/a`.
 
 ```yaml
 ---
@@ -465,6 +529,79 @@ every project.
   visibly broken when wrong.
 - The popover stays the ambient glance; the window is where planning happens.
   Reachable from the popover and from `mtm open`.
+
+### P4.7 "What should I do next"
+
+The question the product exists to answer, and the one that has no answer until
+P4.1 exists. Distinct from P3.5 triage: **triage ranks what is blocked, this
+ranks what is available.** A day with nothing blocked should still open the
+popover to a useful answer.
+
+- **The ready set** is tasks assigned to me whose dependencies are all `done`,
+  which is the same topological computation P5.2 runs for agents — one
+  implementation, two consumers, differing only by assignee.
+- **Ordering inputs**, all local and explainable, no inference: how long a task
+  has been ready, whether its project is pinned, whether an agent is blocked
+  waiting on it (unblocking someone else outranks starting something new),
+  and whether it was in progress and got dropped.
+- **Show the reason.** "First because Claude is blocked on it" is a different
+  instruction from "first because it has sat for four days". A ranked list whose
+  ordering can't be explained gets ignored within a week.
+- **One item, not ten.** The popover has room for a next action and a short
+  list behind it. A ready queue rendered as a wall of tasks is a to-do app, and
+  a to-do app is a thing people already have and already ignore.
+- **Merged view with the attention queue.** What the user sees at the top of the
+  popover is a single ordered answer to "what now" — blocked-on-me items and
+  ready items interleaved by urgency, not two competing lists.
+
+### P4.8 MCP server
+
+The surface the North Star runs on: agents read the board, take the next task,
+report progress, and close work out without a human relaying any of it.
+
+- **A second `EngineClient` consumer, not a second engine.** It sits beside the
+  CLI and the UI over the same protocol. If MCP needs a capability the CLI can't
+  express, that is a sign the engine is missing it, not that MCP needs a private
+  path.
+- **Read-only tools first**, per ground rule 3: `list_tasks`, `get_task`,
+  `next_task`, `project_status`. Writes — `claim_task`, `update_task`,
+  `complete_task` — ship only after the read-only set has been in daily use.
+- **Claiming needs a lease**, the same expiring lease as P5.2, so two agents
+  can't take the same task and a crashed agent's task returns to `ready` rather
+  than stranding.
+- **Confirmation gates are inherited, not bypassed** (ground rule and roadmap
+  principle both). An agent asking through MCP for something that would require
+  my approval from a terminal still stops and asks. This is the single most
+  important line in this item: an MCP server is exactly the shape of thing that
+  quietly becomes a way around a gate.
+- **Transport.** stdio for a locally-spawned server is the simplest thing that
+  works and needs no port. Every tool call is audited per P3.6 — an agent acting
+  on the board is a control-plane action.
+- **Identity.** A task claimed by an agent should record *which* agent and which
+  session, so P4.4's cross-vendor review can route to a different one.
+
+### P4.9 Sync tasks from external trackers
+
+A project's real task list often already lives in Linear or GitHub Issues. Import
+so the board reflects what the project actually needs, not only what could be
+inferred from disk.
+
+- **One-way in by default.** Two-way sync between an external tracker and a local
+  store is a well-known source of lost edits, and the same reasoning that made
+  P4.5 one-way applies with more force here because the other side has other
+  people on it.
+- **Identity and re-import** work like P4.5: a stable external id plus a content
+  hash, so re-importing updates rather than duplicates.
+- **Writing back is opt-in, per project, and shows the diff** before it happens.
+- **Credentials** go to the system keychain, never to a file in the task store,
+  and a project with no integration configured makes no network calls at all —
+  this is the only outbound path in the app and it stays visibly off by default.
+- **This is the one place the app holds state the harness doesn't.** Ground rule
+  4 says don't invent a parallel store where one exists; no harness file
+  describes work that hasn't started, so tasks are owned here. Worth restating
+  because an imported Linear issue is the furthest thing in this app from
+  "something the harness wrote", and the boundary should be a decision rather
+  than a drift.
 
 ---
 
@@ -557,6 +694,10 @@ Developer ID signing, `notarytool` stapling, GitHub Releases, and a Sparkle
 appcast for updates. Signing keys stay out of the repo, in the keychain and CI
 secrets. Until this lands, "install" means Xcode, which caps the audience at one.
 
+Windows (Authenticode, winget) and Linux (tarball, `.deb`) are W5 in
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) rather than here, because they arrive
+with their own platform work rather than as a variation on this one.
+
 ### P6.5 First-run setup
 
 Detect the harness, offer to wire the P1.6 hooks, explain what the app can and
@@ -589,10 +730,29 @@ harnesses) and 97 real Claude Code transcripts.
    should make the common case free; unmeasured at real repo counts.
 4. **Is `forkpty` (P3.4) worth it,** or is "open in Terminal" enough in
    practice? Answerable only after using P3.1 for a week.
-5. **Does the daemon earn its complexity** before Phase 5, or should P2.2 ship
-   as in-process-only with the daemon deferred until scheduling needs it?
-   Leaning deferred: `mtm` shipped against an in-process engine and needed
-   nothing the daemon would have provided.
+5. ~~**Does the daemon earn its complexity** before Phase 5?~~ **Settled by the
+   platform decision, not by the argument.** The answer was "leaning deferred" —
+   `mtm` shipped against an in-process engine and needed nothing the daemon
+   would have provided. That reasoning held on macOS, where the menu-bar app is
+   always running and hosts the engine itself. It does not survive Windows: a
+   C# UI cannot host a Swift engine, so `mtmd` becomes the only place the engine
+   can live there. It is now built because one platform requires it and stays
+   optional on the other two, which is what `EngineClient` was designed for.
+6. **What ranks the ready list (P4.7)?** The inputs are named — time ready,
+   pinned project, unblocking someone else, previously in progress — but their
+   weighting is guesswork until it has been used for a fortnight. Expect the
+   first version to be wrong in a way that is obvious in use and invisible in
+   design.
+7. **Does the MCP server need write tools, or is read plus `mtm act` enough?**
+   Ground rule 3 says read-only ships first regardless. The real question is
+   whether an agent claiming and closing its own tasks turns out to be the thing
+   that makes the North Star work, or the thing that makes the board untrustworthy
+   because nothing a human recognises is happening to it.
+8. **Where does an imported Linear issue live** relative to the harness's own
+   files? Tasks are owned here by decision (P4.9), but a project synced from an
+   external tracker is the furthest thing in this app from "something the harness
+   wrote", and the boundary deserves revisiting once it is real rather than
+   hypothetical.
 
 ### What the real log taught us that this plan didn't say
 
