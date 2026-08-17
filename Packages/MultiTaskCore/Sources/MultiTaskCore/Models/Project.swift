@@ -192,6 +192,8 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     /// exists to hold real tasks.
     public var nextSteps: [String]
     public var sessions: [Session]
+    /// Work belonging to this project — the unit the app actually manages.
+    public var tasks: [TaskRecord]
     public var waves: [Wave]
     public var repository: RepositoryState?
     /// Newest activity across everything belonging to this project.
@@ -208,7 +210,7 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     public init(record: ProjectRecord, status: ProjectStatus, statusReason: String,
                 brief: ProductBrief? = nil, briefs: BriefSet = BriefSet(),
                 progress: ProjectProgress? = nil, nextSteps: [String] = [],
-                sessions: [Session] = [], waves: [Wave] = [],
+                sessions: [Session] = [], tasks: [TaskRecord] = [], waves: [Wave] = [],
                 repository: RepositoryState? = nil,
                 lastActivity: Date = .distantPast, oneLiner: String? = nil) {
         self.record = record
@@ -219,6 +221,7 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
         self.progress = progress
         self.nextSteps = nextSteps
         self.sessions = sessions
+        self.tasks = tasks
         self.waves = waves
         self.repository = repository
         self.lastActivity = lastActivity
@@ -232,4 +235,11 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     public var hasLiveSession: Bool {
         sessions.contains { $0.status == .working }
     }
+
+    /// Open tasks, which is what "how much is left here" actually means once
+    /// tasks exist — roadmap checkboxes are the stand-in until they do.
+    public var openTasks: [TaskRecord] { tasks.filter { $0.state.isOpen } }
+
+    /// Tasks waiting on a human.
+    public var tasksNeedingYou: [TaskRecord] { openTasks.filter(\.needsAHuman) }
 }

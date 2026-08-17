@@ -40,6 +40,75 @@ public enum EngineAction: Codable, Sendable, Equatable {
     case removeManual(sessionId: String)
     case mute(projectPath: String)
     case unmute(projectPath: String)
+
+    // Task actions. Organising work is free; anything that spends — starting a
+    // run, touching a repository — is gated, and none of those live here yet.
+    case createTask(CreateTask)
+    case updateTask(UpdateTask)
+    case claimTask(taskId: String, owner: String)
+    case completeTask(taskId: String, note: String?)
+    case snoozeTask(taskId: String, days: Int)
+    case deleteTask(taskId: String)
+
+    /// Fields for a new task. A struct rather than a dozen associated values so
+    /// the MCP server and the CLI can decode one shape.
+    public struct CreateTask: Codable, Sendable, Equatable {
+        public var title: String
+        public var projectId: String?
+        public var assignee: String?
+        public var body: String?
+        /// What "done" means. Its absence was the most-cited quality failure in
+        /// the prior art this design learned from.
+        public var acceptance: String?
+        public var deps: [String]
+        public var externalRef: String?
+        public var origin: String?
+        public var state: String?
+
+        public init(title: String, projectId: String? = nil, assignee: String? = nil,
+                    body: String? = nil, acceptance: String? = nil, deps: [String] = [],
+                    externalRef: String? = nil, origin: String? = nil, state: String? = nil) {
+            self.title = title
+            self.projectId = projectId
+            self.assignee = assignee
+            self.body = body
+            self.acceptance = acceptance
+            self.deps = deps
+            self.externalRef = externalRef
+            self.origin = origin
+            self.state = state
+        }
+    }
+
+    /// A partial update — every field optional, absent means "leave alone".
+    public struct UpdateTask: Codable, Sendable, Equatable {
+        public var taskId: String
+        public var title: String?
+        public var state: String?
+        public var assignee: String?
+        public var acceptance: String?
+        public var body: String?
+        public var deps: [String]?
+        public var waiting: String?
+        public var waitingReason: String?
+        public var projectId: String?
+
+        public init(taskId: String, title: String? = nil, state: String? = nil,
+                    assignee: String? = nil, acceptance: String? = nil, body: String? = nil,
+                    deps: [String]? = nil, waiting: String? = nil,
+                    waitingReason: String? = nil, projectId: String? = nil) {
+            self.taskId = taskId
+            self.title = title
+            self.state = state
+            self.assignee = assignee
+            self.acceptance = acceptance
+            self.body = body
+            self.deps = deps
+            self.waiting = waiting
+            self.waitingReason = waitingReason
+            self.projectId = projectId
+        }
+    }
 }
 
 public struct ActionResult: Codable, Sendable, Equatable {

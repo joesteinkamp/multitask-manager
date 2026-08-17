@@ -16,6 +16,7 @@ public actor InProcessEngine: EngineClient {
     private let configurationProvider: ConfigurationProviding
     private let engine: DetectionEngine
     private let overridesStore: OverridesStore
+    private let taskStore: TaskStore
     private let policy: NotificationPolicy
 
     private var overrides: UserOverrides
@@ -26,10 +27,12 @@ public actor InProcessEngine: EngineClient {
     public init(configuration: ConfigurationProviding = StaticConfiguration(),
                 engine: DetectionEngine? = nil,
                 overridesStore: OverridesStore = OverridesStore(),
+                taskStore: TaskStore = TaskStore(),
                 policy: NotificationPolicy = NotificationPolicy()) {
         self.configurationProvider = configuration
         self.engine = engine ?? DetectionEngine(configuration: configuration)
         self.overridesStore = overridesStore
+        self.taskStore = taskStore
         self.policy = policy
         self.overrides = overridesStore.load()
     }
@@ -179,12 +182,108 @@ public actor InProcessEngine: EngineClient {
 
         case .unmute(let projectPath):
             overrides.mutedProjects.remove(projectPath)
+
+        // Task actions write to the task store rather than to overrides, and
+        // return early so they don't trigger an overrides save.
+        case .createTask(let fields):
+            _ = try create(fields)
+            return ActionResult(ok: true, snapshot: await refreshNow())
+
+        case .updateTask(let fields):
+            _ = try update(fields)
+            return ActionResult(ok: true, snapshot: await refreshNow())
+
+        case .claimTask(let taskId, let owner):
+            guard let task = taskStore.resolve(taskId) else {
+                throw TaskStoreError.notFound(taskId)
+            }
+            _ = try taskStore.save(TaskQueue.claim(task, by: owner))
+            return ActionResult(ok: true, snapshot: await refreshNow())
+
+        case .completeTask(let taskId, let note):
+            guard var task = taskStore.resolve(taskId) else {
+                throw TaskStoreError.notFound(taskId)
+            }
+            task.state = .done
+            task.claimedBy = nil
+            task.leaseExpires = nil
+            // Completing clears the wait — the thing a human was needed for is
+            // finished, so it must stop counting against the project.
+            task.waiting = nil
+            task.waitingReason = nil
+            if let note, !note.isEmpty {
+                task.body = task.body.isEmpty ? note : task.body + "\n\n" + note
+            }
+            _ = try taskStore.save(task)
+            return ActionResult(ok: true, snapshot: await refreshNow())
+
+        case .snoozeTask(let taskId, let days):
+            guard var task = taskStore.resolve(taskId) else {
+                throw TaskStoreError.notFound(taskId)
+            }
+            task.snoozedUntil = Date().addingTimeInterval(Double(days) * 86_400)
+            _ = try taskStore.save(task)
+            return ActionResult(ok: true, snapshot: await refreshNow())
+
+        case .deleteTask(let taskId):
+            guard let task = taskStore.resolve(taskId) else {
+                throw TaskStoreError.notFound(taskId)
+            }
+            taskStore.delete(id: task.id)
+            return ActionResult(ok: true, snapshot: await refreshNow())
         }
 
         if action != .refresh {
             overridesStore.save(overrides)
         }
         return ActionResult(ok: true, snapshot: await refreshNow())
+    }
+
+    // MARK: Tasks
+
+    /// Creates a task, or updates in place when its external reference is
+    /// already on the board — which is what lets an agent-driven sync run twice
+    /// without doubling everything.
+    @discardableResult
+    func create(_ fields: EngineAction.CreateTask) throws -> TaskRecord {
+        let now = Date()
+        let task = TaskRecord(
+            id: TaskRecord.identifier(title: fields.title, now: now),
+            title: fields.title,
+            projectId: fields.projectId,
+            assignee: fields.assignee.map(Assignee.init(encoded:)) ?? .unassigned,
+            state: fields.state.flatMap(TaskState.init(rawValue:)) ?? .backlog,
+            deps: fields.deps,
+            acceptance: fields.acceptance,
+            externalRef: fields.externalRef,
+            origin: fields.origin,
+            createdAt: now,
+            updatedAt: now,
+            body: fields.body ?? ""
+        )
+        return try taskStore.upsert(task, now: now)
+    }
+
+    /// Applies a partial update. Absent fields are left alone rather than
+    /// cleared, so a caller that knows about three fields can't silently erase
+    /// the ones it doesn't.
+    @discardableResult
+    func update(_ fields: EngineAction.UpdateTask) throws -> TaskRecord {
+        guard var task = taskStore.resolve(fields.taskId) else {
+            throw TaskStoreError.notFound(fields.taskId)
+        }
+        if let title = fields.title { task.title = title }
+        if let state = fields.state, let parsed = TaskState(rawValue: state) { task.state = parsed }
+        if let assignee = fields.assignee { task.assignee = Assignee(encoded: assignee) }
+        if let acceptance = fields.acceptance { task.acceptance = acceptance }
+        if let body = fields.body { task.body = body }
+        if let deps = fields.deps { task.deps = deps }
+        if let projectId = fields.projectId { task.projectId = projectId }
+        if let waiting = fields.waiting {
+            task.waiting = waiting.isEmpty ? nil : WaitingReason(rawValue: waiting)
+        }
+        if let reason = fields.waitingReason { task.waitingReason = reason }
+        return try taskStore.save(task)
     }
 
     // MARK: Internals

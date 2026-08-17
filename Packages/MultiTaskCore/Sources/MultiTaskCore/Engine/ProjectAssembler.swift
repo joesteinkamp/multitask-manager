@@ -26,6 +26,7 @@ public struct ProjectAssembler: Sendable {
     ///   - sessions: already merged and classified.
     public func assemble(records: [ProjectRecord],
                          sessions: [Session],
+                         tasks: [TaskRecord] = [],
                          waves: [Wave],
                          repositories: [RepositoryState],
                          config: Configuration,
@@ -67,9 +68,16 @@ public struct ProjectAssembler: Sendable {
             if let id = pathToId[repo.path] { reposById[id] = repo }
         }
 
+        var tasksById: [String: [TaskRecord]] = [:]
+        for task in tasks {
+            guard let projectId = task.projectId else { continue }
+            tasksById[projectId, default: []].append(task)
+        }
+
         return byId.values.map { record in
             build(record: record.withLifecycleResolved(now: now),
                   sessions: sessionsById[record.id] ?? [],
+                  tasks: tasksById[record.id] ?? [],
                   waves: wavesById[record.id] ?? [],
                   repository: reposById[record.id],
                   config: config,
@@ -80,6 +88,7 @@ public struct ProjectAssembler: Sendable {
 
     private func build(record: ProjectRecord,
                        sessions: [Session],
+                       tasks: [TaskRecord],
                        waves: [Wave],
                        repository: RepositoryState?,
                        config: Configuration,
@@ -106,6 +115,7 @@ public struct ProjectAssembler: Sendable {
 
         let verdict = Self.status(record: record,
                                   sessions: sessions,
+                                  tasks: tasks,
                                   repository: repository,
                                   briefs: briefs,
                                   nextStepCount: nextSteps.count,
@@ -121,6 +131,7 @@ public struct ProjectAssembler: Sendable {
             progress: progress,
             nextSteps: nextSteps,
             sessions: DetectionEngine.sortSessions(sessions),
+            tasks: tasks.sorted { $0.updatedAt > $1.updatedAt },
             waves: waves.sorted { $0.updatedAt > $1.updatedAt },
             repository: repository,
             lastActivity: lastActivity,
@@ -139,6 +150,7 @@ public struct ProjectAssembler: Sendable {
     /// fired, so the UI can always explain itself.
     public static func status(record: ProjectRecord,
                               sessions: [Session],
+                              tasks: [TaskRecord] = [],
                               repository: RepositoryState?,
                               briefs: BriefSet,
                               nextStepCount: Int,
@@ -151,6 +163,15 @@ public struct ProjectAssembler: Sendable {
             return StatusVerdict(status: .needsYou,
                                  reason: "Converge stalled — \(count) conflict\(count == 1 ? "" : "s")")
         }
+        // A task explicitly waiting on a human outranks a merely quiet session:
+        // one is a request, the other is an inference.
+        let waitingTasks = TaskQueue.needingAHuman(tasks: tasks, now: now)
+        if let first = waitingTasks.first {
+            let more = waitingTasks.count > 1 ? " (+\(waitingTasks.count - 1) more)" : ""
+            let why = first.waitingReason ?? first.waiting?.label ?? "Waiting on you"
+            return StatusVerdict(status: .needsYou, reason: "\(why)\(more)")
+        }
+
         let waiting = sessions.filter { $0.status == .needsAttention }
         if !waiting.isEmpty {
             let ranked = AttentionTriage.rank(waiting, now: now)
@@ -168,16 +189,27 @@ public struct ProjectAssembler: Sendable {
                                  reason: live.count == 1 ? detail : "\(live.count) sessions active")
         }
 
-        // 3 — something you could pick up. Until a task store exists, the
-        //     roadmap's unchecked items are the honest stand-in for "ready".
+        // 3 — something you could pick up. Real tasks answer this once they
+        //     exist; the roadmap's unchecked items are the stand-in until then.
+        let readyTasks = TaskQueue.ready(for: nil, tasks: tasks, now: now)
+        if !readyTasks.isEmpty {
+            let mine = readyTasks.filter { $0.assignee == .me }.count
+            let detail = mine > 0 && mine != readyTasks.count
+                ? "\(readyTasks.count) ready, \(mine) yours"
+                : "\(readyTasks.count) task\(readyTasks.count == 1 ? "" : "s") ready"
+            return StatusVerdict(status: .ready, reason: detail)
+        }
         if nextStepCount > 0 {
             return StatusVerdict(status: .ready,
                                  reason: "\(nextStepCount) item\(nextStepCount == 1 ? "" : "s") ready to pick up")
         }
 
-        // 4 — work exists but is waiting on something else. Only a repository
-        //     that is behind its integration branch can say this today; the task
-        //     store's dependency graph is what will really answer it.
+        // 4 — work exists but is waiting on something else.
+        let blockedTasks = TaskQueue.blocked(tasks: tasks, now: now)
+        if !blockedTasks.isEmpty {
+            return StatusVerdict(status: .blocked,
+                                 reason: "\(blockedTasks.count) task\(blockedTasks.count == 1 ? "" : "s") waiting on dependencies")
+        }
         if let repository, let behind = repository.agentWorktrees.map(\.behind).max(), behind > 0 {
             return StatusVerdict(status: .blocked,
                                  reason: "Agent branches \(behind) commit\(behind == 1 ? "" : "s") behind integration")

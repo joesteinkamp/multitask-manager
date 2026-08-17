@@ -60,8 +60,7 @@ public final class ProjectStore: @unchecked Sendable {
     private let lock = NSLock()
 
     public init(directory: URL? = nil) {
-        self.directory = directory ?? FileSupport.homeDirectory
-            .appendingPathComponent(".multitaskmanager", isDirectory: true)
+        self.directory = directory ?? FileSupport.stateDirectory
             .appendingPathComponent("projects", isDirectory: true)
         try? FileSupport.fileManager.createDirectory(at: self.directory, withIntermediateDirectories: true)
     }

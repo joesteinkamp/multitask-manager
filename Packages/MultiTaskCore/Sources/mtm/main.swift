@@ -13,8 +13,8 @@ struct MTM: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
-        subcommands: [Status.self, Projects.self, Show.self, List.self, Watch.self,
-                      Waves.self, Roster.self, Doctor.self],
+        subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
+                      List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
 }
@@ -526,4 +526,366 @@ extension String {
     func padded(to width: Int) -> String {
         count >= width ? self + " " : self + String(repeating: " ", count: width - count)
     }
+}
+
+// MARK: - next
+
+struct Next: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "What to do next — ranked, with the reason."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Option(name: .long, help: "Whose queue: me, or a delegate name like claude.")
+    var who: String = "me"
+
+    @Option(name: .long, help: "How many to show.")
+    var limit: Int = 5
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        let assignee = who == "any" ? nil : Assignee(encoded: who)
+
+        // Blocked-on-a-human comes first: it's a request, not a suggestion.
+        let waiting = snapshot.tasksNeedingYou()
+        if !waiting.isEmpty {
+            print("Waiting on you:")
+            for task in waiting.prefix(limit) {
+                let why = task.waitingReason ?? task.waiting?.label ?? "Waiting"
+                print("  \(String(task.id.prefix(20)).padded(to: 22)) \(task.title)")
+                print("  \(String(repeating: " ", count: 22)) \(why)")
+            }
+            print("")
+        }
+
+        let next = snapshot.whatNext(for: assignee, limit: limit)
+        guard !next.isEmpty else {
+            let owner = assignee?.label ?? "anyone"
+            print("Nothing ready for \(owner).")
+            if snapshot.tasks.isEmpty {
+                print("No tasks yet — `mtm task add \"…\"` to start, or let an agent file them over MCP.")
+            } else {
+                let blocked = TaskQueue.blocked(tasks: snapshot.tasks).count
+                if blocked > 0 { print("\(blocked) task(s) blocked on dependencies.") }
+            }
+            return
+        }
+
+        print("Next for \(assignee?.label ?? "anyone"):")
+        for (index, item) in next.enumerated() {
+            let marker = index == 0 ? "→" : " "
+            print("  \(marker) \(item.task.title)")
+            print("     \(item.reason) · \(item.task.state.label) · \(item.task.id)")
+            if let acceptance = item.task.acceptance {
+                print("     done when: \(ProjectContextReader.truncate(acceptance, to: 80))")
+            }
+        }
+    }
+}
+
+// MARK: - tasks
+
+struct Tasks: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "task",
+        abstract: "The work — yours and your agents'.",
+        subcommands: [TaskList.self, TaskAdd.self, TaskShow.self, TaskDone.self,
+                      TaskClaim.self, TaskSnooze.self, TaskBlock.self, TaskDelete.self],
+        defaultSubcommand: TaskList.self
+    )
+}
+
+struct TaskList: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "list", abstract: "Every open task."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Option(name: .long, help: "Filter by state.")
+    var state: String?
+
+    @Option(name: .long, help: "Filter by assignee: me, or a delegate name.")
+    var who: String?
+
+    @Flag(name: .long, help: "Include completed tasks.")
+    var all = false
+
+    @Flag(name: .long, help: "Emit JSON for scripts and agents.")
+    var json = false
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        var tasks = snapshot.tasks
+        if !all { tasks = tasks.filter { $0.state.isOpen } }
+        if let state, let parsed = TaskState(rawValue: state) { tasks = tasks.filter { $0.state == parsed } }
+        if let who { tasks = tasks.filter { $0.assignee == Assignee(encoded: who) } }
+
+        if json {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            print(String(decoding: try encoder.encode(TaskListPayload(tasks: tasks)), as: UTF8.self))
+            return
+        }
+
+        guard !tasks.isEmpty else {
+            print("No tasks. `mtm task add \"…\"` to start one.")
+            return
+        }
+        let names = Dictionary(uniqueKeysWithValues: snapshot.projects.map { ($0.id, $0.name) })
+        for task in tasks.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            let project = task.projectId.flatMap { names[$0] } ?? "—"
+            print("  \(task.state.label.padded(to: 9)) \(task.assignee.label.padded(to: 10)) \(project.padded(to: 20)) \(task.title)")
+            if task.waiting != nil {
+                print("  \(String(repeating: " ", count: 41))↳ \(task.waitingReason ?? task.waiting!.label)")
+            }
+        }
+    }
+}
+
+struct TaskListPayload: Encodable {
+    var payloadVersion = 1
+    var tasks: [TaskRecord]
+}
+
+struct TaskAdd: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "add", abstract: "Capture a piece of work."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "What needs doing.")
+    var title: String
+
+    @Option(name: .long, help: "Project id or name prefix.")
+    var project: String?
+
+    @Option(name: .long, help: "me, or a delegate name like claude.")
+    var who: String = "me"
+
+    @Option(name: .long, help: "What done means. Strongly recommended.")
+    var acceptance: String?
+
+    @Option(name: .long, help: "Task ids this depends on, comma-separated.")
+    var deps: String?
+
+    @Option(name: .long, help: "External reference, e.g. linear:ENG-412.")
+    var ref: String?
+
+    func run() async throws {
+        let client = options.client()
+        let snapshot = try await client.list()
+
+        var projectId: String?
+        if let project {
+            let needle = project.lowercased()
+            let matches = snapshot.projects.filter {
+                $0.id.hasPrefix(project) || $0.name.lowercased().hasPrefix(needle)
+            }
+            guard matches.count == 1 else {
+                print(matches.isEmpty ? "No project matching \"\(project)\"."
+                                      : "\"\(project)\" matches \(matches.count) projects.")
+                return
+            }
+            projectId = matches[0].id
+        }
+
+        let result = try await client.act(.createTask(.init(
+            title: title,
+            projectId: projectId,
+            assignee: who,
+            acceptance: acceptance,
+            deps: deps?.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) } ?? [],
+            externalRef: ref,
+            state: "ready"
+        )))
+
+        if let created = result.snapshot?.tasks.first(where: { $0.title == title }) {
+            print("Added \(created.id)")
+            if created.acceptance == nil {
+                // Not a failure, but the omission that most reliably produces
+                // work delivered wrong and rejected.
+                print("No acceptance criteria — consider --acceptance \"…\" so it's clear when this is done.")
+            }
+        }
+    }
+}
+
+struct TaskShow: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "show", abstract: "One task in full."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        guard let task = resolve(id, in: snapshot.tasks) else { return }
+
+        print(task.title)
+        print("")
+        print("Id         \(task.id)")
+        print("State      \(task.state.label)")
+        print("Assignee   \(task.assignee.label)")
+        if let project = snapshot.projects.first(where: { $0.id == task.projectId }) {
+            print("Project    \(project.name)")
+        }
+        if let acceptance = task.acceptance { print("Done when  \(acceptance)") }
+        if let waiting = task.waiting {
+            print("Waiting    \(task.waitingReason ?? waiting.label)")
+        }
+        if !task.deps.isEmpty {
+            let index = Dictionary(uniqueKeysWithValues: snapshot.tasks.map { ($0.id, $0) })
+            print("Depends on")
+            for dep in task.deps {
+                let state = index[dep]?.state.label ?? "missing"
+                let title = index[dep]?.title ?? dep
+                print("  · \(state.padded(to: 9)) \(title)")
+            }
+        }
+        let dependents = snapshot.tasks.filter { $0.deps.contains(task.id) && $0.state.isOpen }
+        if !dependents.isEmpty {
+            print("Blocks")
+            for dep in dependents { print("  · \(dep.title)") }
+        }
+        if !task.body.isEmpty { print("\n\(task.body)") }
+    }
+}
+
+struct TaskDone: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "done", abstract: "Mark a task finished."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "A closing note, appended to the task body.")
+    var note: String?
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+        let result = try await client.act(.completeTask(taskId: task.id, note: note))
+
+        print("Done: \(task.title)")
+        // Finishing something usually frees something else — say so, because
+        // that is the moment the next action is most obvious.
+        if let snapshot = result.snapshot {
+            if let next = snapshot.whatNext(for: task.assignee, limit: 1).first {
+                print("Next: \(next.task.title) — \(next.reason)")
+            } else {
+                print("Nothing else ready for \(task.assignee.label).")
+            }
+        }
+    }
+}
+
+struct TaskClaim: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "claim", abstract: "Take a task, with an expiring lease."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Who is taking it.")
+    var owner: String = "me"
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+        _ = try await client.act(.claimTask(taskId: task.id, owner: owner))
+        print("Claimed \(task.title) for \(owner).")
+    }
+}
+
+struct TaskSnooze: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "snooze", abstract: "Put a task out of the way for a while."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Days to stay quiet.")
+    var days: Int = 7
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+        _ = try await client.act(.snoozeTask(taskId: task.id, days: days))
+        print("Snoozed \(task.title) for \(days) day\(days == 1 ? "" : "s").")
+    }
+}
+
+struct TaskBlock: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "needs", abstract: "Say a task is waiting on a human."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Argument(help: "approval | question | done | error, or 'none' to clear.")
+    var kind: String
+
+    @Option(name: .long, help: "Why, in a few words.")
+    var why: String?
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+        _ = try await client.act(.updateTask(.init(
+            taskId: task.id,
+            waiting: kind == "none" ? "" : kind,
+            waitingReason: why
+        )))
+        print(kind == "none" ? "Cleared: \(task.title)" : "\(task.title) now needs you: \(why ?? kind)")
+    }
+}
+
+struct TaskDelete: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "rm", abstract: "Remove a task."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+        _ = try await client.act(.deleteTask(taskId: task.id))
+        print("Removed \(task.title).")
+    }
+}
+
+/// Any unique id prefix, or an exact title. People and agents type what they
+/// were shown, which is rarely the whole id.
+func resolve(_ needle: String, in tasks: [TaskRecord]) -> TaskRecord? {
+    if let exact = tasks.first(where: { $0.id == needle }) { return exact }
+    let matches = tasks.filter {
+        $0.id.hasPrefix(needle) || $0.title.lowercased().hasPrefix(needle.lowercased())
+    }
+    if matches.count == 1 { return matches[0] }
+    print(matches.isEmpty ? "No task matching \"\(needle)\"."
+                          : "\"\(needle)\" matches \(matches.count): \(matches.map(\.title).joined(separator: ", "))")
+    return nil
 }

@@ -24,6 +24,9 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
     /// these; a project is what a person actually manages, and it appears here
     /// whether or not anything is running in it.
     public var projects: [Project] = []
+    /// Every task, across every project. Projects carry their own slice; this is
+    /// the flat view the queue and the MCP server work from.
+    public var tasks: [TaskRecord] = []
     public var sessions: [Session] = []
     public var waves: [Wave] = []
     public var repositories: [RepositoryState] = []
@@ -55,6 +58,20 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
     /// the one nothing else in the app would surface.
     public var dormantProjects: [Project] {
         activeProjects.filter { $0.status == .dormant }
+    }
+
+    /// What to do next, ranked and explained. The question the product is for.
+    public func whatNext(for assignee: Assignee? = .me,
+                         now: Date = Date(),
+                         limit: Int? = nil) -> [ReadyItem] {
+        let pinned = Set(projects.filter(\.record.isPinned).map(\.id))
+        return TaskQueue.next(for: assignee, tasks: tasks,
+                              pinnedProjectIds: pinned, now: now, limit: limit)
+    }
+
+    /// Tasks blocked on a human, most urgent first.
+    public func tasksNeedingYou(now: Date = Date()) -> [TaskRecord] {
+        TaskQueue.needingAHuman(tasks: tasks, now: now)
     }
 
     /// Waiting sessions in triage order.
@@ -92,6 +109,9 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
             projects: projects.map {
                 "\($0.id)|\($0.status.rawValue)|\($0.statusReason)|\($0.progress?.summary ?? "")|\($0.nextSteps.count)"
             },
+            tasks: tasks.map {
+                "\($0.id)|\($0.state.rawValue)|\($0.assignee.encoded)|\($0.waiting?.rawValue ?? "")|\($0.deps.joined(separator: ","))"
+            },
             sessions: sessions.map {
                 "\($0.id)|\($0.status.rawValue)|\($0.waiting?.rawValue ?? "")|\($0.reason ?? "")|\($0.isPinned)|\($0.title)|\($0.evidence.rawValue)"
             },
@@ -110,6 +130,7 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
 /// A snapshot reduced to the facts a subscriber reacts to.
 public struct SnapshotDigest: Equatable, Sendable {
     public var projects: [String]
+    public var tasks: [String]
     public var sessions: [String]
     public var waves: [String]
     public var repositories: [String]
@@ -130,6 +151,7 @@ public actor DetectionEngine {
     private let waveReader: WaveReader
     private let worktreeReader: WorktreeReader
     private let projectStore: ProjectStore
+    private let taskStore: TaskStore
     private let projectAssembler: ProjectAssembler
     /// Detectors the host supplies — `RunningAppsDetector` needs AppKit, so it
     /// lives in the app and is injected here.
@@ -146,6 +168,7 @@ public actor DetectionEngine {
                 waveReader: WaveReader = WaveReader(),
                 worktreeReader: WorktreeReader = WorktreeReader(),
                 projectStore: ProjectStore = ProjectStore(),
+                taskStore: TaskStore = TaskStore(),
                 projectAssembler: ProjectAssembler? = nil) {
         self.configurationProvider = configuration
         self.additionalDetectors = additionalDetectors
@@ -154,6 +177,7 @@ public actor DetectionEngine {
         self.waveReader = waveReader
         self.worktreeReader = worktreeReader
         self.projectStore = projectStore
+        self.taskStore = taskStore
         self.projectAssembler = projectAssembler ?? ProjectAssembler(contextReader: contextReader)
     }
 
@@ -211,11 +235,22 @@ public actor DetectionEngine {
             snapshot.repositories = repositories
         }
 
+        // Reclaim any lease that expired while nobody was looking, so a crashed
+        // agent's task returns to the queue instead of stranding in `running`.
+        var tasks = taskStore.load()
+        let reclaimed = TaskQueue.reclaimExpired(tasks, now: now)
+        if !reclaimed.isEmpty {
+            for task in reclaimed { _ = try? taskStore.save(task, now: now) }
+            tasks = taskStore.load()
+        }
+        snapshot.tasks = tasks
+
         // Projects last: they are assembled *from* everything above, and they are
         // what the surfaces actually render.
         snapshot.projects = projectAssembler.assemble(
             records: projectStore.load(),
             sessions: snapshot.sessions,
+            tasks: tasks,
             waves: snapshot.waves,
             repositories: snapshot.repositories,
             config: config,

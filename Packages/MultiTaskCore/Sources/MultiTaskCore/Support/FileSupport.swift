@@ -21,6 +21,18 @@ public enum FileSupport {
         return String(trimmed[trimmed.index(after: slash)...])
     }
 
+    /// Root for everything this app owns: projects, tasks, runs, the socket.
+    ///
+    /// `$MTM_HOME` overrides it, which is what lets tests and demos run against a
+    /// throwaway directory instead of the real one. Without an escape hatch, the
+    /// only way to try something is to write into the state you actually rely on.
+    public static var stateDirectory: URL {
+        if let override = ProcessInfo.processInfo.environment["MTM_HOME"], !override.isEmpty {
+            return URL(fileURLWithPath: expandingTilde(override), isDirectory: true)
+        }
+        return homeDirectory.appendingPathComponent(".multitaskmanager", isDirectory: true)
+    }
+
     /// Whether a directory is specific enough to be somebody's *project*.
     ///
     /// The home directory becomes a candidate the moment a session runs there,

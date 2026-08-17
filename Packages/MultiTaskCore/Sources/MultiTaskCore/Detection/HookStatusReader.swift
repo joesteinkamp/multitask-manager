@@ -41,9 +41,7 @@ public struct HookStatusReader: SessionDetector {
     }
 
     public static var defaultStatusDirectory: URL {
-        FileSupport.homeDirectory
-            .appendingPathComponent(".multitaskmanager", isDirectory: true)
-            .appendingPathComponent("status", isDirectory: true)
+        FileSupport.stateDirectory.appendingPathComponent("status", isDirectory: true)
     }
 
     /// One parsed status file. Kept `public` so the daemon and CLI can reuse the

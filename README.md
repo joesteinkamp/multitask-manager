@@ -253,7 +253,7 @@ Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/A
 │   ├── Client/                   # EngineClient protocol + InProcessEngine
 │   └── Wire/                     # daemon protocol: envelope, codec, frame reader
 ├── Sources/mtm/                  # the CLI
-└── Tests/                        # 203 tests, incl. opt-in checks against real harness data
+└── Tests/                        # 250 tests, incl. opt-in checks against real harness data
 
 MultiTaskManager/                 # the macOS app — links MultiTaskCore
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
@@ -298,6 +298,12 @@ swift build --package-path Packages/MultiTaskCore -c release
 | Command | What it shows |
 | --- | --- |
 | `mtm status` | every project and what each one needs — the default |
+| `mtm next [--who] [--limit]` | **what to do next, ranked, with the reason** |
+| `mtm task list [--who] [--state] [--json]` | the work, yours and your agents' |
+| `mtm task add "…" [--project] [--acceptance] [--deps]` | capture a piece of work |
+| `mtm task done <id> [--note]` | finish it, and hear what that freed |
+| `mtm task needs <id> approval --why "…"` | hand it back to a human |
+| `mtm task claim/snooze/show/rm <id>` | take it, defer it, read it, drop it |
 | `mtm projects [--all] [--json]` | the same list, with one-liners; `--all` includes archived and parked |
 | `mtm show <project>` | one project: status, progress, sessions, next steps, success metrics |
 | `mtm projects add <name> [--path] [--ref]` | track a project — including one with no repository yet |
@@ -319,6 +325,46 @@ carries a `payloadVersion` and its shape doesn't change casually.
 appearing or leaving, a status or wait-reason changing, a wave advancing, a
 converge breaking. Activity timestamps drift on every tick and are deliberately
 not treated as changes.
+
+## Giving agents the board — MCP
+
+`mtm-mcp` exposes the board over the Model Context Protocol, so an agent can
+read it, take the next task, and file work it found elsewhere. This is the
+surface the North Star runs on: a session with Notion and Linear also connected
+does the integrating, and this app holds the board.
+
+```jsonc
+// ~/.claude.json  (or any MCP client's config)
+{
+  "mcpServers": {
+    "multitask-manager": {
+      "command": "/absolute/path/to/.build/release/mtm-mcp"
+    }
+  }
+}
+```
+
+Nine tools: `whats_next`, `list_projects`, `list_tasks`, `get_task`,
+`create_task`, `update_task`, `claim_task`, `complete_task`, `project_status`.
+Their descriptions are written as numbered procedures rather than API docs,
+because agents follow steps far more reliably than they infer a workflow from a
+parameter list.
+
+Three rules the tools enforce, each of which exists because its absence breaks
+something:
+
+- **`externalRef` makes filing idempotent.** Pass `linear:ENG-412` and a second
+  sweep updates instead of duplicating — and it *merges*, so a sync that knows
+  only the title can't erase acceptance criteria a person wrote.
+- **Work waiting on a human is never offered as available.** It appears under
+  `waitingOnHuman` with the reason, and nowhere else.
+- **Organising work is free; spending is gated.** Filing and reprioritising need
+  no approval. Anything that starts a run, touches a repository or writes
+  outward stops and asks exactly as it would from a terminal — and no such tool
+  exists here yet, deliberately.
+
+Set `MTM_HOME` to point the whole app at a throwaway state directory, which is
+how to try any of this without touching your real board.
 
 ## One engine, several faces
 
