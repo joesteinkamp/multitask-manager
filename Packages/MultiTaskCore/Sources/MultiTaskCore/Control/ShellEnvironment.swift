@@ -53,13 +53,28 @@ public final class ShellEnvironment: @unchecked Sendable {
     /// Whether a delegate is actually on the resolved `PATH`.
     public func locate(_ executable: String) -> String? {
         let env = environment()
-        guard let path = env["PATH"] else { return nil }
+        guard let path = Self.searchPath(in: env) else { return nil }
         let separator: Character = FileSupport.isWindows ? ";" : ":"
         for directory in path.split(separator: separator) where !directory.isEmpty {
             let candidate = String(directory) + (FileSupport.isWindows ? "\\" : "/") + executable
             if FileSupport.fileManager.isExecutableFile(atPath: candidate) { return candidate }
         }
         return nil
+    }
+
+    /// The search path, whatever the platform calls it.
+    ///
+    /// Windows environment variables are case-insensitive and the value is
+    /// conventionally spelled `Path`, but Swift hands back a plain, case-
+    /// *sensitive* dictionary — so a literal `env["PATH"]` returns nil there and
+    /// every executable lookup silently fails. That is exactly what happened the
+    /// first time the Windows CI job ran the suite.
+    static func searchPath(in environment: [String: String]) -> String? {
+        if let exact = environment["PATH"], !exact.isEmpty { return exact }
+        guard let key = environment.keys.first(where: { $0.caseInsensitiveCompare("PATH") == .orderedSame })
+        else { return nil }
+        let value = environment[key]
+        return (value?.isEmpty ?? true) ? nil : value
     }
 
     /// Runs `$SHELL -l -c printenv` and parses the result.

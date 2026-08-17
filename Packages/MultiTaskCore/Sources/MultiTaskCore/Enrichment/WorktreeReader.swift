@@ -25,7 +25,9 @@ public struct GitRunner: Sendable {
         let executable = FileSupport.isWindows ? "git.exe" : "git"
         let separator: Character = FileSupport.isWindows ? ";" : ":"
 
-        if let path = ProcessInfo.processInfo.environment["PATH"] {
+        // Same case-sensitivity trap as ShellEnvironment: Windows spells it
+        // `Path`, so a literal "PATH" lookup would never find git there.
+        if let path = ShellEnvironment.searchPath(in: ProcessInfo.processInfo.environment) {
             for directory in path.split(separator: separator) where !directory.isEmpty {
                 let candidate = String(directory) + (FileSupport.isWindows ? "\\" : "/") + executable
                 if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }

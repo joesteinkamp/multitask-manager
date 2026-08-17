@@ -406,13 +406,33 @@ struct ShellEnvironmentTests {
         // to the current process's environment must still yield something usable
         // rather than an empty dictionary.
         let env = ShellEnvironment().environment()
-        #expect(env["PATH"] != nil)
+        // Asked for the way the code asks for it. A literal `env["PATH"]` passes
+        // on Unix and fails on Windows, where the variable is spelled `Path` and
+        // Swift's dictionary is case-sensitive — which is how that bug reached
+        // CI in the first place.
+        #expect(ShellEnvironment.searchPath(in: env) != nil)
+    }
+
+    @Test("The search path is found whatever the platform calls it")
+    func searchPathIsCaseInsensitive() {
+        #expect(ShellEnvironment.searchPath(in: ["PATH": "/usr/bin"]) == "/usr/bin")
+        #expect(ShellEnvironment.searchPath(in: ["Path": "C:\\Windows"]) == "C:\\Windows")
+        #expect(ShellEnvironment.searchPath(in: ["path": "/bin"]) == "/bin")
+        // Empty is as useless as absent, and must not be reported as a find.
+        #expect(ShellEnvironment.searchPath(in: ["PATH": ""]) == nil)
+        #expect(ShellEnvironment.searchPath(in: [:]) == nil)
     }
 
     @Test("Locates an executable that exists, and doesn't invent one that doesn't")
     func locate() {
         let shell = ShellEnvironment()
+        // Named per platform: `sh`/`ls` simply do not exist on Windows, so
+        // asserting them there tests the OS rather than this code.
+        #if os(Windows)
+        #expect(shell.locate("cmd.exe") != nil || shell.locate("where.exe") != nil)
+        #else
         #expect(shell.locate("sh") != nil || shell.locate("ls") != nil)
+        #endif
         #expect(shell.locate("definitely-not-a-real-binary-xyz") == nil)
     }
 }
