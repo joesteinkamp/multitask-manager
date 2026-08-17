@@ -366,9 +366,25 @@ Ongoing, not last — pull items forward as the surface area grows.
       `ProjectContextReader` and `SessionStore.merge` are pure logic with zero
       coverage today, and they're exactly the code that breaks silently when an
       upstream on-disk format shifts.
-- [ ] **Add CI.**
-      GitHub Actions building the Xcode project and running tests on push, plus
-      `shellcheck` on any shipped shell.
+- [x] **Add CI.**
+      GitHub Actions runs the core's tests on Linux and Windows, builds the app
+      on macOS, checks the generated design tokens against `DESIGN.json`, and
+      runs `shellcheck`. Its first run was worth the whole exercise: it caught a
+      test target that could not compile on the declared Swift version, a
+      design-token check that could not run in its own container, and — once
+      Windows got far enough to execute anything — two real cross-platform bugs.
+- [ ] **Windows: close out runs left by a previous launch.**
+      `Launcher.reconcile` tests liveness with `kill(pid, 0)`, which does not
+      exist on Windows, so it deliberately returns nothing there rather than
+      guess that a run has ended. The consequence is that a crash or reboot
+      leaves runs sitting in `running` forever on Windows. Needs
+      `OpenProcess`/`GetExitCodeProcess`, and a test that currently asserts the
+      *documented* no-op so it will fail loudly the day this is implemented.
+- [ ] **Windows: give `ShellEnvironment` something to read.**
+      There is no login shell to ask, so the environment is whatever the process
+      inherited. That is usually fine for a console app and usually wrong for a
+      GUI one — which is the case the whole class exists for. Decide what the
+      Windows client actually does before it needs to launch anything.
 - [ ] **Make detectors resilient to upstream format changes.**
       Claude Code and Codex on-disk layouts move between versions: fixture-based
       parser tests, and a visible "detector degraded" state instead of a

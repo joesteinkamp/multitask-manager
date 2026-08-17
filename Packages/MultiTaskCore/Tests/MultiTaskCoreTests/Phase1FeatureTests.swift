@@ -171,7 +171,18 @@ struct WaveReaderTests {
     /// Attribution only considers paths under the real home directory, so these
     /// build their fixtures from it rather than hard-coding someone else's.
     private static let home = NSHomeDirectory()
-    private static func project(_ name: String) -> String { "\(home)/projects/\(name)" }
+    /// A project path built the way the platform builds one.
+    ///
+    /// This used to interpolate "/" directly, which on Windows produced
+    /// `C:\\Users\\runner/projects/app` — a path no OS would ever hand you, and
+    /// one the matcher rightly failed to resolve. The test was manufacturing the
+    /// failure it then reported.
+    private static func project(_ name: String) -> String {
+        URL(fileURLWithPath: home)
+            .appendingPathComponent("projects", isDirectory: true)
+            .appendingPathComponent(name, isDirectory: true)
+            .path
+    }
 
     @Test("Attributes a wave to the longest matching project name")
     func longestPrefixWins() {
@@ -193,6 +204,22 @@ struct WaveReaderTests {
             knownProjects: [Self.project("app")]
         )
         #expect(resolved == Self.project("app"))
+    }
+
+    /// The capability the fixed helper stopped exercising by accident.
+    ///
+    /// Fixing `project(_:)` to build native paths means the Windows shape is no
+    /// longer covered incidentally on a Linux runner, so it is covered directly:
+    /// a brief naming a backslash path must still resolve.
+    @Test("A Windows path named in a brief resolves to its project")
+    func resolvesWindowsPaths() {
+        let repo = #"C:\Users\joe\projects\app"#
+        let resolved = WaveReader.resolveProject(
+            waveId: "unrecognisable-slug",
+            taskText: #"Work in C:\Users\joe\projects\app and don't touch build/."#,
+            knownProjects: [repo]
+        )
+        #expect(resolved == repo)
     }
 
     @Test("A path mentioned in the brief attributes to the deepest project, not an ancestor")
@@ -239,10 +266,18 @@ struct WaveReaderTests {
     func staleness() throws {
         let dir = TempDir()
         makeWave(dir)
+        let old = now.addingTimeInterval(-30 * 24 * 3600)
+        var backdated = true
         for file in ["TASK.md", "STATE.md", "agents/codex.md", "agents/agy.md"] {
-            dir.setModificationDate(now.addingTimeInterval(-30 * 24 * 3600), of: "app-audit-reader/\(file)")
+            backdated = dir.setModificationDate(old, of: "app-audit-reader/\(file)") && backdated
         }
-        dir.setModificationDate(now.addingTimeInterval(-30 * 24 * 3600), of: "app-audit-reader")
+        backdated = dir.setModificationDate(old, of: "app-audit-reader") && backdated
+
+        // Staleness is read from mtimes, so this test can only run where the
+        // filesystem lets us set them. Rather than assert against timestamps
+        // that silently stayed at "now" — which is what made this fail on
+        // Windows — it says so and stops.
+        try #require(backdated, "Could not backdate the fixture's timestamps on this filesystem")
 
         let wave = try #require(WaveReader(root: dir.url).read(now: now).first)
         #expect(wave.isStale)
@@ -453,5 +488,36 @@ struct SessionActivityTests {
     func noProject() {
         let activity = SessionActivityReader.parse(Self.transcript, projectPath: nil)
         #expect(activity.touched.isEmpty)
+    }
+}
+
+/// Path shapes the token scanner has to tell apart.
+@Suite("Path tokens in prose")
+struct PathTokenTests {
+
+    @Test("Recognises the three absolute shapes, and nothing else")
+    func absoluteShapes() {
+        #expect(WaveReader.isAbsolutePathToken("/home/joe/projects/app"))
+        #expect(WaveReader.isAbsolutePathToken(#"C:\Users\joe\app"#))
+        #expect(WaveReader.isAbsolutePathToken("C:/Users/joe/app"))
+        #expect(WaveReader.isAbsolutePathToken(#"\\build-server\share\app"#))
+
+        // Relative paths and prose must not be mistaken for locations.
+        #expect(!WaveReader.isAbsolutePathToken("projects/app"))
+        #expect(!WaveReader.isAbsolutePathToken("./app"))
+        #expect(!WaveReader.isAbsolutePathToken("build/"))
+        #expect(!WaveReader.isAbsolutePathToken("C:"))
+        #expect(!WaveReader.isAbsolutePathToken("ratio 3:1"))
+        #expect(!WaveReader.isAbsolutePathToken(""))
+        // A URL is not a filesystem path, and claiming one would attribute a
+        // wave to a project because its brief linked to a website.
+        #expect(!WaveReader.isAbsolutePathToken("https://example.com/app"))
+    }
+
+    @Test("Trailing separators and markdown punctuation come off either platform's paths")
+    func trimming() {
+        let tokens = WaveReader.pathTokens(in: #"See `/home/joe/app/` and (C:\Users\joe\app), then stop."#)
+        #expect(tokens.contains("/home/joe/app"))
+        #expect(tokens.contains(#"C:\Users\joe\app"#))
     }
 }

@@ -190,9 +190,24 @@ final class TempDir {
         return target
     }
 
-    func setModificationDate(_ date: Date, of relativePath: String) {
+    /// Backdates a fixture, reporting whether it took.
+    ///
+    /// `try?` here used to swallow the failure, so a test that depended on an
+    /// old timestamp would compare against "now" and fail somewhere confusing.
+    /// The value is read back rather than trusted: setAttributes can report
+    /// success on filesystems that then round or ignore the value.
+    @discardableResult
+    func setModificationDate(_ date: Date, of relativePath: String) -> Bool {
         let target = url.appendingPathComponent(relativePath)
-        try? FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: target.path)
+        do {
+            try FileManager.default.setAttributes([.modificationDate: date],
+                                                  ofItemAtPath: target.path)
+        } catch {
+            return false
+        }
+        let written = (try? FileManager.default.attributesOfItem(atPath: target.path))?[.modificationDate] as? Date
+        guard let written else { return false }
+        return abs(written.timeIntervalSince(date)) < 2
     }
 
     func path(_ relativePath: String) -> String {

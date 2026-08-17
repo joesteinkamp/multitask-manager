@@ -449,13 +449,41 @@ struct LauncherSpawnTests {
                   workingDirectory: dir.url.path)
     }
 
+    /// A one-liner run through whatever shell the platform actually has.
+    ///
+    /// These tests are about the *plumbing* — redirection, pid capture,
+    /// termination handling — none of which is POSIX-specific. Hard-coding `sh`
+    /// meant they failed on Windows for a reason that had nothing to do with
+    /// what they were testing, so the shell is chosen per platform and the
+    /// coverage survives on both.
+    private static func shell(_ script: String) -> [String] {
+        #if os(Windows)
+        return ["cmd.exe", "/c", script]
+        #else
+        return ["sh", "-c", script]
+        #endif
+    }
+
+    /// A command that keeps running until something stops it.
+    ///
+    /// `timeout` on Windows refuses to run without a console, so `ping` to
+    /// loopback is the portable way to idle — an old trick, and the one that
+    /// works when stdout is redirected to a file.
+    private static var longRunning: [String] {
+        #if os(Windows)
+        return shell("ping -n 31 127.0.0.1 > nul")
+        #else
+        return shell("sleep 30")
+        #endif
+    }
+
     @Test("Output is captured to the run's own files")
     func capturesOutput() throws {
         let dir = TempDir()
         let store = RunStore(directory: dir.url.appendingPathComponent("runs"))
         let launcher = Launcher(runStore: store)
 
-        let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "echo hello-from-run"]))
+        let started = try launcher.start(harmlessRun(dir, command: Self.shell("echo hello-from-run")))
         #expect(started.pid != nil)
         // NOT `== .running`. `start` returns the record as it stands on disk, and
         // `echo` can be reaped before `start` returns — the termination handler
@@ -496,8 +524,18 @@ struct LauncherSpawnTests {
         orphan.pid = 999_999
 
         let closed = launcher.reconcile([orphan])
+
+        #if os(Windows)
+        // Documented behaviour, not an oversight: `reconcile` cannot test
+        // liveness by pid on Windows, so it deliberately leaves records alone
+        // rather than guessing that a run has ended. Asserting that here means
+        // the day someone implements it, this test fails and says so.
+        // See ROADMAP.md, "Windows: close out runs left by a previous launch".
+        #expect(closed.isEmpty)
+        #else
         #expect(closed.first?.state == .finished)
         #expect(closed.first?.note?.contains("exited") == true)
+        #endif
     }
 
     @Test("Cancelling stops a long-running process")
@@ -506,7 +544,7 @@ struct LauncherSpawnTests {
         let store = RunStore(directory: dir.url.appendingPathComponent("runs"))
         let launcher = Launcher(runStore: store)
 
-        let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "sleep 30"]))
+        let started = try launcher.start(harmlessRun(dir, command: Self.longRunning))
         let pid = try #require(started.pid)
         let cancelled = launcher.cancel(started, note: "test", grace: 2)
 
@@ -525,7 +563,7 @@ struct LauncherSpawnTests {
         let store = RunStore(directory: dir.url.appendingPathComponent("runs"))
         let launcher = Launcher(runStore: store)
 
-        let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "exit 3"]))
+        let started = try launcher.start(harmlessRun(dir, command: Self.shell("exit 3")))
         var record = try #require(store.run(id: started.id))
         for _ in 0..<80 {
             Thread.sleep(forTimeInterval: 0.05)
@@ -543,7 +581,7 @@ struct LauncherSpawnTests {
         let store = RunStore(directory: dir.url.appendingPathComponent("runs"))
         let launcher = Launcher(runStore: store)
 
-        let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "exit 0"]))
+        let started = try launcher.start(harmlessRun(dir, command: Self.shell("exit 0")))
         for _ in 0..<80 {
             Thread.sleep(forTimeInterval: 0.05)
             if store.run(id: started.id)?.state.isTerminal == true { break }

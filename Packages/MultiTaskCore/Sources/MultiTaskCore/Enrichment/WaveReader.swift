@@ -240,9 +240,31 @@ public struct WaveReader: Sendable {
     static func pathTokens(in text: String) -> [String] {
         text.split(whereSeparator: { $0 == " " || $0 == "\t" || $0 == "\n" || $0 == "\r" })
             .map { token in
+                // `:` is *not* trimmed from the front-half of a drive letter —
+                // it is only stripped as trailing punctuation, which is why the
+                // trim happens before the shape test rather than after.
                 String(token).trimmingCharacters(in: CharacterSet(charactersIn: "`'\"(),;:*_[]<>"))
             }
-            .filter { $0.hasPrefix("/") }
-            .map { $0.hasSuffix("/") && $0.count > 1 ? String($0.dropLast()) : $0 }
+            .filter(isAbsolutePathToken)
+            .map { token in
+                guard token.count > 1, let last = token.last, last == "/" || last == "\\" else { return token }
+                return String(token.dropLast())
+            }
+    }
+
+    /// Whether a word out of prose looks like an absolute path.
+    ///
+    /// Three shapes, because this ran on Windows and only knew one: a leading
+    /// slash, a drive letter, and a UNC share. Without the last two, a brief
+    /// written on Windows named no paths at all, so a wave there could never be
+    /// attributed to its project by mention.
+    static func isAbsolutePathToken(_ token: String) -> Bool {
+        if token.hasPrefix("/") { return true }
+        if token.hasPrefix("\\\\") { return true }          // UNC: \\server\share
+        // Drive letter: `C:\…` or `C:/…`
+        let characters = Array(token)
+        guard characters.count >= 3, characters[1] == ":" ,
+              characters[0].isLetter, characters[2] == "\\" || characters[2] == "/" else { return false }
+        return true
     }
 }
