@@ -1,145 +1,220 @@
 import SwiftUI
+import MultiTaskCore
 
-/// Root of the menu bar popover: summary header, project-grouped session list,
-/// and footer actions.
+/// Root of the menu bar popover.
+///
+/// **Projects, not sessions.** The previous version listed sessions and grouped
+/// them under a project *name* — a string derived from a directory — which is a
+/// session monitor with a grouping feature. Here the project is the row and
+/// sessions are detail underneath it, and a project with nothing running still
+/// appears, because that is often the one that needs attention most.
 struct MenuContentView: View {
     @EnvironmentObject private var store: SessionStore
 
     @State private var isAdding = false
-    @State private var newTitle = ""
+    @State private var showingPast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+
+            // Asks come first, above even "what's next". While one of these
+            // sits here an agent is stopped, so this is the only thing in the
+            // app where the cost of not looking is measured in idle compute
+            // rather than in your own attention.
+            if !store.pendingApprovals.isEmpty {
+                Divider()
+                ApprovalsSection()
+                    .padding(.horizontal, AppTheme.sectionSpacing)
+                    .padding(.vertical, AppTheme.rowSpacing)
+            }
+
+            // The decision comes before the context: what to do, then which
+            // project is in what state.
+            if !store.nextUp.isEmpty || !store.awaitingMe.isEmpty {
+                Divider()
+                NextUpView()
+            }
+
             Divider()
 
-            if store.sessions.isEmpty {
+            if store.activeProjects.isEmpty {
                 emptyState
             } else {
-                sessionList
+                projectList
+            }
+
+            if !store.runs.isEmpty {
+                Divider()
+                RunsSection()
+                    .padding(.horizontal, AppTheme.sectionSpacing)
+                    .padding(.vertical, AppTheme.rowSpacing)
+            }
+
+            if !store.degraded.isEmpty {
+                Divider()
+                degradedNotice
             }
 
             Divider()
             footer
         }
-        .frame(width: 340)
+        .frame(width: AppTheme.popoverWidth)
     }
 
     // MARK: Header
 
     private var header: some View {
-        let attention = store.needsAttentionCount
-        return VStack(alignment: .leading, spacing: 2) {
+        // Counted separately and named for what they are. `needsAttentionCount`
+        // drives the badge and now includes agents' asks, so reusing it here
+        // would have reported "3 projects need you" when two of the three were
+        // agents waiting on a decision — the wrong thing to go looking for.
+        let projectsNeeding = store.activeProjects.filter { $0.status == .needsYou }.count
+        let asks = store.pendingApprovals.count
+        return VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
             Text("MultiTask Manager")
                 .font(.headline)
-            HStack(spacing: 6) {
-                if attention > 0 {
-                    Label("\(attention) need attention", systemImage: "exclamationmark.circle.fill")
-                        .foregroundStyle(.orange)
+            HStack(spacing: AppTheme.rowSpacing) {
+                if asks > 0 {
+                    Label(asks == 1 ? "An agent is asking you"
+                                    : "\(asks) agents are asking you",
+                          systemImage: "hand.raised.fill")
+                        .foregroundStyle(AppTheme.attentionColor)
+                        .font(.caption)
+                } else if projectsNeeding > 0 {
+                    Label("\(projectsNeeding) project\(projectsNeeding == 1 ? "" : "s") need you",
+                          systemImage: "exclamationmark.circle.fill")
+                        .foregroundStyle(AppTheme.attentionColor)
                         .font(.caption)
                 } else {
-                    Label("All caught up", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                    Label("Nothing waiting on you", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(AppTheme.workingColor)
                         .font(.caption)
                 }
                 Spacer()
-                Text("\(store.sessions.count) tracked")
+                Text("\(store.activeProjects.count) project\(store.activeProjects.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
+        .padding(AppTheme.sectionSpacing)
     }
 
     // MARK: List
 
-    private var sessionList: some View {
+    private var projectList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(store.groupedByProject, id: \.project) { group in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(group.project)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                        ForEach(sortedSessions(group.sessions)) { session in
-                            SessionRowView(session: session)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
+                ForEach(liveProjects) { project in
+                    ProjectRowView(project: project)
                 }
+
+                if !dormantProjects.isEmpty {
+                    dormantDisclosure
+                }
+
                 if isAdding { addField }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, AppTheme.rowPadding)
         }
-        .frame(maxHeight: 420)
+        .frame(maxHeight: 460)
     }
 
-    private func sortedSessions(_ sessions: [Session]) -> [Session] {
-        sessions.sorted { a, b in
-            if a.status.sortRank != b.status.sortRank { return a.status.sortRank < b.status.sortRank }
-            return a.lastActivity > b.lastActivity
+    /// Everything except the quiet ones, which collapse so they don't crowd out
+    /// what's live — but they stay one click away rather than disappearing.
+    private var liveProjects: [Project] {
+        store.activeProjects.filter { $0.status != .dormant }
+    }
+
+    private var dormantProjects: [Project] {
+        store.activeProjects.filter { $0.status == .dormant }
+    }
+
+    private var dormantDisclosure: some View {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { showingPast.toggle() }
+            } label: {
+                HStack(spacing: AppTheme.tightSpacing) {
+                    Image(systemName: "chevron.right")
+                        .font(AppTheme.glyphFont.weight(.semibold))
+                        .rotationEffect(.degrees(showingPast ? 90 : 0))
+                    Text("\(dormantProjects.count) gone quiet")
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, AppTheme.sectionSpacing)
+            .help("Projects with no activity and nothing ready to pick up")
+
+            if showingPast {
+                ForEach(dormantProjects) { project in
+                    ProjectRowView(project: project)
+                }
+            }
         }
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppTheme.rowPadding) {
             if isAdding {
-                addField.padding(.horizontal, 12)
+                addField.padding(.horizontal, AppTheme.sectionSpacing)
             } else {
                 Image(systemName: "moon.stars")
                     .font(.largeTitle)
                     .foregroundStyle(.secondary)
-                Text("No active sessions detected")
+                Text("No projects tracked yet")
                     .font(.callout)
-                Text("Start a Claude Code or Codex session, or add one manually.")
+                Text("Start a Claude Code or Codex session in a project, or capture a task to begin.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .padding(.horizontal, 12)
+        .padding(.vertical, AppTheme.spaciousPadding)
+        .padding(.horizontal, AppTheme.sectionSpacing)
     }
 
     private var addField: some View {
-        HStack {
-            TextField("Name this task…", text: $newTitle, onCommit: commitAdd)
-                .textFieldStyle(.roundedBorder)
-            Button("Add", action: commitAdd)
-                .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(.horizontal, 12)
+        TaskComposer(projectId: nil) { isAdding = false }
+            .padding(.horizontal, AppTheme.sectionSpacing)
     }
 
-    private func commitAdd() {
-        store.addManual(title: newTitle, projectPath: nil)
-        newTitle = ""
-        isAdding = false
+    // MARK: Degraded
+
+    /// "Nothing is running" and "I can't see anything" must not look the same.
+    private var degradedNotice: some View {
+        VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
+            ForEach(store.degraded, id: \.self) { reason in
+                Label(reason.message, systemImage: "eye.trianglebadge.exclamationmark")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.horizontal, AppTheme.sectionSpacing)
+        .padding(.vertical, AppTheme.rowSpacing)
     }
 
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 12) {
-            Button {
-                isAdding.toggle()
-            } label: {
+        HStack(spacing: AppTheme.sectionSpacing) {
+            Button { isAdding.toggle() } label: {
                 Label("Add", systemImage: "plus.circle")
             }
             .buttonStyle(.plain)
 
-            Button {
-                store.refresh()
-            } label: {
+            Button { store.refresh() } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.plain)
 
             if store.hiddenCount > 0 {
-                Button {
-                    store.clearHidden()
-                } label: {
+                Button { store.clearHidden() } label: {
                     Label("Restore \(store.hiddenCount)", systemImage: "arrow.uturn.backward")
                 }
                 .buttonStyle(.plain)
@@ -149,16 +224,14 @@ struct MenuContentView: View {
 
             SettingsButton()
 
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
+            Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power")
             }
             .buttonStyle(.plain)
             .help("Quit")
         }
         .font(.callout)
-        .padding(12)
+        .padding(AppTheme.sectionSpacing)
     }
 }
 

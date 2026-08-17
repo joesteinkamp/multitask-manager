@@ -1,11 +1,21 @@
 # Implementation plan
 
-[ROADMAP.md](../ROADMAP.md) says *what* and *why*. This says *how*: the design
-decisions, the order to build in, and the things most likely to go wrong.
+[ROADMAP.md](../ROADMAP.md) says *what* and *why*.
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) says how it reaches Windows and Linux.
+This says *how*: the design decisions, the order to build in, and the things
+most likely to go wrong.
 
 Each numbered item below is scoped to roughly one pull request — independently
 shippable, with the app working at every step. Item numbers match roadmap
 phases (P1.1 is the first item of Phase 1).
+
+**Keep the destination in view while reading the early phases.** Phases 1–3 are
+about sessions, which makes them look like a session monitor. They aren't the
+product; they're how the app earns a trustworthy picture of what's happening.
+The product is Phase 4 onward: work — mine and my agents' — tracked per project,
+with a next action for each actor, reachable by agents through MCP. Every
+decision in Phases 1–3 should be judged on whether it makes that easier, not on
+whether it makes a better session list.
 
 ---
 
@@ -31,35 +41,238 @@ These constrain every phase, so they're stated once.
    inputs and responses — best-effort redacted, not guaranteed. Never re-log it,
    never copy it into app state that gets written elsewhere, never display it
    beyond what the user explicitly opens.
+6. **A project has a brief, or the app is guessing.** Tracked projects are
+   expected to carry the briefs
+   [`project-starter-pack`](https://github.com/joesteinkamp/project-starter-pack)
+   generates — `PRODUCT.md` at minimum. See below.
+
+---
+
+## Project briefs are the context layer
+
+The app is built on top of `project-starter-pack`, which walks a project through
+three briefs and leaves them at the repo root:
+
+| File | What it gives this app |
+|---|---|
+| `PRODUCT.md` | **The one-liner** — a single sentence a stranger could repeat. Also users, jobs-to-be-done, product purpose, success metrics, design principles, anti-references. |
+| `DESIGN.md` + `DESIGN.json` | The UX foundation and machine-readable design tokens. |
+| `CODE.md` | Stack, architecture, conventions, testing, performance, security. |
+| `AGENTS.md` / `CLAUDE.md` | The router pointing agents at the brief that owns each kind of work. |
+
+**Why this matters more than it looks.** Everything the app currently knows
+about a project is scraped: a goal guessed from the first paragraph of a README,
+next steps guessed from checkbox syntax. A brief is *stated* context, in known
+sections, written deliberately. That difference is what makes the difference
+between listing what is stuck and suggesting what to do next.
+
+Three concrete consequences, all pure file reads with no inference:
+
+- **The one-liner is the canonical Goal**, not the first paragraph of anything.
+  Today `ProjectContextReader` ranks `PRODUCT.md` fifth and reads its opening
+  paragraph, which in a generated brief is the **Register** section — so a
+  starter-pack project currently shows "product — a daily-use reading tool where
+  earned familiarity beats novelty" where it should show the one-liner. That is
+  a live bug for exactly the projects this app is meant to serve best.
+- **Jobs-to-be-done and success metrics say what "done" looks like.** They are
+  the closest thing on disk to an acceptance criterion, and they are what a
+  proposed next action should be judged against.
+- **Design principles and anti-references are review context.** When a task
+  dispatches a cross-vendor review, the reviewer should be handed the project's
+  own principles rather than generic ones.
+
+**Where a project has no brief**, the app says so plainly and offers to fix it:
+`setup` for a new project, `extract` for a brownfield one — both flows the pack
+already ships. It does not silently degrade to guessing, because a project
+without a brief is precisely the project whose "next action" suggestions would
+be worthless.
+
+**This repository does not yet have its own briefs**, which needs fixing before
+the app requires them of anyone else. `extract` exists for exactly this case.
+
+---
+
+## Prior art: what `mission-control` learned the hard way
+
+`~/mission-control` is an abandoned Next.js + SQLite orchestration layer for a
+fully autonomous agent team — a Chief-of-Staff agent generating tasks, waking
+specialists on cron, quality-gating their output. Last commit 2026-05-28; the
+final entries in its decision log are the author disabling every agent one at a
+time. Its own `PROJECT.md` says plainly: *"Only one agent has ever completed a
+task autonomously… The scheduled autonomous cycle has never fully worked from
+start to finish."*
+
+**Its premise was that agents work and the human is removed from the loop. Ours
+is the correction, not a variant** — the human is a first-class actor and the
+app's job is knowing where to look. That difference is why most of it is not
+reusable. But it ran for four months and left an unusually honest record, and
+three things in it are worth taking.
+
+### Worth taking
+
+- **A decision log, separate from the event feed.** A closed category vocabulary
+  (`task_created`, `task_escalated`, `quality_rejected`, `direction_blocked`, …)
+  plus a one-line human-readable summary of *why*. It is the only thing in that
+  repo that still answers "what happened here" months later, and it is exactly
+  the shape of the "what's happening" question this app leads with. Distinct
+  from an audit log, which records that a thing occurred; this records why.
+- **One call that returns everything needed to decide.** Its heartbeat endpoint
+  returned, in a single round-trip, assigned work, blocked work *partitioned
+  server-side by whether the blockers were done*, review requests, and current
+  workload. `EngineSnapshot` already has this shape, which is reassuring; the
+  detail worth copying is that partitioning happens engine-side, so no client
+  reimplements "is this actually blocked".
+- **Deriving what a session actually did from its transcript** — see P1.7 below.
+  This is the highest-leverage idea in the repo and it needs no cooperation from
+  anything.
+
+### Failures worth designing against
+
+- **The un-killable task.** For two days its orchestrator logged, roughly hourly,
+  that one task "continues to persist in the inbox despite multiple deletion
+  attempts". It burned an entire cycle-day on a single stuck row while the log
+  looked busy. **Anything that proposes work needs an explicit terminal state —
+  give up, snooze, hand to a human — or it will spend its whole budget on the
+  one thing it cannot finish.**
+- **Missing acceptance criteria was the top quality failure**, cited over and
+  over in its rejections — and its task model had no field for them. They were
+  expected to live in free-text. Ours should not repeat that (P4.1).
+- **Duplicate proposals.** Agents re-proposed the same work every cycle because
+  they could not see their own history. A suggestion mechanism needs to know
+  what it has already suggested *and what was rejected*.
+- **The feed drowned in noise** — 77% of 11,721 rows were status changes.
+  Meaningful state changes have to be separated from churn *at write time*, not
+  filtered later. The subscription change-digest already applies this reasoning
+  to the live stream; a persistent log needs the same split.
+- **Hardcoded per-agent config forced a rebuild** to add an agent, until it moved
+  to a drop-in file in the agent's own workspace. **Per-project configuration
+  belongs in the project, not in a table inside this app** — which is the same
+  conclusion the brief decision above reaches from a different direction.
+- **The overhead ratio is sobering:** 760 wake decisions produced 358
+  completions, and ~40% of completions were rejected. Two wakes per finished
+  task. Worth holding against Phase 5's optimism before building a scheduler.
+
+### Deliberately not taking
+
+Its autonomy machinery — the generate-and-wake cycle, the wake queue, the
+watchdog — is where all its atomicity bugs lived and it never worked end to end.
+Its org-chart metaphor (`LEAD`/`INT`/`SPC` roles, teams, cross-review rules that
+were defined but never enforced) is overhead for one person and a few projects.
+And its four-status task model had no `blocked`, no `waiting on human` and no
+`snoozed`: escalation was a magic string inside a tags array. **For an app whose
+core question is "what needs me", that must be a column, not a tag.**
 
 ---
 
 ## Sequencing
 
+### Already done
+
+**2026-08-16, 152 tests.** **P6.1** (tests, written first), **P2.1** (core
+extracted), the Foundation-only logic of **P1.1–P1.6**, **P3.5** (triage),
+**P2.4** (the `mtm` CLI), and **P6.2** (CI).
+
+**2026-08-17, 330 tests.** The task layer (**P4.1–P4.7**), the MCP server
+(**P4.8**), Phase 3 control — gated runs, cancellation, worktree provisioning —
+and the design system (`DESIGN.json` plus a generated token file, checked in CI).
+
+The **approval queue** was not in the original plan and was pulled forward from
+Phase 5, because writing the MCP server made a hole in the design obvious: the
+confirmation-token gate assumes the party reading the description and the party
+replaying the token is a person. Over MCP that is false, and an agent handed a
+token simply calls again with it. So agents now `request_run`; only a person
+decides, and approving is what mints the token, inside the engine. There is no
+MCP tool that decides, and a test fails if one is ever added. This is the
+foundation Phase 5's standing authority has to be built on top of, rather than
+instead of.
+
+Everything above is exercised end to end through the CLI and the MCP server on
+Linux. **The macOS app has never been compiled** — every file parses, but
+type-checking needs a Mac. That, and migrating the app onto the package, is the
+outstanding piece of P2.1.
+
+The P1.2 spike is settled: the audit log's `session` matches 95 of 97 local
+Claude Code transcript ids and every Codex rollout, so the join is precise and
+`cwd` is a genuine fallback. See *Open questions* for what the real log taught us.
+
+### Bugs the build found that reading would not have
+
+Recorded because each one is a design lesson rather than a typo, and because a
+plan that only lists intentions reads as if nothing surprising happened:
+
+- **The gate could never be passed.** The confirmation token was a freshly minted
+  run id, so it differed between the describe pass and the do pass. Every
+  confirmed run was silently refused and the CLI exited 0 saying nothing — and
+  the whole suite stayed green, because the tests only ever checked refusal,
+  which is what a broken gate does perfectly. Tokens are now derived from the
+  request, so they are stable *and* bound: approving one run cannot authorise
+  another.
+- **`confirm == "yes"` was a literal that always passed.** Removed.
+- **`Process.isRunning` and `waitUntilExit()` are unreliable on Linux.** After
+  `terminate()` the termination handler fires at once with status 15, yet
+  `isRunning` still answers `true` seconds later and `waitUntilExit` blocks for
+  the child's *full original lifetime* — a `sleep 30` killed at 200ms held the
+  caller 30 seconds. Everything waits on the handler now; the suite went from 31s
+  to 4.4s.
+- **Tests were writing to the real `~/.multitaskmanager`.** 378 fixture decisions
+  ("Do a thing", "Vague work") had accumulated in a live home and would have
+  appeared in the app's own feed. Stores now resolve to a per-process temp root
+  under a test bundle — a mechanism, not a convention each test must remember.
+
+### What remains
+
 ```
-P1 (independent, ship in any order) ─────────┐
-                                             ├──> P3 ──> P4 ──> P5
-P6.1 tests ──> P2 (core + daemon + IPC) ─────┘
-P6.2-6.5 hardening: continuous
+P1 UI surfaces (macOS) ──┐
+                         ├──> P4.1 tasks ──> P4.7 next ──> P4.8 MCP ──> P5
+P2.2/2.3 daemon + IPC ───┘                        │
+                                                  └──> P3 control ──> P3.4
+W0-W5 cross-platform: interleaves, see CROSS-PLATFORM.md
+P6.3-6.5 hardening: continuous
 ```
 
-Two deliberate reorderings:
+**The one reordering that matters: tasks move ahead of control.**
 
-- **Pull P6.1 (tests) in front of P2.** Phase 2 moves nearly every file in the
-  project. Doing that without tests on `ProjectContextReader` and
-  `SessionStore.merge` is a blind rewrite — those two are the only places with
-  real logic, and they have zero coverage today. Write the tests against the
-  *current* code, then refactor until they pass again.
-- **Spike P1.2's schema join before anything depends on it.** The audit log is
-  the backbone of Phases 1, 3 and 5. Its record shape is now known (appendix A),
-  but whether its `session` value matches the session ids the Claude Code and
-  Codex detectors derive from transcript filenames is **unverified**. A
-  half-day spike against a real `~/.ai-logs/tool-calls.jsonl` settles it. If the
-  ids don't match, the join falls back to `cwd` → project path, which is
-  coarser but always present — design for both from the start.
+The original plan ran P3 (launch and steer sessions) before P4 (tasks). That
+order made sense when the app was understood as a session control plane. It is
+wrong now. The task layer is what makes this a project manager rather than a
+session monitor, and three things follow from putting it first:
 
-Within Phase 1, P1.1 (notifications) has no dependencies and delivers the
-single biggest daily improvement. Start there.
+- **"What should I do next" has no answer without it.** Until tasks exist, the
+  app can say what is stuck but not what is ready — and the second is the
+  question the product is actually for.
+- **P3.1 changes shape.** Launching becomes "run *this task*" rather than "start
+  a session in this project". A run attaches to a task, which is what makes
+  P3.6's audit trail and P5.4's run reports mean anything.
+- **The North Star needs a queue before it needs a driver.** An agent can only
+  take its own next task once there is a next task to take and a way to reach it
+  (P4.8). Steering (P3.4) — the riskiest item in the whole plan — is what you
+  need when an agent *can't* proceed alone, so it belongs after, not before.
+
+P4.1 is also cheap and low-risk: markdown files, front matter, a watcher. It
+gates far more than it costs.
+
+**P3.4 (steer a running session) moves to the end of Phase 3** for the same
+reason. It is the item most likely to consume a week and produce something that
+demos well and fails in use, and every hour spent on it is an hour not spent on
+the layer the app exists for.
+
+### Still true from the original ordering
+
+- **P6.1 before any refactor.** Held, and it paid: the first test written
+  against `extractGoal` found a live bug where a README opening with a code
+  fence presented shell commands as the project's goal.
+- **P1.1 (notifications) is the single biggest daily improvement** and has no
+  dependencies. Its policy is built and tested; only the macOS delivery wiring
+  remains.
+
+### Where cross-platform fits
+
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) runs W0–W5 alongside these phases rather
+than after them. Two couplings to keep in mind: **W0 (core portability) should
+land before P4.1**, because a task store written with Unix path assumptions is a
+thing to redo rather than port; and **P2.2/P2.3 (daemon + IPC) are W2**, which
+is where the daemon stops being optional, because a C# UI on Windows cannot host
+a Swift engine.
 
 ---
 
@@ -204,6 +417,39 @@ Current file: `{projectPath, project, status, updatedAt}`. Add
   separate repo, and it should land *after* this app can read v2, so the two
   never disagree.
 
+### P1.7 What a session actually did
+
+Borrowed from `mission-control`, which derived this and got more value from it
+than from anything else it built.
+
+The transcript already read for the "Now" line contains every tool call the
+agent made. Walking its `tool_use` blocks for `Write` and `Edit`, and keeping
+those whose `file_path` falls inside the project, yields **the files a session
+created or changed** — the difference between "this session is quiet" and "this
+session wrote four files and edited nine, then went quiet". That is the "what's
+happening" question answered concretely, from a file the app is already opening.
+
+- **No cooperation required.** No hook, no agent convention, no harness support.
+  It reads what Claude Code writes anyway, which makes it the cheapest real
+  signal available and one that cannot silently stop working when an agent
+  forgets a convention.
+- **Also gives duration and shape**: first prompt, started-at, last-activity,
+  message count, and a tool histogram — a session that has made forty `Read`
+  calls and no edits is exploring; forty `Edit` calls is a rewrite. Same parse.
+- **Bounded like everything else.** Tail-window read, capped counts, and a cache
+  keyed on transcript mtime — this runs on the refresh tick.
+- **Privacy line.** File *paths* inside the project are what gets kept; tool
+  inputs and outputs are not retained, consistent with ground rule 5. A path can
+  still be sensitive, so this shows what the popover shows and nothing is copied
+  into app state that gets written elsewhere.
+- **Feeds the task layer later.** When a run attaches to a task, "what changed"
+  is most of a run report (P5.4) already assembled — and it is assembled, not
+  summarised, so no inference is involved.
+
+The Codex transcript shape differs and should be handled the same way it is for
+the "Now" line: same extraction, tolerant of both layouts, absent rather than
+wrong when a format moves.
+
 ---
 
 ## Phase 2 — Extract the core
@@ -291,7 +537,27 @@ Executable target using `swift-argument-parser`.
 **Objective:** the app launches and steers agents instead of only watching them.
 First phase with writes, so ground rules 3 and 4 start doing real work.
 
-### P3.1 Launch a session from a project row
+### P3.1 Start work — on a task, or just a new session
+
+Two things people actually do, and both are first-class:
+
+- **Run a task.** Once tasks exist, this is the common case: a run is how a task
+  gets done, and it attaches to one. That attachment is what makes the audit
+  trail and the run report describe something somebody asked for.
+- **Start a session, with no task behind it.** Exploring, debugging, answering a
+  question, or just wanting another agent working alongside the ones already
+  going. This is not an escape hatch and shouldn't be modelled as one — a lot of
+  real work starts before anyone knows what the task is.
+
+**A session started bare can become a task afterwards.** The app already reads
+enough to propose one — the project, the first prompt, what the session touched
+— so "this turned out to be real work, keep it" should be a single action rather
+than a retype. That path matters more than it looks: it is how ad-hoc work stops
+disappearing from the board, which is exactly the leak this app exists to close.
+
+The reverse also holds: a task can spawn *more* sessions than one. Fan-out into
+several delegates is the orchestration-wave case, so the task-to-session
+relationship is one-to-many in both the model and the UI.
 
 - **Templated invocations** per the orchestration playbook: `claude -p`,
   `codex exec --json`, `agy -p`, `agent -p`, `lm -p`. The default delegate comes
@@ -367,10 +633,126 @@ don't display.
 **Objective:** the unit of work stops being a session and becomes a task that
 outlives sessions and can be assigned to a person or an agent.
 
-### P4.1 Task model and store
+**This is the phase the app exists for.** Phases 1–3 earn a trustworthy picture
+of what is happening; this is where the app starts managing the work rather than
+reporting on it. Judge the earlier phases by whether they make this easier.
+
+### What "project management tool" means concretely
+
+The rest of this plan can be read as session plumbing, so this states the thing
+it is all in service of. Managing five parallel projects means being able to
+answer, in one glance, five questions — and every item below exists to answer
+one of them:
+
+| Question | Answered by |
+|---|---|
+| Which of my projects needs me right now? | project status, computed |
+| What's the state of *this* project? | the project view |
+| How far along is it? | progress, from the roadmap and the task list |
+| What should I do next, here or anywhere? | the ready list and suggestions |
+| What moved since I last looked? | the overview, and the decision log |
+
+**The single most important change is what the popover's primary unit is.**
+Today it lists sessions and groups them under a project *name* — a string
+derived from a directory. That is a session monitor with a grouping feature. In
+this phase the primary unit becomes the **project**, and sessions become detail
+underneath it. A project with no live session at all still appears, because a
+project with nothing running is often the one that needs attention most.
+
+### P4.0 Projects: record, status, progress, lifecycle
+
+Four things that turn a derived string into something manageable.
+
+**The record** — covered in P4.1. Id, name, one-liner from the brief, optional
+repo path, optional external ref, and the tasks hanging off it.
+
+**Status, computed and explainable.** No inference; a fixed ladder, first match
+wins, and the UI can always say which rung it landed on:
+
+| Status | Means |
+|---|---|
+| `needsYou` | a task is waiting on you, a session needs attention, or a converge has stalled |
+| `working` | a session is live or an agent task is running |
+| `ready` | nothing is blocked and there is at least one task you could start |
+| `blocked` | remaining work is all waiting on dependencies or on someone else |
+| `dormant` | no activity for N days and nothing ready — the quiet failure a multi-project week produces |
+| `unbriefed` | no `PRODUCT.md`; the app can watch it but can't help with it |
+
+`dormant` is the one worth building for. A project that's stuck screams; a
+project everyone forgot goes silent, and silence reads identically to "fine".
+
+**Progress, from what's already parsed.** The roadmap checkbox ratio is free —
+the reader already distinguishes `- [ ]` from `- [x]`, and today throws away the
+checked ones. "12 of 30" per project is a real progress signal with no inference
+and no new file format. Task completion gives a second, and the brief's success
+metrics give the qualitative target neither number captures.
+
+**Lifecycle.** Create a project *before* there's a repo or a session — an idea
+with a brief is a project. Archive one so it stops competing for attention
+without being deleted. Park one until a date, the project-level form of snooze.
+Right now projects only come into existence by an agent happening to run
+somewhere, which means the app can only manage work that has already started.
+
+### P4.0b The project view, and the overview
+
+**The project view** is the screen this app is for, and it did not previously
+exist in this plan. One project: its one-liner, its status and why, what's
+happening now (live sessions and what they actually changed, per P1.7), what
+needs you, what's next, recent decisions, and progress. It is reachable from the
+popover row and is the drill-down the popover deliberately can't hold.
+
+**The overview** answers "what moved since I last looked" across everything —
+every project with its status, what needs you first, and what changed since
+yesterday. Not a generated report on a schedule: a view, computed on open, so it
+is never stale and never arrives when you aren't reading. `mission-control`
+generated daily reports on cron and they were read once.
+
+Both are the same data at two altitudes, and both must survive the popover being
+the only surface — the window makes them roomier, not possible.
+
+### P4.1 Project and task model, and their store
+
+**A project becomes a real record, not an inference.** Today a project is
+whatever directory a session happened to be running in. That works while every
+project has a live session and a repo, and it breaks the moment either is
+untrue — a project someone filed from Linear before any work started has no
+session and possibly no checkout, and the app currently cannot represent it at
+all. So: a project gets an id, a name, an optional repo path, an optional
+`external_ref`, and tasks hanging off it. Detected sessions attach to a project
+when their working directory matches one; otherwise they create it, as they
+effectively do now.
 
 One markdown file per task at `~/.multitaskmanager/tasks/<id>.md`, YAML front
-matter plus a body.
+matter plus a body, with projects stored the same way alongside them.
+
+**Three fields that exist because their absence is what broke the prior art:**
+
+- **`acceptance` — what "done" means for this task.** Missing acceptance
+  criteria was `mission-control`'s single most-cited quality failure, and its
+  model had no field for them; they were expected to live in free text and so
+  routinely didn't. A task with no acceptance criteria is a task that will be
+  delivered wrong and rejected, which costs more than asking for it up front.
+  The project's success metrics and jobs-to-be-done are the reference this is
+  written against.
+- **`waiting` — what this task needs from a human**, as a column, not a tag.
+  The prior art expressed escalation by writing the string `escalated` into a
+  tags array and grepping for it. For an app whose central question is "what
+  needs me", that state is the product and belongs in the schema. Same
+  vocabulary as the session-level `waiting`: approval, question, done, error.
+- **`snoozed_until` — an explicit terminal state for work that can't proceed.**
+  See P4.7: something that cannot be finished and cannot be dismissed will
+  consume every cycle it is offered.
+
+**`assignee: me` is not a placeholder.** Roughly half the work in a project a
+person runs with agents is that person's, and a task assigned to a human has to
+be as complete a citizen as one assigned to a delegate: it appears in the ready
+list (P4.7), it blocks agent tasks that depend on it, it accrues time-in-state,
+and it can be completed from the popover in one action. A model that treats
+human tasks as untracked context around the real (agent) work reproduces exactly
+the problem this app is meant to solve. The practical test: every field below
+must mean something for a human assignee, and where one genuinely doesn't
+(`privacy`, delegate routing) that should be visible as an absence rather than a
+field showing `n/a`.
 
 ```yaml
 ---
@@ -445,8 +827,10 @@ Reuse `extractNextSteps` without the 3-item limit to import `- [ ]` items from
 
 ### P4.6 Board window
 
-A real `Window` scene: task graph, agent activity timeline, run history across
-every project.
+A real `Window` scene. **Projects first, task graph second** — the earlier
+version of this item led with the task graph, which is the drill-down rather than
+the thing you open it to see. A row per project with status, what's next, and
+who's on it; the graph, the agent timeline and run history hang off that.
 
 - **Activation policy.** The app is `LSUIElement` (accessory) with no Dock icon.
   Opening a real window requires switching `NSApp.setActivationPolicy` to
@@ -456,12 +840,184 @@ every project.
 - The popover stays the ambient glance; the window is where planning happens.
   Reachable from the popover and from `mtm open`.
 
+### P4.7 "What should I do next"
+
+The question the product exists to answer. Distinct from P3.5 triage: **triage
+ranks what is blocked, this ranks what is available.** A day with nothing
+blocked should still open the popover to a useful answer.
+
+**Start with suggestion, not with ranking.** The full version needs the task
+graph, but a useful first version does not: a project with a brief is already
+well enough understood to propose a next action from. One-liner, purpose,
+jobs-to-be-done, success metrics, design principles, plus the unchecked roadmap
+items and what the last session was doing — that is a genuinely good prompt, and
+it produces something worth reading on day one rather than after the task store
+is populated.
+
+- **The app doesn't do the suggesting** (ground rule 2). It dispatches a
+  delegate with the brief as context, into a context dir, and reads back the
+  proposal as a task file. Identical mechanism to P4.2 decomposition, smaller
+  scope: one next action rather than a graph.
+- **A suggestion is a proposal, not a task.** It lands in the same inbox as
+  agent-filed work (P4.9), where I accept, edit or reject it. Auto-committing
+  suggestions to the board is how a board fills with things nobody chose.
+- **Cheap to refresh, expensive to spam.** Regenerate when the project's brief
+  or roadmap changes, or on demand — not on a timer. A suggestion that changes
+  every five minutes is noise, and each one costs a delegate run.
+- **It degrades honestly.** No brief means no suggestion, and the app says which
+  brief is missing rather than guessing from a README.
+- **It knows what it already suggested, and what was rejected.** The prior art's
+  agents re-proposed identical work every cycle because they couldn't see their
+  own history. A rejected suggestion is a fact about this project, and it goes
+  into the prompt for the next one.
+
+**Every item offered needs an exit.** `mission-control` spent two days logging,
+roughly hourly, that a single task "continues to persist in the inbox despite
+multiple deletion attempts" — one stuck row consumed an entire cycle-day while
+the log looked busy. So: anything the ready list surfaces can be **done,
+snoozed until a date, handed to an agent, or dismissed with a reason** — and
+dismissal is recorded rather than silent, because the reason is what stops it
+being suggested again tomorrow. A list you can only complete is a list that
+eventually shows you one impossible thing forever.
+
+Then the ranked version, once tasks exist:
+
+- **The ready set** is tasks assigned to me whose dependencies are all `done`,
+  which is the same topological computation P5.2 runs for agents — one
+  implementation, two consumers, differing only by assignee.
+- **Ordering inputs**, all local and explainable, no inference: how long a task
+  has been ready, whether its project is pinned, whether an agent is blocked
+  waiting on it (unblocking someone else outranks starting something new),
+  and whether it was in progress and got dropped.
+- **Show the reason.** "First because Claude is blocked on it" is a different
+  instruction from "first because it has sat for four days". A ranked list whose
+  ordering can't be explained gets ignored within a week.
+- **One item, not ten.** The popover has room for a next action and a short
+  list behind it. A ready queue rendered as a wall of tasks is a to-do app, and
+  a to-do app is a thing people already have and already ignore.
+- **Merged view with the attention queue.** What the user sees at the top of the
+  popover is a single ordered answer to "what now" — blocked-on-me items and
+  ready items interleaved by urgency, not two competing lists.
+
+### P4.8 MCP server — the board as something agents can write to
+
+The surface the North Star runs on, and **the app's main input, not just an
+output**. The intended shape is an agent elsewhere — a Claude session with
+Notion, Linear and this app all connected — working out what work exists and
+writing it here. That agent does the integrating; this app holds the board.
+
+That reframing has consequences, and they are the substance of this item.
+
+- **Write tools are required, not a later graduation.** Ground rule 3 still
+  applies to the *destructive* surface, but a read-only MCP server is useless for
+  the job described above: the whole point is that something outside puts work
+  on the board. Read tools (`list_projects`, `list_tasks`, `get_task`,
+  `next_task`, `project_status`) and creation tools (`create_project`,
+  `create_task`, `update_task`) ship together.
+- **Projects become first-class.** Today a project is implied by a session's
+  working directory. If an agent can say "there is a new project", a project has
+  to be a real record with an id, a name, an optional repo path, and tasks
+  hanging off it — including projects with **no** repo and no session yet, which
+  is a shape the app currently cannot represent at all. This is the largest model
+  change in the phase and it belongs to P4.1 rather than here.
+- **Idempotency is the thing that makes agent-driven sync work.** Every task and
+  project accepts an `external_ref` (`linear:ENG-412`, `notion:<page-id>`), and
+  create-with-an-existing-ref updates instead of inserting. Without it, an agent
+  that runs its sync twice doubles the board, and the second run is the one that
+  destroys trust in it.
+- **Provenance on every write.** Which agent, which session, which tool call,
+  when. Two reasons: `mtm` needs to show where a task came from, and a bad sweep
+  needs to be reviewable and reversible as a batch (see P4.9).
+- **The gate line, drawn precisely.** "Confirmation gates are inherited" cannot
+  mean every write prompts — an agent filing twelve tasks would produce twelve
+  dialogs and the feature would be turned off within a day. The line that holds:
+  **organising work is free; spending is gated.** Creating, updating and
+  reprioritising tasks needs no approval. Anything that starts a run, touches a
+  repository, deletes work, or writes outward stops and asks exactly as it would
+  from a terminal.
+- **Claiming needs a lease** — the same expiring lease as P5.2 — so two agents
+  can't take the same task, and a crashed agent's task returns to `ready` rather
+  than stranding.
+- **A second `EngineClient` consumer, not a second engine.** It sits beside the
+  CLI and the UI over the same protocol. If MCP needs a capability the CLI can't
+  express, the engine is missing it; MCP doesn't get a private path.
+- **Transport.** stdio for a locally-spawned server is simplest and needs no
+  port. Every tool call is audited per P3.6 — an agent acting on the board is a
+  control-plane action.
+- **`suggest` is a different verb from `create`.** Same underlying write, but a
+  suggestion lands in the reviewable lane with its proposer recorded, rather
+  than in the trusted pipeline. Taken from the prior art, where it was the one
+  guard that kept agent-generated work separable from the real thing.
+- **Tool descriptions read as procedures, not API docs.** Agents follow numbered
+  steps far more reliably than they infer a workflow from parameter lists — the
+  prior art's agent-facing skill doc opened with "Workflow for Specialist
+  Agents" and a numbered list, and that is the register to write in.
+- **Small affordances that matter more than they look**, all from watching real
+  agents use the prior art's CLI: accept any unique **id prefix** wherever a full
+  id is expected, because agents copy what they were shown; accept a **file path
+  in place of an inline payload** for anything document-shaped, because
+  otherwise an agent tries to shell-quote a markdown document; and return **one
+  dense line per task** in listings rather than pretty multi-line records, which
+  is what a model skimming a list actually reads well.
+- **Bounded retries with visible abandonment.** Where the server retries
+  anything, cap it, then move to a distinctly-marked terminal state and emit one
+  escalation — never an unbounded retry. The prior art's wake loop silently
+  retried forever until it was capped at four attempts.
+
+### P4.9 See and trust what agents put on the board
+
+**This replaces "sync tasks from external trackers", and the replacement is
+smaller.** If an agent with Notion and Linear connected can read those and write
+tasks here through P4.8, this app does not need its own tracker integrations:
+no per-service client, no credentials in the keychain, no outbound network path,
+no per-project integration config. The integration burden moves to the agent,
+which is both more general — anything with an MCP server works, including
+services nobody has thought of — and consistent with the rule the whole project
+runs on: **the app orchestrates, the delegate thinks.**
+
+The tradeoff, stated plainly: an agent-driven sync runs when an agent runs,
+where a built-in one runs continuously. Given Phase 5 schedules agents anyway, a
+scheduled sync agent covers it, and the generality is worth the latency.
+
+What genuinely remains is the human side of letting something else write to your
+board:
+
+- **An inbox for agent-created work.** Tasks arriving from outside land visibly
+  — what came in, from which agent, when, and against which project — rather
+  than silently appearing among things I wrote myself.
+- **Batch review and undo.** A sync that misfires creates dozens of rows at once,
+  so the unit of undo is the sweep, not the row.
+- **Provenance shown, always.** A task's origin is part of the task. "Filed by
+  the Linear sweep at 08:00" is context I need in order to trust or distrust it.
+- **A quality floor.** A task with no outcome in its body is noise. The app
+  should say so plainly rather than accumulate rows nobody can act on.
+
+**This is still the one place the app holds state the harness doesn't** — no
+harness file describes work that hasn't started — and that boundary stays a
+decision rather than a drift.
+
 ---
 
 ## Phase 5 — Autonomy and scheduling
 
 **Objective:** agent-assigned tasks run without being started by hand, bounded
 and reviewable.
+
+> **Read the prior-art section before starting this phase.** `mission-control`
+> built essentially this — generate tasks, wake agents on a schedule, gate the
+> output — and it never worked end to end, by its author's own account. Its
+> numbers: 760 wake decisions produced 358 completions, of which about 40% were
+> then rejected. Two wakes per finished task, and the most common failure was
+> work delivered against criteria nobody had written down.
+>
+> That is not an argument against this phase. It is an argument about ordering:
+> **the value is in the queue and the reports, not in the waking.** A ready list
+> a human drains, with runs that produce reviewable reports, delivers most of
+> the benefit and none of the failure mode. Automatic scheduling should be the
+> last thing built here, gated on acceptance criteria being routinely present
+> (P4.1) and on run reports being good enough to review at a glance (P5.4) —
+> because unattended runs against vague criteria is precisely the combination
+> that produced a 40% rejection rate.
 
 ### P5.1 Scheduling
 
@@ -547,6 +1103,10 @@ Developer ID signing, `notarytool` stapling, GitHub Releases, and a Sparkle
 appcast for updates. Signing keys stay out of the repo, in the keychain and CI
 secrets. Until this lands, "install" means Xcode, which caps the audience at one.
 
+Windows (Authenticode, winget) and Linux (tarball, `.deb`) are W5 in
+[CROSS-PLATFORM.md](CROSS-PLATFORM.md) rather than here, because they arrive
+with their own platform work rather than as a variation on this one.
+
 ### P6.5 First-run setup
 
 Detect the harness, offer to wire the P1.6 hooks, explain what the app can and
@@ -558,16 +1118,75 @@ be granted.
 
 ## Open questions
 
-1. **Does the audit log's `session` match detector session ids?** Settles
-   whether P1.2 joins precisely or falls back to `cwd`. Spike first.
-2. **Does the Codex detector's session id survive its format changes?** Affects
-   the same join and P6.3's fixture strategy.
+**1 and 2 are now settled** — the spike ran on 2026-08-16 against a real
+35 MB `~/.ai-logs/tool-calls.jsonl` (24,585 records, 161 sessions, four
+harnesses) and 97 real Claude Code transcripts.
+
+1. ~~**Does the audit log's `session` match detector session ids?**~~
+   **Yes — join precisely.** 95 of 97 Claude Code transcript ids (97.9%)
+   appear verbatim as `session` values. The two misses are transcripts that
+   predate the logging hook, not mismatches. `cwd` remains implemented as the
+   fallback, but it is a fallback rather than the common path.
+2. ~~**Does the Codex detector's session id survive its format changes?**~~
+   **Yes, and better than expected.** The rollout filename
+   (`rollout-<timestamp>-<uuid>.jsonl`) ends with exactly the uuid the log
+   records: 3 of 3 local Codex sessions join. Both detectors now carry
+   `harnessSessionId`, so the precise join covers both harnesses. Note the
+   uuid must be matched on its 8-4-4-4-12 shape from the end, because the
+   timestamp ahead of it also contains dashes.
 3. **How much does the git shelling in P1.4 actually cost** across ~20 repos?
-   If it's worse than expected, the 30s cadence becomes on-demand-only.
+   Still open. Implemented on a 30s cadence with a `.git`-mtime skip, which
+   should make the common case free; unmeasured at real repo counts.
 4. **Is `forkpty` (P3.4) worth it,** or is "open in Terminal" enough in
    practice? Answerable only after using P3.1 for a week.
-5. **Does the daemon earn its complexity** before Phase 5, or should P2.2 ship
-   as in-process-only with the daemon deferred until scheduling needs it?
+5. ~~**Does the daemon earn its complexity** before Phase 5?~~ **Settled by the
+   platform decision, not by the argument.** The answer was "leaning deferred" —
+   `mtm` shipped against an in-process engine and needed nothing the daemon
+   would have provided. That reasoning held on macOS, where the menu-bar app is
+   always running and hosts the engine itself. It does not survive Windows: a
+   C# UI cannot host a Swift engine, so `mtmd` becomes the only place the engine
+   can live there. It is now built because one platform requires it and stays
+   optional on the other two, which is what `EngineClient` was designed for.
+6. **What ranks the ready list (P4.7)?** The inputs are named — time ready,
+   pinned project, unblocking someone else, previously in progress — but their
+   weighting is guesswork until it has been used for a fortnight. Expect the
+   first version to be wrong in a way that is obvious in use and invisible in
+   design.
+7. ~~**Does the MCP server need write tools?**~~ **Yes — settled, and it
+   reshaped the phase.** The intended use is an agent elsewhere, with Notion and
+   Linear also connected, deciding what work exists and writing it here. Writing
+   *is* the primary use, which makes the board an input surface rather than only
+   an output. Two consequences: projects have to become first-class records
+   (P4.1), and built-in tracker integrations become unnecessary (P4.9). The
+   remaining question is not whether but **how much can be written without
+   asking** — the current line is that organising work is free and spending is
+   gated, and it is unproven.
+8. **Where does an imported Linear issue live** relative to the harness's own
+   files? Tasks are owned here by decision (P4.9), but a project synced from an
+   external tracker is the furthest thing in this app from "something the harness
+   wrote", and the boundary deserves revisiting once it is real rather than
+   hypothetical.
+
+### What the real log taught us that this plan didn't say
+
+Three things the appendix-A record shape didn't capture, all now handled:
+
+- **Event names arrive in more than one casing, under the same harness.**
+  `preToolUse`/`postToolUse` appear alongside `PreToolUse`/`PostToolUse` in
+  529 records written by `claude`. Matching is case-insensitive over a known
+  set.
+- **Cursor uses a different vocabulary entirely** — `beforeShellExecution`,
+  `afterFileEdit`. Rather than enumerate every harness's names, any
+  unrecognised event still counts as activity: an unknown event still proves
+  the agent was alive at that timestamp, which is the signal that matters.
+- **`cwd` is absent from several hundred records** (557 `claude`, 31
+  `cursor`), so the fallback index genuinely can miss. Appendix A says "most
+  records", which is right; the reader must not assume otherwise.
+
+Also worth recording: **zero of 24,585 lines were unparseable** on Linux,
+where `flock` exists. The interleaving tolerance is still correct — it is a
+macOS concern — but the malformed-line counter is the thing that will tell us
+whether it ever actually bites, which is why it surfaces in Settings.
 
 ---
 

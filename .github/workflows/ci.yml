@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # A stale DesignTokens.swift is a design system that has quietly forked from
+  # DESIGN.json, and it should fail in seconds rather than be discovered when the
+  # two clients sit side by side.
+  #
+  # Its own job, on the plain runner, because the `swift:6.0` container has no
+  # python3 — running it there exits 127, which is how this step failed the first
+  # time it ran. The Swift-side DesignTokensTests skips when python3 is absent,
+  # so it did not catch this either; that skip is why the check is also here.
+  design:
+    name: Design tokens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: DesignTokens.swift matches DESIGN.json
+        run: python3 Scripts/generate-tokens.py --check
+
+  # The core imports Foundation only, so it builds and tests on Linux. This job is
+  # the fast one — it runs on every push in well under a minute and catches almost
+  # everything, because almost all of the logic lives in the core.
+  core:
+    name: MultiTaskCore (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Test
+        working-directory: Packages/MultiTaskCore
+        run: swift test
+
+  # Windows runs the engine headless — no UI binding involved, which is the part
+  # of Swift-on-Windows most likely to work. This job is the evidence for whether
+  # the Windows product is viable at all, so it lands green or it doesn't land.
+  windows:
+    name: MultiTaskCore (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # 6.0 (Sept 2024) does not build against the MSVC the runner now ships
+      # (14.51): every compile dies with "cyclic dependency in module 'ucrt'",
+      # inside Microsoft's own headers rather than anywhere in this repo. A newer
+      # toolchain is the documented fix.
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.1-release
+          tag: 6.1-RELEASE
+      - name: Build
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Test
+        working-directory: Packages/MultiTaskCore
+        run: swift test
+
+  # The app can only be built on macOS. It is the slower, scarcer runner, so it
+  # runs second and only builds — the behaviour it would test already ran above.
+  app:
+    name: MultiTaskManager (macOS)
+    runs-on: macos-latest
+    needs: core
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the core on macOS too
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Build the app
+        working-directory: MultiTaskManager
+        run: |
+          xcodebuild \
+            -project MultiTaskManager.xcodeproj \
+            -scheme MultiTaskManager \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          # No-op until the repo ships shell; wired up now so the first script
+          # added is linted rather than remembered about later.
+          scripts=$(git ls-files '*.sh')
+          if [ -z "$scripts" ]; then
+            echo "no shell scripts to check"
+            exit 0
+          fi
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          # shellcheck disable=SC2086
+          shellcheck $scripts

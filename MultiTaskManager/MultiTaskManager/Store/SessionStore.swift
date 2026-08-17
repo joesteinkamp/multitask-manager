@@ -1,367 +1,346 @@
 import Foundation
 import AppKit
 import Combine
+import MultiTaskCore
 
-/// Central view model. Periodically runs the enabled detectors on a background
-/// queue, merges results with persisted user overrides, classifies each session
-/// with the stagnation heuristic, and publishes a sorted list for the UI.
+/// The app's view model: subscribes to the engine and republishes what SwiftUI
+/// needs.
+///
+/// It used to *be* the engine — detectors, merge logic, the status heuristic and
+/// a timer in one `@MainActor` class. All of that moved to `MultiTaskCore`,
+/// where it can be tested. What's left here is the part that genuinely belongs
+/// to a Mac app: `@Published` properties, activating a window, and revealing a
+/// folder in Finder.
 @MainActor
 final class SessionStore: ObservableObject {
+    /// **Projects are the primary unit.** Sessions are still published because
+    /// rows drill into them, but the popover leads with these.
+    @Published private(set) var projects: [Project] = []
     @Published private(set) var sessions: [Session] = []
+    /// The work — the unit this app manages. Sessions are how it observes.
+    @Published private(set) var tasks: [TaskRecord] = []
+    /// Ranked answer to "what should I do next", with the reason for each.
+    @Published private(set) var nextUp: [ReadyItem] = []
+    /// Tasks explicitly blocked on a person. Requests, not suggestions.
+    @Published private(set) var awaitingMe: [TaskRecord] = []
+    /// Agents asking permission to spend something. These outrank everything
+    /// else in the popover: an agent is stopped until you answer, so every
+    /// minute one sits here is a minute of idle work.
+    @Published private(set) var pendingApprovals: [ApprovalRequest] = []
+    @Published private(set) var runs: [RunRecord] = []
+    @Published private(set) var waves: [Wave] = []
+    @Published private(set) var repositories: [RepositoryState] = []
+    @Published private(set) var degraded: [DegradedReason] = []
     @Published private(set) var lastRefresh: Date = .distantPast
-
-    /// Audit log health, surfaced in Settings. Nil until the reader has run.
-    @Published private(set) var auditHealth: AuditLogReader.Health?
+    /// Set when notification authorization was denied, so Settings can say so
+    /// rather than silently never notifying.
+    @Published var notificationsDenied = false
 
     private let prefs = Preferences.shared
     private let overridesStore = OverridesStore.shared
+    private let projectStore = ProjectStore()
+    private let notifier = NotificationPresenter()
+
+    private var engine: InProcessEngine!
     private var overrides: UserOverrides
-
-    private let auditReader = AuditLogReader.shared
-    private let notifier = AttentionNotifier()
-    private let notifications = NotificationManager.shared
-
-    private var timer: Timer?
-    private let work = DispatchQueue(label: "com.multitaskmanager.detect", qos: .utility)
-    private var isRefreshing = false
+    private var eventTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    /// Count of sessions currently flagged as needing attention. Drives the badge.
+    /// Drives the menu bar badge.
     var needsAttentionCount: Int {
-        sessions.filter { $0.status == .needsAttention }.count
+        projects.filter { $0.status == .needsYou && $0.record.lifecycle.isActive }.count
+            + pendingApprovals.count
     }
+
+    /// Runs still going, for the "working" summary.
+    var activeRuns: [RunRecord] { runs.filter { !$0.state.isTerminal } }
+
+    var activeProjects: [Project] {
+        projects.filter { $0.record.lifecycle.isActive }
+    }
+
+    /// What to do first, across everything.
+    var triageQueue: [Session] {
+        AttentionTriage.waitingSessions(sessions)
+    }
+
+    var hiddenCount: Int { overrides.hidden.count }
 
     init() {
         overrides = overridesStore.load()
 
-        // Restart the timer whenever the cadence preference changes.
+        let detection = DetectionEngine(
+            configuration: prefs,
+            additionalDetectors: [RunningAppsDetector(configuration: prefs)],
+            projectStore: projectStore
+        )
+        engine = InProcessEngine(configuration: prefs,
+                                 engine: detection,
+                                 overridesStore: overridesStore)
+
+        // Restart the engine's cadence when the interval preference changes.
         prefs.$refreshInterval
             .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.startTimer() }
-            }
+            .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
+            .sink { [weak self] _ in Task { await self?.restart() } }
             .store(in: &cancellables)
 
-        // Re-prime the audit reader when the configured path changes, so it
-        // doesn't read a different file at a stale offset.
-        prefs.$auditLogPath
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.auditReader.reset() }
-            }
-            .store(in: &cancellables)
-
-        // Turning notifications back on shouldn't replay the transitions that
-        // happened while they were off.
-        prefs.$enableNotifications
-            .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.notifier.reset() }
-            }
-            .store(in: &cancellables)
-
-        // The delegate has to exist before the first notification is scheduled,
-        // or the "Open" action won't be attached to it.
-        notifications.bootstrap()
-        notifications.onOpen = { [weak self] id in
-            Task { @MainActor in self?.activate(id: id) }
-        }
-
-        // Begin detecting at launch so the menu bar badge is live before the user
-        // ever opens the popover.
         start()
     }
 
     // MARK: Lifecycle
 
     func start() {
-        startTimer()
-        refresh()
-    }
-
-    private func startTimer() {
-        timer?.invalidate()
-        let interval = max(1.0, prefs.refreshInterval)
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
-    }
-
-    // MARK: Refresh pipeline
-
-    func refresh() {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-
-        let detectors = makeDetectors()
-        let snapshot = overrides
-        let contextEnabled = prefs.enableProjectContext
-        let auditEnabled = prefs.enableAuditLog
-        let auditPath = AuditLogReader.resolvePath(override: prefs.auditLogPath)
-        let reader = auditReader
-
-        work.async { [weak self] in
-            let raw = detectors.flatMap { $0.detect() }
-            // Read project briefings (goal/now/next) off the main thread so the file
-            // I/O never blocks the UI. Cached by file mtime inside the reader.
-            var enriched = contextEnabled ? ProjectContextReader.shared.attach(to: raw) : raw
-
-            // Tail whatever the harness appended since last pass. Reads only new
-            // bytes, so this stays cheap on the refresh path.
-            var health: AuditLogReader.Health?
-            if auditEnabled {
-                let index = reader.refresh(path: auditPath)
-                enriched = reader.attach(to: enriched, index: index)
-                health = reader.currentHealth
-            }
-
-            let finalSessions = enriched
-            let finalHealth = health
-            Task { @MainActor in
+        eventTask?.cancel()
+        let engine = engine!
+        eventTask = Task { [weak self] in
+            // Prime first so launching the app doesn't announce every session
+            // that was already quiet.
+            await engine.primeNotifications()
+            await engine.start()
+            for await event in engine.subscribe() {
                 guard let self else { return }
-                self.sessions = self.merge(raw: finalSessions, overrides: snapshot)
-                self.auditHealth = finalHealth
-                self.lastRefresh = Date()
-                self.isRefreshing = false
-                self.notifyIfNeeded()
-            }
-        }
-    }
-
-    /// Feeds the freshly-classified list to the notifier and delivers whatever
-    /// survives its filters. Runs on every refresh — the notifier needs to see
-    /// each pass to detect edges and debounce them, even when notifications are
-    /// switched off.
-    private func notifyIfNeeded() {
-        notifier.policy.cooldown = max(60, prefs.notificationCooldown)
-        let alerts = notifier.evaluate(
-            sessions: sessions,
-            isMuted: { [overrides] session in overrides.isMuted(session) },
-            isQuiet: prefs.isWithinQuietHours
-        )
-        guard prefs.enableNotifications else { return }
-        notifications.deliver(alerts)
-    }
-
-    /// Builds the active detector set from preferences.
-    private func makeDetectors() -> [SessionDetector] {
-        var detectors: [SessionDetector] = []
-        if prefs.enableClaudeCode { detectors.append(ClaudeCodeDetector()) }
-        if prefs.enableCodex { detectors.append(CodexDetector()) }
-        if prefs.enableRunningApps {
-            detectors.append(RunningAppsDetector(
-                bundleAllowlist: prefs.bundleAllowlist,
-                nameKeywords: prefs.appNameKeywords
-            ))
-        }
-        if prefs.enableDevFolders {
-            detectors.append(DevFolderDetector(roots: prefs.devFolders))
-        }
-        if prefs.enableHooks { detectors.append(HookStatusReader()) }
-        return detectors
-    }
-
-    /// Dedupe detected sessions, fold in hook overrides, drop hidden ones, append
-    /// manual entries, apply renames/pins, classify, and sort.
-    private func merge(raw: [Session], overrides: UserOverrides) -> [Session] {
-        // Split hook records from regular detections.
-        let hookRecords = raw.filter { $0.id.hasPrefix("hook:") }
-        let detected = raw.filter { !$0.id.hasPrefix("hook:") }
-
-        // Dedupe regular detections by id, keeping the most recent activity.
-        var byId: [String: Session] = [:]
-        for session in detected {
-            if let existing = byId[session.id], existing.lastActivity >= session.lastActivity { continue }
-            byId[session.id] = session
-        }
-
-        // Apply hook statuses: match by projectPath; otherwise keep standalone.
-        for record in hookRecords {
-            if let path = record.projectPath,
-               let matchKey = byId.first(where: { $0.value.projectPath == path })?.key {
-                byId[matchKey]?.hookStatus = record.hookStatus
-                // v2 fields ride along. All nil for a v1 hook, which is what
-                // makes the old contract keep working unchanged.
-                byId[matchKey]?.waiting = record.waiting
-                byId[matchKey]?.statusReason = record.statusReason
-                if let sessionID = record.harnessSessionID, !sessionID.isEmpty {
-                    byId[matchKey]?.harnessSessionID = sessionID
+                switch event {
+                case .snapshot(let snapshot):
+                    await self.apply(snapshot)
+                case .notify(let notification):
+                    await self.deliver(notification)
                 }
-                byId[matchKey]?.lastActivity = max(byId[matchKey]!.lastActivity, record.lastActivity)
-            } else {
-                byId[record.id] = record
             }
         }
-
-        var result = Array(byId.values)
-
-        // Remove user-hidden sessions.
-        result.removeAll { overrides.hidden.contains($0.id) }
-
-        // Append manual sessions (not subject to hidden — removing deletes them).
-        result.append(contentsOf: overrides.manual)
-
-        // Apply renames, pins, and classify.
-        let now = Date()
-        result = result.map { session in
-            var s = session
-            if let renamed = overrides.renames[s.id] { s.title = renamed }
-            s.isPinned = overrides.pinned.contains(s.id)
-            s.status = classify(s, now: now)
-            return s
-        }
-
-        if prefs.hideIdle {
-            result.removeAll { $0.status == .idle && !$0.isPinned }
-        }
-
-        return sortSessions(result)
     }
 
-    /// Resolves status from the best signal available, in this order:
-    ///
-    /// 1. **Hook status file.** The only source that knows *why* a session
-    ///    stopped, because the harness told it.
-    /// 2. **Audit `SessionEnd`.** A record that the run finished — a fact, not
-    ///    an inference. Everything below this line is guesswork about silence.
-    /// 3. **Audit last-event age.** Tool calls are a truer pulse than a file's
-    ///    mtime, which also moves for reasons that aren't the agent working.
-    /// 4. **Transcript mtime.** Always present, so it stays at the bottom of the
-    ///    stack and the list never degrades below what shipped (ground rule 1).
-    private func classify(_ session: Session, now: Date) -> SessionStatus {
-        if let hook = session.hookStatus { return hook }
-
-        if let audit = session.audit {
-            if let endedAt = audit.endedAt {
-                // Finished. Still worth your attention until it goes stale, at
-                // which point it's just history.
-                return now.timeIntervalSince(endedAt) >= prefs.idleThreshold ? .idle : .needsAttention
-            }
-            if !audit.matchedByWorkingDirectory {
-                return classify(gap: now.timeIntervalSince(audit.lastEventAt))
-            }
-        }
-
-        // A working-directory match identifies the project, not the session, so
-        // it only ever moves the clock forward — it never decides on its own.
-        let activity = max(session.lastActivity, session.audit?.lastEventAt ?? .distantPast)
-        return classify(gap: now.timeIntervalSince(activity))
+    private func restart() async {
+        await engine.stop()
+        start()
     }
 
-    private func classify(gap: TimeInterval) -> SessionStatus {
-        if gap >= prefs.idleThreshold { return .idle }
-        if gap >= prefs.attentionThreshold { return .needsAttention }
-        return .working
+    private func apply(_ snapshot: EngineSnapshot) {
+        projects = snapshot.projects
+        tasks = snapshot.tasks
+        nextUp = snapshot.whatNext(for: .me, limit: 5)
+        awaitingMe = snapshot.tasksNeedingYou()
+        pendingApprovals = snapshot.pendingApprovals
+        runs = snapshot.runs
+        sessions = snapshot.sessions
+        waves = snapshot.waves
+        repositories = snapshot.repositories
+        degraded = snapshot.degraded
+        lastRefresh = snapshot.refreshedAt
     }
 
-    private func sortSessions(_ sessions: [Session]) -> [Session] {
-        sessions.sorted { a, b in
-            if a.isPinned != b.isPinned { return a.isPinned }
-            if a.status.sortRank != b.status.sortRank { return a.status.sortRank < b.status.sortRank }
-            return a.lastActivity > b.lastActivity
+    private func deliver(_ notification: PendingNotification) async {
+        let granted = await notifier.deliver(notification)
+        if !granted { notificationsDenied = true }
+    }
+
+    /// Forces a pass now, rather than waiting for the cadence.
+    func refresh() {
+        Task { [engine] in _ = try? await engine?.act(.refresh) }
+    }
+
+    // MARK: Actions
+
+    /// Every mutation goes through the engine's action set rather than editing
+    /// overrides here, so the CLI, the app and (later) an agent over MCP all
+    /// take the same path and hit the same gates.
+    private func perform(_ action: EngineAction) {
+        Task { [weak self] in
+            guard let self else { return }
+            _ = try? await self.engine.act(action)
+            self.overrides = self.overridesStore.load()
         }
     }
-
-    /// Sessions grouped by project for sectioned display.
-    var groupedByProject: [(project: String, sessions: [Session])] {
-        let groups = Dictionary(grouping: sessions) { $0.projectName }
-        return groups
-            .map { (project: $0.key, sessions: $0.value) }
-            .sorted { lhs, rhs in
-                let l = lhs.sessions.map(\.status.sortRank).min() ?? Int.max
-                let r = rhs.sessions.map(\.status.sortRank).min() ?? Int.max
-                if l != r { return l < r }
-                return lhs.project.localizedCaseInsensitiveCompare(rhs.project) == .orderedAscending
-            }
-    }
-
-    // MARK: User actions
 
     func addManual(title: String, projectPath: String?) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let session = Session(
-            id: "manual:\(UUID().uuidString)",
-            title: trimmed,
-            projectName: trimmed,
-            projectPath: projectPath,
-            source: .manual,
-            lastActivity: Date(),
-            isManual: true
-        )
-        overrides.manual.append(session)
-        persistAndRefresh()
+        perform(.addManual(title: title, projectPath: projectPath))
     }
 
     func remove(_ session: Session) {
-        if session.isManual {
-            overrides.manual.removeAll { $0.id == session.id }
-        } else {
-            overrides.hidden.insert(session.id)
-        }
-        overrides.renames[session.id] = nil
-        overrides.pinned.remove(session.id)
-        persistAndRefresh()
+        perform(session.isManual ? .removeManual(sessionId: session.id) : .hide(sessionId: session.id))
     }
 
     func rename(_ session: Session, to newTitle: String) {
-        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if session.isManual, let idx = overrides.manual.firstIndex(where: { $0.id == session.id }) {
-            overrides.manual[idx].title = trimmed
-        } else {
-            overrides.renames[session.id] = trimmed
-        }
-        persistAndRefresh()
+        perform(.rename(sessionId: session.id, title: newTitle))
     }
 
     func togglePin(_ session: Session) {
-        if overrides.pinned.contains(session.id) {
-            overrides.pinned.remove(session.id)
-        } else {
-            overrides.pinned.insert(session.id)
+        perform(session.isPinned ? .unpin(sessionId: session.id) : .pin(sessionId: session.id))
+    }
+
+    func clearHidden() { perform(.clearHidden) }
+
+    func toggleMute(_ project: Project) {
+        guard let path = project.path else { return }
+        perform(isMuted(project) ? .unmute(projectPath: path) : .mute(projectPath: path))
+    }
+
+    func isMuted(_ project: Project) -> Bool {
+        guard let path = project.path else { return false }
+        return overrides.mutedProjects.contains(path)
+    }
+
+    /// Every muted project path, for the list in Settings.
+    ///
+    /// Muting happens on a project's row, which is the right place for it — but
+    /// a muted project stops being somewhere you look, so the row you would undo
+    /// it from is the row you no longer visit. Without a list, muting is a
+    /// one-way door.
+    var mutedProjectPaths: [String] { overrides.mutedProjects.sorted() }
+
+    func unmute(path: String) { perform(.unmute(projectPath: path)) }
+
+    // MARK: Tasks
+
+    /// Captures a piece of work. `acceptance` is optional here but strongly
+    /// wanted: work filed without it gets delivered wrong and rejected, which
+    /// costs more than writing the line.
+    func addTask(title: String, projectId: String? = nil,
+                 assignee: Assignee = .me, acceptance: String? = nil) {
+        perform(.createTask(.init(
+            title: title,
+            projectId: projectId,
+            assignee: assignee.encoded,
+            acceptance: acceptance,
+            origin: "app",
+            state: "ready"
+        )))
+    }
+
+    func complete(_ task: TaskRecord) { perform(.completeTask(taskId: task.id, note: nil)) }
+
+    func snooze(_ task: TaskRecord, days: Int = 7) {
+        perform(.snoozeTask(taskId: task.id, days: days))
+    }
+
+    func delete(_ task: TaskRecord) { perform(.deleteTask(taskId: task.id)) }
+
+    func start(_ task: TaskRecord) {
+        perform(.updateTask(.init(taskId: task.id, state: TaskState.running.rawValue)))
+    }
+
+    /// Hands a task to a delegate. It does not *run* anything — assigning is
+    /// organising, and organising is free. Starting the run is the gated step.
+    func assign(_ task: TaskRecord, to assignee: Assignee) {
+        perform(.updateTask(.init(taskId: task.id, assignee: assignee.encoded)))
+    }
+
+    // MARK: Control
+
+    /// Asks the engine what running this task would do, without doing it.
+    ///
+    /// The app never guesses the confirmation text: it shows exactly what the
+    /// engine hands back, so the sheet and the thing that runs cannot drift
+    /// apart. Returns `nil` when the run is impossible — no project directory,
+    /// no such delegate — with the reason in `error`.
+    func describeRun(_ task: TaskRecord, delegate: String?) async -> (ConfirmationRequest?, String?) {
+        do {
+            let result = try await engine.act(.runTask(taskId: task.id, delegate: delegate, confirm: nil))
+            return (result.confirmation, nil)
+        } catch {
+            return (nil, "\(error)")
         }
-        persistAndRefresh()
     }
 
-    /// Silences notifications for a session's whole project. The row, the badge,
-    /// and the count all keep working — mute is about interruption, not about
-    /// hiding the work.
-    func toggleMute(_ session: Session) {
-        let key = UserOverrides.muteKey(for: session)
-        if overrides.mutedProjects.contains(key) {
-            overrides.mutedProjects.remove(key)
-        } else {
-            overrides.mutedProjects.insert(key)
+    /// Starts a run the person has just agreed to, carrying the token from the
+    /// description they were shown.
+    @discardableResult
+    func confirmRun(_ task: TaskRecord, delegate: String?, token: String) async -> String? {
+        do {
+            let result = try await engine.act(.runTask(taskId: task.id, delegate: delegate,
+                                                       confirm: token))
+            guard result.runId != nil else {
+                return "That confirmation no longer matches this task. Try again."
+            }
+            return nil
+        } catch {
+            return "\(error)"
         }
-        persistAndRefresh()
     }
 
-    func isMuted(_ session: Session) -> Bool { overrides.isMuted(session) }
+    func cancel(_ run: RunRecord) { perform(.cancelRun(runId: run.id)) }
 
-    var mutedProjectKeys: [String] { overrides.mutedProjects.sorted() }
-
-    func unmute(key: String) {
-        overrides.mutedProjects.remove(key)
-        persistAndRefresh()
+    /// Opens a run's output in whatever the user reads logs with. Output is a
+    /// file precisely so this works, rather than the app pretending to be a
+    /// terminal.
+    func showOutput(_ run: RunRecord) {
+        NSWorkspace.shared.open(RunStore().stdoutURL(for: run.id))
     }
 
-    /// Restores everything the user previously removed.
-    func clearHidden() {
-        overrides.hidden.removeAll()
-        persistAndRefresh()
+    // MARK: Approvals
+
+    /// A person's decision on an agent's request.
+    ///
+    /// Approving here is the *only* path that mints a confirmation token, and it
+    /// runs inside the engine. Nothing in the app — and nothing over MCP — can
+    /// approve on the user's behalf.
+    @discardableResult
+    func decide(_ request: ApprovalRequest, approve: Bool, note: String? = nil) async -> String? {
+        do {
+            let result = try await engine.act(.decideApproval(id: request.id, approve: approve,
+                                                              note: note))
+            guard let decided = result.approval else { return "That request is gone." }
+            switch decided.effectiveState() {
+            case .expired:
+                return "This sat too long to act on safely. Ask the agent to request it again."
+            case .pending:
+                return "It wasn't decided."
+            case .approved where decided.runId == nil:
+                return decided.note ?? "Approved, but it didn't start."
+            default:
+                return nil
+            }
+        } catch {
+            // Left pending on purpose, so the reason can be fixed and the same
+            // decision made again.
+            return "\(error)"
+        }
     }
 
-    var hiddenCount: Int { overrides.hidden.count }
+    /// Clears a task's request for a human, once you've dealt with it.
+    func resolveWaiting(_ task: TaskRecord) {
+        perform(.updateTask(.init(taskId: task.id, waiting: "")))
+    }
 
-    /// Brings the underlying work to the foreground: activates the app for desktop
-    /// sessions, or reveals the project folder in Finder for file-based ones.
+    /// The delegates this machine can hand work to, for the assign menu.
+    lazy var delegates: [String] = RosterReader().read().delegates.map(\.name)
+
+    // MARK: Project lifecycle
+
+    func archive(_ project: Project) {
+        var record = project.record
+        record.lifecycle = .archived
+        projectStore.save(record)
+        refresh()
+    }
+
+    func park(_ project: Project, days: Int = 7) {
+        var record = project.record
+        record.lifecycle = .parked(until: Date().addingTimeInterval(Double(days) * 86_400))
+        projectStore.save(record)
+        refresh()
+    }
+
+    func unarchive(_ project: Project) {
+        var record = project.record
+        record.lifecycle = .active
+        projectStore.save(record)
+        refresh()
+    }
+
+    func togglePin(_ project: Project) {
+        var record = project.record
+        record.isPinned.toggle()
+        projectStore.save(record)
+        refresh()
+    }
+
+    // MARK: Opening things
+
+    /// Brings the underlying work to the foreground: activates the app for
+    /// desktop sessions, or reveals the project folder in Finder otherwise.
     func activate(_ session: Session) {
-        if let pid = session.pid,
-           let app = NSRunningApplication(processIdentifier: pid) {
+        if let pid = session.pid, let app = NSRunningApplication(processIdentifier: pid) {
             app.activate(options: [.activateAllWindows])
             return
         }
@@ -370,22 +349,32 @@ final class SessionStore: ObservableObject {
             NSWorkspace.shared.open(url)
             return
         }
-        if let path = session.projectPath {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-        }
+        if let path = session.projectPath { reveal(path) }
     }
 
-    /// Entry point for a notification's "Open" action. The session may have been
-    /// reclassified — or have disappeared — between the notification firing and
-    /// the user clicking it, so this fails quietly rather than guessing.
-    func activate(id: String) {
+    func activate(_ project: Project) {
+        if let path = project.path { reveal(path) }
+    }
+
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Brings the app forward when a notification about a decision is tapped.
+    ///
+    /// **It cannot open the popover, and doesn't pretend to.** `MenuBarExtra`
+    /// exposes no supported way to present its own window, and the unsupported
+    /// routes — synthesising a click on the status item, or replacing it with a
+    /// hand-built `NSStatusItem` — trade a working menu bar for one click. So
+    /// the notification's job ends at telling you there is a decision; the badge
+    /// carries the count, and the request is the first thing in the popover when
+    /// you open it.
+    func requestPopover() {
         NSApp.activate(ignoringOtherApps: true)
-        guard let session = sessions.first(where: { $0.id == id }) else { return }
-        activate(session)
     }
 
-    private func persistAndRefresh() {
-        overridesStore.save(overrides)
-        refresh()
+    /// Focuses the session a notification was about.
+    func focus(sessionId: String) {
+        if let session = sessions.first(where: { $0.id == sessionId }) { activate(session) }
     }
 }
