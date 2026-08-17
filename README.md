@@ -131,10 +131,10 @@ rather than merely gone quiet. It reads only bytes appended since the last
 refresh, tolerates the interleaved lines that stock macOS's missing `flock`
 produces, and never retains the `input`/`response` fields.
 
-Enable it under **Settings → Detection → Harness audit log**, where the parse
-health (records read, unparseable lines skipped) is also shown. A menu bar app
-doesn't inherit your shell environment, so set the path explicitly there if
-`$AI_TOOL_LOG` is non-standard.
+Enable it under **Settings → Signals → Harness audit log**; the parse health
+(records read, unparseable lines skipped) is shown under **Settings → Health**. A
+menu bar app doesn't inherit your shell environment, so set the path explicitly
+if `$AI_TOOL_LOG` is non-standard.
 
 Records join to a session by the harness's own session id, falling back to the
 working directory. `mtm doctor` reports how many of your sessions join precisely:
@@ -261,7 +261,7 @@ Notes:
   expanding a row and the periodic refresh stay snappy even with many projects.
 - **Dev-folder** projects (no transcript) still show Goal and Next — handy for repos
   you're editing without an agent attached.
-- Toggle the whole feature in **Settings → Detection → Project briefing**.
+- Toggle the whole feature in **Settings → Signals → Project briefing**.
 - Nothing is sent anywhere; it's all local file reads.
 
 To get the most out of it, keep a one-line purpose near the top of your project's
