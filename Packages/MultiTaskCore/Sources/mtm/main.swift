@@ -14,6 +14,7 @@ struct MTM: AsyncParsableCommand {
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
         subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
+                      Run.self, Runs.self, Provision.self,
                       Log.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
@@ -923,5 +924,162 @@ struct Log: ParsableCommand {
                 print("  \(String(repeating: " ", count: 18))by \(decision.actor)")
             }
         }
+    }
+}
+
+// MARK: - run
+
+struct Run: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Hand a task to a delegate and let it work."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Which delegate. Defaults to the task's assignee.")
+    var delegate: String?
+
+    @Flag(name: .long, help: "Skip the confirmation prompt.")
+    var yes = false
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+
+        // Ask first. Running a delegate spends compute and writes to a
+        // repository, and the gate is the app's own rule rather than a courtesy.
+        let dryRun = try await client.act(.runTask(taskId: task.id, delegate: delegate, confirm: nil))
+        guard let confirmation = dryRun.confirmation else {
+            print("Nothing to confirm — the run did not start.")
+            return
+        }
+
+        print(confirmation.summary)
+        for detail in confirmation.details { print("  \(detail)") }
+
+        if !yes {
+            print("\nProceed? [y/N] ", terminator: "")
+            guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased(),
+                  answer == "y" || answer == "yes" else {
+                print("Cancelled.")
+                return
+            }
+        }
+
+        let result = try await client.act(.runTask(taskId: task.id, delegate: delegate,
+                                                   confirm: confirmation.token))
+        guard let runId = result.runId else {
+            // Silence here once hid a gate that could never be passed: the run
+            // was refused every time and the command exited 0 saying nothing.
+            print("The run did not start — the confirmation no longer matches this request.")
+            throw ExitCode.failure
+        }
+        print("Started \(runId).")
+        print("Output: \(RunStore().stdoutURL(for: runId).path)")
+        print("Stop it with `mtm runs cancel \(runId)`.")
+    }
+}
+
+// MARK: - runs
+
+struct Runs: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Delegate runs, newest first.",
+        subcommands: [RunsCancel.self, RunsTail.self]
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    func run() async throws {
+        let runs = RunStore().load()
+        guard !runs.isEmpty else {
+            print("No runs yet. `mtm run <task>` hands one to a delegate.")
+            return
+        }
+        for record in runs.prefix(20) {
+            let duration = Format.duration(record.duration)
+            print("  \(record.state.label.padded(to: 10)) \(record.delegate.padded(to: 8)) \(duration.padded(to: 6)) \(record.id)")
+            print("  \(String(repeating: " ", count: 26))\(ProjectContextReader.truncate(record.shortCommand, to: 76))")
+            if let note = record.note { print("  \(String(repeating: " ", count: 26))\(note)") }
+        }
+    }
+}
+
+struct RunsCancel: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "cancel", abstract: "Stop a run."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Run id or any unique prefix.")
+    var id: String
+
+    func run() async throws {
+        _ = try await options.client().act(.cancelRun(runId: id))
+        print("Cancelled.")
+    }
+}
+
+struct RunsTail: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "tail", abstract: "The end of a run's output."
+    )
+
+    @Argument(help: "Run id or any unique prefix.")
+    var id: String
+
+    func run() throws {
+        let store = RunStore()
+        guard let record = store.load().first(where: { $0.id.hasPrefix(id) }) else {
+            print("No run matching \"\(id)\".")
+            return
+        }
+        print(store.tail(of: record.id) ?? "(no output yet)")
+    }
+}
+
+// MARK: - provision
+
+struct Provision: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Create an isolated worktree and context dir for a task."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Task id or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Agent name — becomes the ai/<agent> branch.")
+    var agent: String = "claude"
+
+    @Flag(name: .long, help: "Skip the confirmation prompt.")
+    var yes = false
+
+    func run() async throws {
+        let client = options.client()
+        guard let task = resolve(id, in: try await client.list().tasks) else { return }
+
+        let dryRun = try await client.act(.provisionIsolation(taskId: task.id, agent: agent, confirm: nil))
+        guard let confirmation = dryRun.confirmation else { return }
+
+        print(confirmation.summary)
+        for detail in confirmation.details { print("  \(detail)") }
+
+        if !yes {
+            print("\nProceed? [y/N] ", terminator: "")
+            guard let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased(),
+                  answer == "y" || answer == "yes" else {
+                print("Cancelled.")
+                return
+            }
+        }
+        _ = try await client.act(.provisionIsolation(taskId: task.id, agent: agent,
+                                                     confirm: confirmation.token))
+        print("Provisioned.")
     }
 }

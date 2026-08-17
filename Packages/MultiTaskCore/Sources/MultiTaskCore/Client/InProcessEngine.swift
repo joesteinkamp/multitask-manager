@@ -18,6 +18,10 @@ public actor InProcessEngine: EngineClient {
     private let overridesStore: OverridesStore
     private let taskStore: TaskStore
     private let decisions: DecisionLog
+    private let runStore: RunStore
+    private let launcher: Launcher
+    private let provisioner: Provisioner
+    private let auditWriter: AuditWriter
     private let policy: NotificationPolicy
 
     private var overrides: UserOverrides
@@ -30,12 +34,20 @@ public actor InProcessEngine: EngineClient {
                 overridesStore: OverridesStore = OverridesStore(),
                 taskStore: TaskStore = TaskStore(),
                 decisions: DecisionLog = DecisionLog(),
+                runStore: RunStore = RunStore(),
+                launcher: Launcher? = nil,
+                provisioner: Provisioner = Provisioner(),
+                auditWriter: AuditWriter? = nil,
                 policy: NotificationPolicy = NotificationPolicy()) {
         self.configurationProvider = configuration
         self.engine = engine ?? DetectionEngine(configuration: configuration)
         self.overridesStore = overridesStore
         self.taskStore = taskStore
         self.decisions = decisions
+        self.runStore = runStore
+        self.launcher = launcher ?? Launcher(runStore: runStore)
+        self.provisioner = provisioner
+        self.auditWriter = auditWriter ?? AuditWriter(configuration: configuration.configuration)
         self.policy = policy
         self.overrides = overridesStore.load()
     }
@@ -249,6 +261,21 @@ public actor InProcessEngine: EngineClient {
                              projectId: task.projectId, taskId: task.id)
             return ActionResult(ok: true, snapshot: await refreshNow())
 
+        case .runTask(let taskId, let delegate, let confirm):
+            return try await runTask(taskId: taskId, delegate: delegate, confirm: confirm)
+
+        case .cancelRun(let runId):
+            guard let run = runStore.load().first(where: { $0.id.hasPrefix(runId) }) else {
+                throw LaunchError.taskNotFound(runId)
+            }
+            let cancelled = launcher.cancel(run)
+            auditWriter.recordEnd(cancelled)
+            decisions.record(.other, "Cancelled run \(cancelled.id)", taskId: cancelled.taskId)
+            return ActionResult(ok: true, snapshot: await refreshNow(), runId: cancelled.id)
+
+        case .provisionIsolation(let taskId, let agent, let confirm):
+            return try await provision(taskId: taskId, agent: agent, confirm: confirm)
+
         case .deleteTask(let taskId):
             guard let task = taskStore.resolve(taskId) else {
                 throw TaskStoreError.notFound(taskId)
@@ -262,6 +289,109 @@ public actor InProcessEngine: EngineClient {
         }
         return ActionResult(ok: true, snapshot: await refreshNow())
     }
+
+    // MARK: Control
+
+    /// Runs a task with a delegate. **Gated**: without a matching confirmation
+    /// token this describes what would happen and does nothing.
+    private func runTask(taskId: String, delegate: String?, confirm: String?) async throws -> ActionResult {
+        guard let task = taskStore.resolve(taskId) else { throw LaunchError.taskNotFound(taskId) }
+
+        let snapshot = await currentSnapshot()
+        let project = snapshot.projects.first { $0.id == task.projectId }
+        guard let workingDirectory = project?.path else { throw LaunchError.noWorkingDirectory }
+
+        // Routing is advisory and always visible: the task's own assignee first,
+        // then whatever the caller asked for, then a default.
+        let chosen = delegate
+            ?? { if case .agent(let name) = task.assignee { return name } else { return nil } }()
+            ?? "claude"
+
+        let context = FileSupport.homeDirectory
+            .appendingPathComponent(".ai-context", isDirectory: true)
+            .appendingPathComponent("\(FileSupport.lastComponent(of: workingDirectory))-\(task.id)")
+            .path
+        let prompt = Provisioner.brief(task: task, agent: chosen, contextDirectory: context)
+        let command = try Launcher.command(delegate: chosen, prompt: prompt, extraDirectories: [context])
+
+        var run = RunRecord(id: RunRecord.identifier(), taskId: task.id,
+                            projectId: task.projectId, delegate: chosen,
+                            command: command, workingDirectory: workingDirectory)
+
+        // The gate. Nothing has been spawned at this point.
+        guard let confirm, !confirm.isEmpty else {
+            return ActionResult(ok: false, snapshot: snapshot,
+                                confirmation: Launcher.confirmation(for: run, task: task))
+        }
+        // No `"yes"` escape hatch: a literal that always passes is a bypass, and
+        // the MCP server is exactly the sort of caller that would find it.
+        // Mismatches hand back the real confirmation rather than an error, so a
+        // caller working from a stale token is corrected instead of blocked.
+        guard confirm == Launcher.token(for: run) else {
+            return ActionResult(ok: false, snapshot: snapshot,
+                                confirmation: Launcher.confirmation(for: run, task: task))
+        }
+
+        run = try launcher.start(run)
+        auditWriter.recordStart(run)
+        decisions.record(.taskAssigned, "Started \"\(task.title)\" with \(chosen)",
+                         actor: chosen, projectId: task.projectId, taskId: task.id)
+
+        // The task is now in flight and claimed by the delegate running it.
+        var claimed = try TaskQueue.claim(task, by: chosen)
+        claimed.sessions.append(run.id)
+        _ = try? taskStore.save(claimed)
+
+        return ActionResult(ok: true, snapshot: await refreshNow(), runId: run.id)
+    }
+
+    /// Binds a provisioning confirmation to the repository and agent it names,
+    /// for the same reason run tokens are bound to their command.
+    static func provisionToken(repository: String, agent: String, task: String) -> String {
+        Launcher.token(delegate: agent, command: ["provision", task], workingDirectory: repository)
+    }
+
+    /// Creates a worktree and a context directory for a task. Also gated — it
+    /// writes to a repository.
+    private func provision(taskId: String, agent: String, confirm: String?) async throws -> ActionResult {
+        guard let task = taskStore.resolve(taskId) else { throw LaunchError.taskNotFound(taskId) }
+        let snapshot = await currentSnapshot()
+        guard let repository = snapshot.projects.first(where: { $0.id == task.projectId })?.path else {
+            throw LaunchError.noWorkingDirectory
+        }
+
+        // Preflight before asking: there is no point confirming something that
+        // cannot happen, and the reason is more useful than the prompt.
+        try provisioner.preflight(repository: repository, agent: agent)
+
+        guard let confirm, !confirm.isEmpty else {
+            let worktree = Provisioner.worktreePath(repository: repository, agent: agent)
+            return ActionResult(ok: false, snapshot: snapshot, confirmation: ConfirmationRequest(
+                summary: "Create an isolated worktree for \(agent)",
+                details: [
+                    "Worktree: \(worktree)",
+                    "Branch: \(Provisioner.branchName(for: agent))",
+                    "From: \(repository)"
+                ],
+                token: Self.provisionToken(repository: repository, agent: agent, task: task.id)
+            ))
+        }
+        guard confirm == Self.provisionToken(repository: repository, agent: agent, task: task.id) else {
+            throw ProvisionError.gitFailed("confirmation did not match this request")
+        }
+
+        let isolation = try provisioner.provision(
+            repository: repository, agent: agent, slug: task.id,
+            brief: Provisioner.brief(task: task, agent: agent,
+                                     contextDirectory: "(this directory)")
+        )
+        decisions.record(.other, "Provisioned \(isolation.branch) for \(agent)",
+                         projectId: task.projectId, taskId: task.id)
+        return ActionResult(ok: true, snapshot: await refreshNow())
+    }
+
+    /// Runs, newest first.
+    public func runs() -> [RunRecord] { runStore.load() }
 
     // MARK: Tasks
 
@@ -326,6 +456,12 @@ public actor InProcessEngine: EngineClient {
 
     @discardableResult
     private func refreshNow() async -> EngineSnapshot {
+        // Close out runs whose process is gone, so nothing sits in `running`
+        // forever after a crash or a reboot.
+        for finished in launcher.reconcile(runStore.load()) {
+            runStore.save(finished)
+            auditWriter.recordEnd(finished)
+        }
         let snapshot = await engine.refresh(overrides: overrides)
         let previous = latest
         latest = snapshot

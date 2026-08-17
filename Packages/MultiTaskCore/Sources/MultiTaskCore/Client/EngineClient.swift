@@ -50,6 +50,13 @@ public enum EngineAction: Codable, Sendable, Equatable {
     case snoozeTask(taskId: String, days: Int)
     case deleteTask(taskId: String)
 
+    // Control actions. These *spend* — compute, and writes to a repository — so
+    // each is gated: issued without a confirmation token the engine describes
+    // what would happen and does nothing.
+    case runTask(taskId: String, delegate: String?, confirm: String?)
+    case cancelRun(runId: String)
+    case provisionIsolation(taskId: String, agent: String, confirm: String?)
+
     /// Fields for a new task. A struct rather than a dozen associated values so
     /// the MCP server and the CLI can decode one shape.
     public struct CreateTask: Codable, Sendable, Equatable {
@@ -115,11 +122,22 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public var ok: Bool
     /// Snapshot after the action, so a caller doesn't need a second round-trip.
     public var snapshot: EngineSnapshot?
+    /// Present when the action was **not** performed because it spends something
+    /// and hasn't been approved. Re-issue the same action carrying `token`.
+    public var confirmation: ConfirmationRequest?
+    /// Set by control actions that produced one.
+    public var runId: String?
 
-    public init(ok: Bool, snapshot: EngineSnapshot? = nil) {
+    public init(ok: Bool, snapshot: EngineSnapshot? = nil,
+                confirmation: ConfirmationRequest? = nil, runId: String? = nil) {
         self.ok = ok
         self.snapshot = snapshot
+        self.confirmation = confirmation
+        self.runId = runId
     }
+
+    /// True when nothing happened and approval is what's missing.
+    public var needsConfirmation: Bool { confirmation != nil }
 }
 
 /// Something the engine reports without being asked.
