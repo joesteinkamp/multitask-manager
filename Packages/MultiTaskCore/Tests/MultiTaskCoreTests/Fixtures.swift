@@ -292,16 +292,20 @@ extension Session {
 /// silently compares against "now" because a timestamp never moved is worse
 /// than one that reports itself skipped.
 enum FilesystemCapabilities {
-    /// Whether setting a file's modification date into the past sticks.
+    /// Whether setting a **directory's** modification date into the past sticks.
     ///
-    /// Windows does not, which is why the wave-staleness test cannot run there.
+    /// A directory specifically, because that is what the callers need: a wave's
+    /// `updatedAt` is the newer of its directory's mtime and `STATE.md`'s. An
+    /// earlier version of this probe used a file, which Windows *does* backdate
+    /// — so the gate reported the capability as present, the test ran anyway,
+    /// and it failed on the one timestamp that had not moved.
     static let canBackdate: Bool = {
         let dir = TempDir()
-        let file = dir.write("probe", to: "probe.txt")
+        let target = dir.makeDirectory("probe")
         let past = Date().addingTimeInterval(-86_400)
         guard (try? FileManager.default.setAttributes([.modificationDate: past],
-                                                      ofItemAtPath: file.path)) != nil else { return false }
-        let written = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date
+                                                      ofItemAtPath: target.path)) != nil else { return false }
+        let written = (try? FileManager.default.attributesOfItem(atPath: target.path))?[.modificationDate] as? Date
         guard let written else { return false }
         return abs(written.timeIntervalSince(past)) < 2
     }()

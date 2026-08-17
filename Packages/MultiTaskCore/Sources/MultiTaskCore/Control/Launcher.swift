@@ -28,7 +28,11 @@ public struct ConfirmationRequest: Codable, Hashable, Sendable {
 public enum LaunchError: Error, Equatable, CustomStringConvertible {
     case unknownDelegate(String)
     case delegateNotInstalled(String)
-    case noWorkingDirectory
+    /// The task's project has no directory. Carries the project it looked for
+    /// and what it saw, because "no project directory" alone leaves you
+    /// guessing whether the project is missing, pathless, or simply not yet
+    /// in the snapshot.
+    case noWorkingDirectory(project: String?, known: [String])
     case taskNotFound(String)
     case bannedFlag(String)
 
@@ -37,7 +41,12 @@ public enum LaunchError: Error, Equatable, CustomStringConvertible {
         case .unknownDelegate(let name): return "No invocation template for \(name)"
         case .delegateNotInstalled(let name):
             return "\(name) isn't on PATH. Check `mtm roster`, or open the app from a shell."
-        case .noWorkingDirectory: return "This task has no project directory to run in"
+        case .noWorkingDirectory(let project, let known):
+            let wanted = project.map { "project \($0)" } ?? "no project"
+            if known.isEmpty {
+                return "This task has no project directory to run in — it names \(wanted), and nothing is tracked yet"
+            }
+            return "This task has no project directory to run in — it names \(wanted); tracked: \(known.joined(separator: ", "))"
         case .taskNotFound(let id): return "No task \(id)"
         case .bannedFlag(let flag): return "Refusing to launch with \(flag)"
         }

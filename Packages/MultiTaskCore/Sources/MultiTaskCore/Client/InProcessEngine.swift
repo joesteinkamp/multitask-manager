@@ -327,7 +327,11 @@ public actor InProcessEngine: EngineClient {
 
         let snapshot = await currentSnapshot()
         let project = snapshot.projects.first { $0.id == task.projectId }
-        guard let workingDirectory = project?.path else { throw LaunchError.noWorkingDirectory }
+        guard let workingDirectory = project?.path else {
+            throw LaunchError.noWorkingDirectory(
+                project: task.projectId,
+                known: snapshot.projects.map { "\($0.id)=\($0.path ?? "-")" })
+        }
 
         // Routing is advisory and always visible: the task's own assignee first,
         // then whatever the caller asked for, then a default.
@@ -378,7 +382,9 @@ public actor InProcessEngine: EngineClient {
         guard let task = taskStore.resolve(taskId) else { throw LaunchError.taskNotFound(taskId) }
         let snapshot = await currentSnapshot()
         guard let repository = snapshot.projects.first(where: { $0.id == task.projectId })?.path else {
-            throw LaunchError.noWorkingDirectory
+            throw LaunchError.noWorkingDirectory(
+                project: task.projectId,
+                known: await currentSnapshot().projects.map { "\($0.id)=\($0.path ?? "-")" })
         }
 
         // Preflight before asking: there is no point confirming something that
@@ -434,7 +440,9 @@ public actor InProcessEngine: EngineClient {
 
         let snapshot = await currentSnapshot()
         guard let workingDirectory = snapshot.projects.first(where: { $0.id == task.projectId })?.path else {
-            throw LaunchError.noWorkingDirectory
+            throw LaunchError.noWorkingDirectory(
+                project: task.projectId,
+                known: await currentSnapshot().projects.map { "\($0.id)=\($0.path ?? "-")" })
         }
         let chosen = delegate
             ?? { if case .agent(let name) = task.assignee { return name } else { return nil } }()
@@ -541,7 +549,9 @@ public actor InProcessEngine: EngineClient {
         case .provision:
             guard let workingDirectory = await currentSnapshot().projects
                     .first(where: { $0.id == request.projectId })?.path else {
-                throw LaunchError.noWorkingDirectory
+                throw LaunchError.noWorkingDirectory(
+                    project: request.projectId,
+                    known: await currentSnapshot().projects.map { "\($0.id)=\($0.path ?? "-")" })
             }
             let agent = request.delegate ?? "claude"
             outcome = try await provision(
