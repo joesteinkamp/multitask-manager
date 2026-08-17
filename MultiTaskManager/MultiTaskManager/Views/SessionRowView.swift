@@ -14,12 +14,12 @@ struct SessionRowView: View {
     @State private var renameText = ""
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: AppTheme.rowSpacing) {
             Image(systemName: session.status.symbolName)
                 .foregroundStyle(session.status.color)
-                .font(.system(size: 9))
-                .frame(width: 12)
-                .padding(.top, 2)
+                .font(AppTheme.glyphFont)
+                .frame(width: AppTheme.statusGlyph)
+                .padding(.top, AppTheme.hairSpacing)
 
             if isRenaming {
                 TextField("Name", text: $renameText, onCommit: commitRename)
@@ -27,10 +27,10 @@ struct SessionRowView: View {
                     .font(.caption)
             } else {
                 Button { store.activate(session) } label: {
-                    VStack(alignment: .leading, spacing: 1) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
+                        HStack(spacing: AppTheme.tightSpacing) {
                             if session.isPinned {
-                                Image(systemName: "pin.fill").font(.system(size: 8))
+                                Image(systemName: "pin.fill").font(AppTheme.glyphFont)
                                     .foregroundStyle(.tertiary)
                             }
                             Text(session.title)
@@ -38,26 +38,26 @@ struct SessionRowView: View {
                                 .lineLimit(1)
                             if let waiting = session.waiting {
                                 Image(systemName: waiting.symbolName)
-                                    .font(.system(size: 8))
-                                    .foregroundStyle(.orange)
+                                    .font(AppTheme.glyphFont)
+                                    .foregroundStyle(AppTheme.attentionColor)
                                     .help(waiting.label)
                             }
                         }
                         Text(subtitle)
-                            .font(.system(size: 9))
+                            .font(AppTheme.glyphFont)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                         // What it changed beats what it was asked: "wrote 4
                         // files" is evidence, the prompt is only intent.
                         if let did = session.activity?.summary {
                             Text(did)
-                                .font(.system(size: 9))
+                                .font(AppTheme.glyphFont)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
                         if let now = session.context?.now {
                             Text(now)
-                                .font(.system(size: 9))
+                                .font(AppTheme.glyphFont)
                                 .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                         }
@@ -101,7 +101,7 @@ struct SessionRowView: View {
             Button("Remove", role: .destructive) { store.remove(session) }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 9))
+                .font(AppTheme.glyphFont)
                 .foregroundStyle(.tertiary)
         }
         .menuStyle(.borderlessButton)
@@ -122,7 +122,7 @@ struct ProjectBriefView: View {
     let context: ProjectContext
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
             if let goal = context.goal {
                 briefLine(icon: "target", title: "Goal", text: goal, source: context.goalSource)
             }
@@ -130,7 +130,7 @@ struct ProjectBriefView: View {
                 briefLine(icon: "waveform", title: "Now", text: now, source: nil)
             }
             if !context.next.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
                     ForEach(Array(context.next.enumerated()), id: \.offset) { index, item in
                         briefLine(
                             icon: index == 0 ? "arrow.right.circle" : nil,
@@ -142,35 +142,35 @@ struct ProjectBriefView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
-        .padding(.horizontal, 8)
+        .padding(.vertical, AppTheme.tightSpacing)
+        .padding(.horizontal, AppTheme.rowPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+        .background(RoundedRectangle(cornerRadius: AppTheme.controlRadius).fill(Color.secondary.opacity(0.08)))
     }
 
     @ViewBuilder
     private func briefLine(icon: String?, title: String?, text: String, source: String?) -> some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: AppTheme.rowSpacing) {
             Group {
                 if let icon {
-                    Image(systemName: icon).font(.system(size: 10))
+                    Image(systemName: icon).font(AppTheme.iconFont)
                 } else {
-                    Color.clear.frame(width: 10, height: 10)
+                    Color.clear.frame(width: AppTheme.iconSmall, height: AppTheme.iconSmall)
                 }
             }
             .foregroundStyle(.secondary)
-            .frame(width: 12)
-            .padding(.top, 1)
+            .frame(width: AppTheme.statusGlyph)
+            .padding(.top, AppTheme.hairSpacing)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                 if let title {
-                    HStack(spacing: 4) {
+                    HStack(spacing: AppTheme.tightSpacing) {
                         Text(title)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(.secondary)
                         if let source {
                             Text(source)
-                                .font(.system(size: 8))
+                                .font(AppTheme.glyphFont)
                                 .foregroundStyle(.tertiary)
                         }
                     }

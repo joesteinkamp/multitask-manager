@@ -35,6 +35,12 @@ duplicate them; it tells you which one to read **before** starting the matching 
 | Making **product or brand decisions** — scope, positioning, personas, tone | `PRODUCT.md` (who it's for, why it exists, personality, anti-references) | Re-deciding scope and audience the product already settled |
 | Writing **code** — stack, architecture, conventions, testing, performance, security | `CODE.md` | Stack and architecture choices that contradict the repo |
 
+**`DESIGN.json` is a source, not a mirror.** Every constant both interfaces share lives there,
+and `Packages/MultiTaskCore/Sources/MultiTaskCore/Design/DesignTokens.swift` is *generated* from
+it by `Scripts/generate-tokens.py`. Never edit the generated file, and never hardcode a spacing
+value, radius, or colour in a view — add it to `DESIGN.json`, regenerate, and reach it through
+`AppTheme`. A test and a CI step both fail if the two disagree.
+
 **Design and writing have a hard trigger:** read `DESIGN.md` before your first edit to a
 component, stylesheet, or token file, and `WRITING.md` before your first edit to any string a
 user will see — including a one-line tweak. Drift in these two is invisible; the output looks

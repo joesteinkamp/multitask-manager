@@ -15,14 +15,14 @@ struct ProjectRowView: View {
     @State private var isCapturing = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .top, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
+            HStack(alignment: .top, spacing: AppTheme.rowPadding) {
                 disclosure
                 statusDot
 
                 Button { store.activate(project) } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
+                    VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
+                        HStack(spacing: AppTheme.tightSpacing) {
                             if project.record.isPinned {
                                 Image(systemName: "pin.fill")
                                     .font(.caption2).foregroundStyle(.secondary)
@@ -54,8 +54,8 @@ struct ProjectRowView: View {
 
             if isExpanded { detail }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, AppTheme.sectionSpacing)
+        .padding(.vertical, AppTheme.tightSpacing)
         .contentShape(Rectangle())
     }
 
@@ -68,17 +68,17 @@ struct ProjectRowView: View {
                 withAnimation(.easeInOut(duration: 0.18)) { isExpanded.toggle() }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
+                    .font(AppTheme.glyphFont.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .frame(width: 12, height: 12)
+                    .frame(width: AppTheme.statusGlyph, height: 12)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.top, 2)
+            .padding(.top, AppTheme.hairSpacing)
             .help(isExpanded ? "Hide detail" : "Show sessions, next steps and waves")
         } else {
-            Color.clear.frame(width: 12, height: 12)
+            Color.clear.frame(width: AppTheme.statusGlyph, height: 12)
         }
     }
 
@@ -92,20 +92,20 @@ struct ProjectRowView: View {
     private var statusDot: some View {
         Image(systemName: project.status.symbolName)
             .foregroundStyle(project.status.color)
-            .font(.system(size: 11))
+            .font(AppTheme.statusGlyphFont)
             .opacity(isLive && pulse ? 0.35 : 1)
             .animation(isLive ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default,
                        value: pulse)
             .onAppear { if isLive { pulse = true } }
-            .frame(width: 14)
-            .padding(.top, 2)
+            .frame(width: AppTheme.statusGlyph)
+            .padding(.top, AppTheme.hairSpacing)
             .help(project.status.label)
     }
 
     private var isLive: Bool { project.status == .working }
 
     private func progressBar(_ progress: ProjectProgress) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: AppTheme.rowSpacing) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.secondary.opacity(0.15))
@@ -117,19 +117,19 @@ struct ProjectRowView: View {
             .frame(height: 3)
 
             Text(progress.summary)
-                .font(.system(size: 9))
+                .font(AppTheme.glyphFont)
                 .foregroundStyle(.tertiary)
                 .monospacedDigit()
         }
         .frame(maxWidth: 190)
-        .padding(.top, 1)
+        .padding(.top, AppTheme.hairSpacing)
         .help("\(progress.summary) items checked in \(progress.source)")
     }
 
     // MARK: Detail
 
     private var detail: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
             if let one = project.oneLiner {
                 Text(one)
                     .font(.caption2)
@@ -140,7 +140,7 @@ struct ProjectRowView: View {
             // Tasks before sessions: the work is the point, the sessions are
             // how it's being done.
             if !project.openTasks.isEmpty {
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
                     Label("Tasks", systemImage: "checklist")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -172,7 +172,7 @@ struct ProjectRowView: View {
             }
 
             if !project.nextSteps.isEmpty && project.openTasks.isEmpty {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                     Label("Next", systemImage: "arrow.right.circle")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -197,12 +197,12 @@ struct ProjectRowView: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .padding(.leading, 22)
-        .padding(.trailing, 4)
-        .padding(.vertical, 4)
+        .padding(.leading, AppTheme.nestedIndent)
+        .padding(.trailing, AppTheme.tightSpacing)
+        .padding(.vertical, AppTheme.tightSpacing)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.07))
+            RoundedRectangle(cornerRadius: AppTheme.controlRadius).fill(Color.secondary.opacity(0.07))
         )
         .transition(.opacity.combined(with: .move(edge: .top)))
     }
@@ -234,16 +234,16 @@ struct WaveRowView: View {
     let wave: Wave
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
+            HStack(spacing: AppTheme.tightSpacing) {
                 Image(systemName: "square.stack.3d.down.right")
-                    .font(.system(size: 9))
+                    .font(AppTheme.glyphFont)
                 Text(wave.title ?? wave.id)
                     .font(.caption2.weight(.semibold))
                     .lineLimit(1)
                 Spacer()
                 Text("\(wave.doneCount)/\(wave.delegates.count)")
-                    .font(.system(size: 9))
+                    .font(AppTheme.glyphFont)
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
             }

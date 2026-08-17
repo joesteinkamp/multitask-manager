@@ -25,8 +25,8 @@ struct MenuContentView: View {
             if !store.pendingApprovals.isEmpty {
                 Divider()
                 ApprovalsSection()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, AppTheme.sectionSpacing)
+                    .padding(.vertical, AppTheme.rowSpacing)
             }
 
             // The decision comes before the context: what to do, then which
@@ -47,8 +47,8 @@ struct MenuContentView: View {
             if !store.runs.isEmpty {
                 Divider()
                 RunsSection()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, AppTheme.sectionSpacing)
+                    .padding(.vertical, AppTheme.rowSpacing)
             }
 
             if !store.degraded.isEmpty {
@@ -59,7 +59,7 @@ struct MenuContentView: View {
             Divider()
             footer
         }
-        .frame(width: 380)
+        .frame(width: AppTheme.popoverWidth)
     }
 
     // MARK: Header
@@ -71,10 +71,10 @@ struct MenuContentView: View {
         // agents waiting on a decision — the wrong thing to go looking for.
         let projectsNeeding = store.activeProjects.filter { $0.status == .needsYou }.count
         let asks = store.pendingApprovals.count
-        return VStack(alignment: .leading, spacing: 2) {
+        return VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
             Text("MultiTask Manager")
                 .font(.headline)
-            HStack(spacing: 6) {
+            HStack(spacing: AppTheme.rowSpacing) {
                 if asks > 0 {
                     Label(asks == 1 ? "An agent is asking you"
                                     : "\(asks) agents are asking you",
@@ -88,7 +88,7 @@ struct MenuContentView: View {
                         .font(.caption)
                 } else {
                     Label("Nothing waiting on you", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.workingColor)
                         .font(.caption)
                 }
                 Spacer()
@@ -97,14 +97,14 @@ struct MenuContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .padding(12)
+        .padding(AppTheme.sectionSpacing)
     }
 
     // MARK: List
 
     private var projectList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
                 ForEach(liveProjects) { project in
                     ProjectRowView(project: project)
                 }
@@ -115,7 +115,7 @@ struct MenuContentView: View {
 
                 if isAdding { addField }
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, AppTheme.rowPadding)
         }
         .frame(maxHeight: 460)
     }
@@ -131,13 +131,13 @@ struct MenuContentView: View {
     }
 
     private var dormantDisclosure: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Button {
                 withAnimation(.easeInOut(duration: 0.18)) { showingPast.toggle() }
             } label: {
-                HStack(spacing: 4) {
+                HStack(spacing: AppTheme.tightSpacing) {
                     Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
+                        .font(AppTheme.glyphFont.weight(.semibold))
                         .rotationEffect(.degrees(showingPast ? 90 : 0))
                     Text("\(dormantProjects.count) gone quiet")
                         .font(.caption)
@@ -146,7 +146,7 @@ struct MenuContentView: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.sectionSpacing)
             .help("Projects with no activity and nothing ready to pick up")
 
             if showingPast {
@@ -158,9 +158,9 @@ struct MenuContentView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AppTheme.rowPadding) {
             if isAdding {
-                addField.padding(.horizontal, 12)
+                addField.padding(.horizontal, AppTheme.sectionSpacing)
             } else {
                 Image(systemName: "moon.stars")
                     .font(.largeTitle)
@@ -174,20 +174,20 @@ struct MenuContentView: View {
             }
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 24)
-        .padding(.horizontal, 12)
+        .padding(.vertical, AppTheme.spaciousPadding)
+        .padding(.horizontal, AppTheme.sectionSpacing)
     }
 
     private var addField: some View {
         TaskComposer(projectId: nil) { isAdding = false }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, AppTheme.sectionSpacing)
     }
 
     // MARK: Degraded
 
     /// "Nothing is running" and "I can't see anything" must not look the same.
     private var degradedNotice: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
             ForEach(store.degraded, id: \.self) { reason in
                 Label(reason.message, systemImage: "eye.trianglebadge.exclamationmark")
                     .font(.caption2)
@@ -195,14 +195,14 @@ struct MenuContentView: View {
                     .lineLimit(2)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, AppTheme.sectionSpacing)
+        .padding(.vertical, AppTheme.rowSpacing)
     }
 
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: AppTheme.sectionSpacing) {
             Button { isAdding.toggle() } label: {
                 Label("Add", systemImage: "plus.circle")
             }
@@ -231,7 +231,7 @@ struct MenuContentView: View {
             .help("Quit")
         }
         .font(.callout)
-        .padding(12)
+        .padding(AppTheme.sectionSpacing)
     }
 }
 

@@ -23,9 +23,15 @@ Every flow, including the three briefs (which have no command of their own), als
 
 ## Project-specific Claude notes
 
-**Still to write:** `DESIGN.md` / `DESIGN.json` and `CODE.md`. The design tokens matter more
-here than usual — they are the mechanism that keeps the macOS and Windows UIs from drifting
-apart, since both generate their constants from one source rather than transcribing twice.
+**Still to write:** `CODE.md`.
+
+**`DESIGN.json` is generated-from, not edited-alongside.** It is the single source for every
+constant both interfaces share, and
+`Packages/MultiTaskCore/Sources/MultiTaskCore/Design/DesignTokens.swift` is generated from it by
+`Scripts/generate-tokens.py`. Edit the JSON, run the script, commit both — `DesignTokensTests`
+and a CI step both fail if they disagree. This is the mechanism that keeps the macOS and Windows
+UIs from drifting, since two hand-maintained constant files drift by two points of padding at a
+time, which nobody notices until the apps sit side by side.
 
 The Swift package lives at `Packages/MultiTaskCore` and is built and tested with a Linux
 toolchain (`swift test` from that directory). The macOS app has **not** yet been migrated onto

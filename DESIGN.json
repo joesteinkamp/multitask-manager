@@ -1,0 +1,142 @@
+{
+  "$comment": [
+    "The single source for every constant the interfaces share.",
+    "",
+    "This file exists for one reason: MultiTask Manager ships a macOS client and a",
+    "Windows client from one engine, and two hand-maintained constant files drift.",
+    "They do not drift dramatically — they drift by two points of padding and one",
+    "shade of orange, which nobody notices until the two apps sit side by side.",
+    "",
+    "Sources/MultiTaskCore/Design/DesignTokens.swift is GENERATED from this file by",
+    "Scripts/generate-tokens.py, and a test fails if the two disagree. Edit this",
+    "file, run the script, commit both.",
+    "",
+    "Colour is the exception, and deliberately so. See notes in `color`."
+  ],
+
+  "spacing": {
+    "$comment": "A 4pt base with 2 and 6 as half steps, because a dense menu bar list genuinely needs the half steps and inventing them per-view is how 1, 3, and 5 got in.",
+    "hair": 2,
+    "tight": 4,
+    "row": 6,
+    "group": 8,
+    "section": 12,
+    "loose": 16,
+    "$comment2": "`spacious` is for empty states only — the one place in the app with room to breathe, because an empty state is the only screen nobody is scanning.",
+    "spacious": 24
+  },
+
+  "radius": {
+    "$comment": "Two only. A third radius is a decision nobody remembers making.",
+    "control": 6,
+    "group": 8
+  },
+
+  "size": {
+    "$comment": "Popover width is the one hard number in the design: 380 fits a project row with a status glyph, a title, and a menu affordance without truncating at the default system font, and stays narrow enough not to look like a window.",
+    "popoverWidth": 380,
+    "sheetWidth": 460,
+    "settingsWidth": 480,
+    "$comment2": "Two dot sizes, named by role rather than by number. A run's state sits on its own line and takes the larger dot; a marker beside caption text takes the smaller. Two role-named sizes are a decision; two bare numbers are drift.",
+    "statusDot": 7,
+    "inlineDot": 5,
+    "statusGlyph": 12,
+    "iconSmall": 10,
+    "$comment3": "Indent for content nested under a row, derived so it stays aligned with the glyph above it if the glyph changes: statusGlyph + row + tight.",
+    "nestedIndent": 22
+  },
+
+  "type": {
+    "$comment": [
+      "Semantic system fonts, not point sizes, for everything a person reads.",
+      "That is not laziness: on macOS the semantic fonts follow the user's text-size",
+      "and accessibility settings, and a menu bar utility that ignores those is",
+      "unusable for the people who change them. The explicit sizes below are only",
+      "for things that are not prose — a monospaced command line, a glyph.",
+      "Windows maps the roles to its own type ramp."
+    ],
+    "roles": {
+      "sectionTitle": "headline",
+      "rowTitle": "callout",
+      "rowDetail": "caption",
+      "rowMeta": "caption2"
+    },
+    "mono": {
+      "$comment": "The confirmation sheet and the run command. Monospaced because misreading a path or a flag is the failure this text exists to prevent.",
+      "detail": 11,
+      "dense": 10
+    },
+    "glyph": {
+      "affordance": 9
+    }
+  },
+
+  "color": {
+    "$comment": [
+      "Semantic ROLES, mapped by each platform to its own system colour — not hex",
+      "values baked into two apps.",
+      "",
+      "This is a deliberate rejection of a custom status palette. System colours",
+      "already satisfy contrast in light and dark, already respond to Increase",
+      "Contrast and to the colour-blind accommodations in macOS, and already look",
+      "native next to every other menu bar item. A hand-picked orange would have to",
+      "re-earn all of that, and would fail quietly for exactly the users who need it.",
+      "",
+      "`fallback` is for platforms with no system equivalent, and for documentation.",
+      "It is never the preferred source on macOS."
+    ],
+    "roles": {
+      "attention": {
+        "meaning": "Something is waiting on the person. The only role permitted to interrupt.",
+        "macOS": "systemOrange",
+        "fallback": "#E8730A"
+      },
+      "working": {
+        "meaning": "Progressing on its own. No action wanted.",
+        "macOS": "systemGreen",
+        "fallback": "#1E8E3E"
+      },
+      "ready": {
+        "meaning": "Available to pick up.",
+        "macOS": "controlAccentColor",
+        "fallback": "#0A6ED1"
+      },
+      "blocked": {
+        "meaning": "Waiting on something impersonal — a dependency, another task.",
+        "macOS": "systemPurple",
+        "fallback": "#7A3DB8"
+      },
+      "dormant": {
+        "meaning": "Quiet with nothing ready. Reported, never highlighted.",
+        "macOS": "secondaryLabelColor",
+        "fallback": "#6B6B70"
+      },
+      "unknown": {
+        "meaning": "The app cannot tell. Distinct from 'nothing is happening'.",
+        "macOS": "tertiaryLabelColor",
+        "fallback": "#8E8E93"
+      }
+    },
+    "emphasis": {
+      "$comment": "Opacities for the one grouped, bordered block the design allows — the asks section. Kept here so a second such block cannot invent its own.",
+      "groupFill": 0.08,
+      "groupBorder": 0.35,
+      "subtleFill": 0.08
+    }
+  },
+
+  "motion": {
+    "$comment": [
+      "There is almost none, on purpose. This is a status surface read in a glance",
+      "while thinking about something else, and animation on a list that refreshes",
+      "every few seconds turns a glance into a wait.",
+      "",
+      "Nothing animates on a data refresh — a row that slides when a number changes",
+      "makes the list feel unreliable. Only direct manipulation animates.",
+      "Both durations must be skipped entirely under reduced-motion."
+    ],
+    "disclosure": 0.15,
+    "sheet": 0.2,
+    "refresh": 0
+  }
+}

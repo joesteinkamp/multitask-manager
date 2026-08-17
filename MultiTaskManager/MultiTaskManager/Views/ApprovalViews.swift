@@ -16,13 +16,13 @@ struct ApprovalsSection: View {
     var body: some View {
         if !store.pendingApprovals.isEmpty {
             VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
-                HStack(spacing: 6) {
+                HStack(spacing: AppTheme.rowSpacing) {
                     Image(systemName: "hand.raised.fill")
                         .foregroundStyle(AppTheme.attentionColor)
                     Text(store.pendingApprovals.count == 1
                          ? "An agent is asking you"
                          : "\(store.pendingApprovals.count) agents are asking you")
-                        .font(.headline)
+                        .font(AppTheme.sectionTitle)
                 }
 
                 ForEach(store.pendingApprovals) { request in
@@ -30,10 +30,10 @@ struct ApprovalsSection: View {
                 }
             }
             .padding(AppTheme.rowPadding)
-            .background(AppTheme.attentionColor.opacity(0.08), in: RoundedRectangle(cornerRadius: 8))
+            .background(AppTheme.attentionColor.opacity(AppTheme.groupFill), in: RoundedRectangle(cornerRadius: AppTheme.groupRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .strokeBorder(AppTheme.attentionColor.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppTheme.groupRadius)
+                    .strokeBorder(AppTheme.attentionColor.opacity(AppTheme.groupBorder), lineWidth: 1)
             )
         }
     }
@@ -59,11 +59,11 @@ struct ApprovalRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Text(request.summary)
-                .font(.system(size: 12, weight: .medium))
+                .font(AppTheme.rowTitle.weight(.medium))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("\(request.requestedBy) · \(Self.age(request.requestedAt))")
-                .font(.caption)
+                .font(AppTheme.rowDetail)
                 .foregroundStyle(.secondary)
 
             // The reason the agent gave. Shown without being asked for: it is
@@ -71,32 +71,32 @@ struct ApprovalRowView: View {
             // disclosure would mean deciding without it.
             if let rationale = request.rationale {
                 Text(rationale)
-                    .font(.caption)
+                    .font(AppTheme.rowDetail)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("No reason given.")
-                    .font(.caption)
+                    .font(AppTheme.rowDetail)
                     .italic()
                     .foregroundStyle(.secondary)
             }
 
             if showingDetails {
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                     ForEach(request.details, id: \.self) { detail in
                         Text(detail)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(AppTheme.monoDense)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, AppTheme.hairSpacing)
             }
 
             if let problem {
                 Text(problem)
-                    .font(.caption)
+                    .font(AppTheme.rowDetail)
                     .foregroundStyle(AppTheme.attentionColor)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -105,10 +105,10 @@ struct ApprovalRowView: View {
                 // A decline the agent can learn from. Optional, because forcing
                 // a sentence out of someone who just wants it gone is how a
                 // queue stops getting cleared.
-                HStack(spacing: 4) {
+                HStack(spacing: AppTheme.tightSpacing) {
                     TextField("Why not? (optional)", text: $reason)
                         .textFieldStyle(.roundedBorder)
-                        .font(.caption)
+                        .font(AppTheme.rowDetail)
                         .onSubmit { decide(approve: false, note: reason) }
                     Button("Decline") { decide(approve: false, note: reason) }
                         .controlSize(.small)
@@ -116,10 +116,15 @@ struct ApprovalRowView: View {
                         .controlSize(.small)
                 }
             } else {
-                HStack(spacing: 6) {
+                HStack(spacing: AppTheme.rowSpacing) {
+                    // Approve is deliberately **not** the default action. It
+                    // spends compute and lets an agent write to a repository, and
+                    // a button that fires on a stray Return — in a popover that
+                    // appears under whatever you were already typing into — is
+                    // not a confirmation. The run sheet makes the same choice for
+                    // the same reason.
                     Button("Approve") { decide(approve: true, note: nil) }
                         .controlSize(.small)
-                        .keyboardShortcut(.defaultAction)
                     Button("Decline") { decliningWithReason = true }
                         .controlSize(.small)
                     Button(showingDetails ? "Hide command" : "Show command") {
@@ -127,13 +132,13 @@ struct ApprovalRowView: View {
                     }
                     .controlSize(.small)
                     .buttonStyle(.borderless)
-                    .font(.caption)
+                    .font(AppTheme.rowDetail)
                 }
                 .disabled(deciding)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, 2)
+        .padding(.vertical, AppTheme.hairSpacing)
     }
 
     private func decide(approve: Bool, note: String?) {
@@ -180,7 +185,7 @@ struct RunsSection: View {
         if !visible.isEmpty {
             VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
                 Text(store.activeRuns.isEmpty ? "Recent runs" : "\(store.activeRuns.count) running")
-                    .font(.headline)
+                    .font(AppTheme.sectionTitle)
                 ForEach(visible) { run in
                     RunRowView(run: run)
                 }
@@ -194,23 +199,23 @@ struct RunRowView: View {
     @EnvironmentObject var store: SessionStore
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: AppTheme.rowSpacing) {
             Circle()
                 .fill(colour)
-                .frame(width: 7, height: 7)
-                .padding(.top, 5)
+                .frame(width: AppTheme.statusDot, height: AppTheme.statusDot)
+                .padding(.top, AppTheme.tightSpacing)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                 Text(run.delegate)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(AppTheme.rowTitle.weight(.medium))
                 Text(subtitle)
-                    .font(.caption)
+                    .font(AppTheme.rowDetail)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: AppTheme.tightSpacing)
 
             if !run.state.isTerminal {
                 Button("Stop") { store.cancel(run) }
@@ -219,9 +224,9 @@ struct RunRowView: View {
             Button("Output") { store.showOutput(run) }
                 .controlSize(.small)
                 .buttonStyle(.borderless)
-                .font(.caption)
+                .font(AppTheme.rowDetail)
         }
-        .padding(.vertical, 1)
+        .padding(.vertical, AppTheme.hairSpacing)
     }
 
     private var subtitle: String {

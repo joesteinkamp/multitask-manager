@@ -11,26 +11,28 @@ struct NextUpView: View {
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppTheme.rowPadding) {
             if !store.awaitingMe.isEmpty { waitingSection }
             if !store.nextUp.isEmpty { nextSection }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, AppTheme.sectionSpacing)
+        .padding(.vertical, AppTheme.sectionSpacing)
     }
 
     /// Requests, not suggestions — these are things an agent stopped and asked
     /// about, so they come first and read differently.
     private var waitingSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Label("Waiting on you", systemImage: "hand.raised.fill")
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
+                .foregroundStyle(AppTheme.attentionColor)
 
             ForEach(store.awaitingMe.prefix(3)) { task in
-                HStack(alignment: .top, spacing: 6) {
-                    Circle().fill(Color.orange).frame(width: 5, height: 5).padding(.top, 5)
-                    VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .top, spacing: AppTheme.rowSpacing) {
+                    Circle().fill(AppTheme.attentionColor)
+                        .frame(width: AppTheme.inlineDot, height: AppTheme.inlineDot)
+                        .padding(.top, AppTheme.tightSpacing)
+                    VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                         Text(task.title).font(.callout).lineLimit(1)
                         Text(task.waitingReason ?? task.waiting?.label ?? "Waiting")
                             .font(.caption2)
@@ -48,7 +50,7 @@ struct NextUpView: View {
     }
 
     private var nextSection: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Label("Do next", systemImage: "arrow.right.circle.fill")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.accentColor)
@@ -76,23 +78,23 @@ struct TaskRowView: View {
     @State private var runProblem: String?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 6) {
+        HStack(alignment: .top, spacing: AppTheme.rowSpacing) {
             Button { store.complete(task) } label: {
                 Image(systemName: hovering ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 12))
+                    .font(AppTheme.statusGlyphFont)
                     .foregroundStyle(hovering ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
             .help("Mark done")
-            .padding(.top, 1)
+            .padding(.top, AppTheme.hairSpacing)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: AppTheme.hairSpacing) {
                 Text(task.title)
                     .font(isLead ? .callout.weight(.medium) : .callout)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: 4) {
+                HStack(spacing: AppTheme.tightSpacing) {
                     if let reason {
                         Text(reason).foregroundStyle(.secondary)
                     } else {
@@ -182,7 +184,7 @@ struct TaskRowView: View {
             Button("Delete", role: .destructive) { store.delete(task) }
         } label: {
             Image(systemName: "ellipsis")
-                .font(.system(size: 9))
+                .font(AppTheme.glyphFont)
                 .foregroundStyle(.tertiary)
         }
         .menuStyle(.borderlessButton)
@@ -206,7 +208,7 @@ struct TaskComposer: View {
     @FocusState private var titleFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             TextField("What needs doing?", text: $title, onCommit: commit)
                 .textFieldStyle(.roundedBorder)
                 .focused($titleFocused)
@@ -265,22 +267,22 @@ struct RunConfirmationSheet: View {
     @State private var problem: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppTheme.sectionSpacing) {
             Text(confirmation.summary)
                 .font(.headline)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
                 ForEach(confirmation.details, id: \.self) { detail in
                     Text(detail)
-                        .font(.system(size: 11, design: .monospaced))
+                        .font(AppTheme.monoDetail)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .padding(8)
+            .padding(AppTheme.rowPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+            .background(Color.secondary.opacity(AppTheme.groupFill), in: RoundedRectangle(cornerRadius: AppTheme.controlRadius))
 
             if task.acceptance == nil {
                 // Said plainly at the moment of spending: a delegate with no
@@ -311,8 +313,8 @@ struct RunConfirmationSheet: View {
                     .disabled(starting)
             }
         }
-        .padding(16)
-        .frame(width: 460)
+        .padding(AppTheme.loosePadding)
+        .frame(width: AppTheme.sheetWidth)
     }
 
     private func start() {

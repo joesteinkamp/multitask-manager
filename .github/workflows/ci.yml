@@ -19,6 +19,11 @@ jobs:
     container: swift:6.0
     steps:
       - uses: actions/checkout@v4
+      # Before the build: a stale DesignTokens.swift is a design system that has
+      # quietly forked from DESIGN.json, and it should fail here in two seconds
+      # rather than be discovered when the two clients sit side by side.
+      - name: Design tokens match DESIGN.json
+        run: python3 Scripts/generate-tokens.py --check
       - name: Build
         working-directory: Packages/MultiTaskCore
         run: swift build

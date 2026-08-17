@@ -20,7 +20,7 @@ struct SettingsView: View {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 480, height: 400)
+        .frame(width: AppTheme.settingsWidth, height: 400)
     }
 }
 
@@ -70,8 +70,8 @@ private struct NotificationSettings: View {
             Section {
                 Toggle("Notify when a project needs me", isOn: $prefs.enableNotifications)
                 if store.notificationsDenied {
-                    HStack(spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    HStack(spacing: AppTheme.rowSpacing) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(AppTheme.attentionColor)
                         Text("macOS denied notification permission — the badge still works.")
                             .font(.caption)
                         Button("Open System Settings") {
@@ -141,12 +141,12 @@ private struct HealthSettings: View {
             Section("Sources") {
                 if store.degraded.isEmpty {
                     Label("Everything readable", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.workingColor)
                         .font(.callout)
                 } else {
                     ForEach(store.degraded, id: \.self) { reason in
                         Label(reason.message, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AppTheme.attentionColor)
                             .font(.caption)
                             .fixedSize(horizontal: false, vertical: true)
                     }
