@@ -447,7 +447,7 @@ struct LauncherSpawnTests {
         // Give the child a moment to finish and flush.
         var tail: String?
         for _ in 0..<40 {
-            usleep(50_000)
+            Thread.sleep(forTimeInterval: 0.05)
             tail = store.tail(of: started.id)
             if tail?.contains("hello-from-run") == true { break }
         }
@@ -508,7 +508,7 @@ struct LauncherSpawnTests {
         let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "exit 3"]))
         var record = try #require(store.run(id: started.id))
         for _ in 0..<80 {
-            usleep(50_000)
+            Thread.sleep(forTimeInterval: 0.05)
             record = try #require(store.run(id: started.id))
             if record.state.isTerminal { break }
         }
@@ -525,7 +525,7 @@ struct LauncherSpawnTests {
 
         let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "exit 0"]))
         for _ in 0..<80 {
-            usleep(50_000)
+            Thread.sleep(forTimeInterval: 0.05)
             if store.run(id: started.id)?.state.isTerminal == true { break }
         }
         #expect(store.run(id: started.id)?.state == .finished)
