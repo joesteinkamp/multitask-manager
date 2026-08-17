@@ -655,6 +655,12 @@ public actor InProcessEngine: EngineClient {
                                             mutedProjects: overrides.mutedProjects) {
             broadcast(.notify(notification))
         }
+        // Separate pass, because a request has nothing in common with a status
+        // heuristic: it doesn't flap, so it doesn't wait two refreshes.
+        for notification in policy.evaluate(approvals: snapshot.approvals,
+                                            configuration: configuration) {
+            broadcast(.notify(notification))
+        }
 
         return snapshot
     }
@@ -663,7 +669,7 @@ public actor InProcessEngine: EngineClient {
     /// app doesn't announce every already-quiet session the moment it launches.
     public func primeNotifications() async {
         let snapshot = await currentSnapshot()
-        policy.prime(with: snapshot.sessions)
+        policy.prime(with: snapshot.sessions, approvals: snapshot.approvals)
     }
 
     private func broadcast(_ event: EngineEvent) {

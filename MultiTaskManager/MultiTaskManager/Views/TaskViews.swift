@@ -70,6 +70,10 @@ struct TaskRowView: View {
     var isLead = false
 
     @State private var hovering = false
+    /// The confirmation the engine handed back, and the delegate it was for.
+    /// Held together so the sheet cannot show one command and authorise another.
+    @State private var pendingRun: (ConfirmationRequest, delegate: String)?
+    @State private var runProblem: String?
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
@@ -117,6 +121,36 @@ struct TaskRowView: View {
         }
         .onHover { hovering = $0 }
         .contentShape(Rectangle())
+        .sheet(isPresented: Binding(get: { pendingRun != nil },
+                                    set: { if !$0 { pendingRun = nil } })) {
+            if let (confirmation, delegate) = pendingRun {
+                RunConfirmationSheet(task: task, confirmation: confirmation, delegate: delegate) {
+                    pendingRun = nil
+                }
+            }
+        }
+        .alert("Can't run this", isPresented: Binding(get: { runProblem != nil },
+                                                      set: { if !$0 { runProblem = nil } })) {
+            Button("OK") { runProblem = nil }
+        } message: {
+            Text(runProblem ?? "")
+        }
+    }
+
+    /// Asks the engine to describe the run, then shows what it said.
+    ///
+    /// The app never composes the command or the confirmation text itself: it
+    /// displays exactly what the engine returns, and sends back the token that
+    /// came with it. Anything else and the sheet and the run could drift apart.
+    private func offerRun(with delegate: String) {
+        Task {
+            let (confirmation, error) = await store.describeRun(task, delegate: delegate)
+            if let confirmation {
+                pendingRun = (confirmation, delegate)
+            } else {
+                runProblem = error ?? "The engine wouldn't describe this run."
+            }
+        }
     }
 
     private var menu: some View {
@@ -129,6 +163,15 @@ struct TaskRowView: View {
                 Button("Me") { store.assign(task, to: .me) }
                 ForEach(store.delegates, id: \.self) { name in
                     Button(name) { store.assign(task, to: .agent(name)) }
+                }
+            }
+            // Separate from "Hand to" on purpose. Assigning is organising and
+            // costs nothing; running spends compute and writes to a repository,
+            // and the two reading as one menu item is how you end up spending
+            // by accident.
+            Menu("Run now with…") {
+                ForEach(store.delegates, id: \.self) { name in
+                    Button(name) { offerRun(with: name) }
                 }
             }
             Divider()
@@ -198,5 +241,88 @@ struct TaskComposer: View {
         title = ""
         acceptance = ""
         onFinish()
+    }
+}
+
+/// The confirmation shown before a run starts.
+///
+/// Everything on it comes from the engine. The app contributes layout and
+/// nothing else — no re-worded summary, no reconstructed command — because the
+/// text a person agrees to and the command that runs have to be the same thing,
+/// and the only way to guarantee that is to not have a second source for it.
+///
+/// The command is shown in full and selectable rather than elided. A delegate's
+/// prompt is long, but this is the one moment where the length is the point: it
+/// is the last place to notice that the brief says something you didn't mean.
+struct RunConfirmationSheet: View {
+    let task: TaskRecord
+    let confirmation: ConfirmationRequest
+    let delegate: String
+    let onFinish: () -> Void
+
+    @EnvironmentObject private var store: SessionStore
+    @State private var starting = false
+    @State private var problem: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(confirmation.summary)
+                .font(.headline)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(confirmation.details, id: \.self) { detail in
+                    Text(detail)
+                        .font(.system(size: 11, design: .monospaced))
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+
+            if task.acceptance == nil {
+                // Said plainly at the moment of spending: a delegate with no
+                // target to hit reliably delivers the wrong thing, and finding
+                // that out afterwards costs more than the run did.
+                Label("This task has no acceptance criteria, so nothing defines a good result.",
+                      systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.attentionColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if let problem {
+                Text(problem)
+                    .font(.caption)
+                    .foregroundStyle(AppTheme.attentionColor)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") { onFinish() }
+                    .keyboardShortcut(.cancelAction)
+                Button(starting ? "Starting…" : "Run") { start() }
+                    // Deliberately *not* the default action: return should not
+                    // start a run, because a sheet that spends on a stray
+                    // keypress is not a confirmation.
+                    .disabled(starting)
+            }
+        }
+        .padding(16)
+        .frame(width: 460)
+    }
+
+    private func start() {
+        starting = true
+        problem = nil
+        Task {
+            let failure = await store.confirmRun(task, delegate: delegate,
+                                                 token: confirmation.token)
+            starting = false
+            if let failure { problem = failure } else { onFinish() }
+        }
     }
 }

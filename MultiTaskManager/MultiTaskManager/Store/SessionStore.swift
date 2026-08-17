@@ -23,6 +23,11 @@ final class SessionStore: ObservableObject {
     @Published private(set) var nextUp: [ReadyItem] = []
     /// Tasks explicitly blocked on a person. Requests, not suggestions.
     @Published private(set) var awaitingMe: [TaskRecord] = []
+    /// Agents asking permission to spend something. These outrank everything
+    /// else in the popover: an agent is stopped until you answer, so every
+    /// minute one sits here is a minute of idle work.
+    @Published private(set) var pendingApprovals: [ApprovalRequest] = []
+    @Published private(set) var runs: [RunRecord] = []
     @Published private(set) var waves: [Wave] = []
     @Published private(set) var repositories: [RepositoryState] = []
     @Published private(set) var degraded: [DegradedReason] = []
@@ -44,7 +49,11 @@ final class SessionStore: ObservableObject {
     /// Drives the menu bar badge.
     var needsAttentionCount: Int {
         projects.filter { $0.status == .needsYou && $0.record.lifecycle.isActive }.count
+            + pendingApprovals.count
     }
+
+    /// Runs still going, for the "working" summary.
+    var activeRuns: [RunRecord] { runs.filter { !$0.state.isTerminal } }
 
     var activeProjects: [Project] {
         projects.filter { $0.record.lifecycle.isActive }
@@ -111,6 +120,8 @@ final class SessionStore: ObservableObject {
         tasks = snapshot.tasks
         nextUp = snapshot.whatNext(for: .me, limit: 5)
         awaitingMe = snapshot.tasksNeedingYou()
+        pendingApprovals = snapshot.pendingApprovals
+        runs = snapshot.runs
         sessions = snapshot.sessions
         waves = snapshot.waves
         repositories = snapshot.repositories
@@ -199,10 +210,81 @@ final class SessionStore: ObservableObject {
     }
 
     /// Hands a task to a delegate. It does not *run* anything — assigning is
-    /// organising, and organising is free; starting a run is the gated step and
-    /// lives in Phase 3.
+    /// organising, and organising is free. Starting the run is the gated step.
     func assign(_ task: TaskRecord, to assignee: Assignee) {
         perform(.updateTask(.init(taskId: task.id, assignee: assignee.encoded)))
+    }
+
+    // MARK: Control
+
+    /// Asks the engine what running this task would do, without doing it.
+    ///
+    /// The app never guesses the confirmation text: it shows exactly what the
+    /// engine hands back, so the sheet and the thing that runs cannot drift
+    /// apart. Returns `nil` when the run is impossible — no project directory,
+    /// no such delegate — with the reason in `error`.
+    func describeRun(_ task: TaskRecord, delegate: String?) async -> (ConfirmationRequest?, String?) {
+        do {
+            let result = try await engine.act(.runTask(taskId: task.id, delegate: delegate, confirm: nil))
+            return (result.confirmation, nil)
+        } catch {
+            return (nil, "\(error)")
+        }
+    }
+
+    /// Starts a run the person has just agreed to, carrying the token from the
+    /// description they were shown.
+    @discardableResult
+    func confirmRun(_ task: TaskRecord, delegate: String?, token: String) async -> String? {
+        do {
+            let result = try await engine.act(.runTask(taskId: task.id, delegate: delegate,
+                                                       confirm: token))
+            guard result.runId != nil else {
+                return "That confirmation no longer matches this task. Try again."
+            }
+            return nil
+        } catch {
+            return "\(error)"
+        }
+    }
+
+    func cancel(_ run: RunRecord) { perform(.cancelRun(runId: run.id)) }
+
+    /// Opens a run's output in whatever the user reads logs with. Output is a
+    /// file precisely so this works, rather than the app pretending to be a
+    /// terminal.
+    func showOutput(_ run: RunRecord) {
+        NSWorkspace.shared.open(RunStore().stdoutURL(for: run.id))
+    }
+
+    // MARK: Approvals
+
+    /// A person's decision on an agent's request.
+    ///
+    /// Approving here is the *only* path that mints a confirmation token, and it
+    /// runs inside the engine. Nothing in the app — and nothing over MCP — can
+    /// approve on the user's behalf.
+    @discardableResult
+    func decide(_ request: ApprovalRequest, approve: Bool, note: String? = nil) async -> String? {
+        do {
+            let result = try await engine.act(.decideApproval(id: request.id, approve: approve,
+                                                              note: note))
+            guard let decided = result.approval else { return "That request is gone." }
+            switch decided.effectiveState() {
+            case .expired:
+                return "This sat too long to act on safely. Ask the agent to request it again."
+            case .pending:
+                return "It wasn't decided."
+            case .approved where decided.runId == nil:
+                return decided.note ?? "Approved, but it didn't start."
+            default:
+                return nil
+            }
+        } catch {
+            // Left pending on purpose, so the reason can be fixed and the same
+            // decision made again.
+            return "\(error)"
+        }
     }
 
     /// Clears a task's request for a human, once you've dealt with it.
@@ -266,6 +348,19 @@ final class SessionStore: ObservableObject {
 
     func reveal(_ path: String) {
         NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Brings the app forward when a notification about a decision is tapped.
+    ///
+    /// **It cannot open the popover, and doesn't pretend to.** `MenuBarExtra`
+    /// exposes no supported way to present its own window, and the unsupported
+    /// routes — synthesising a click on the status item, or replacing it with a
+    /// hand-built `NSStatusItem` — trade a working menu bar for one click. So
+    /// the notification's job ends at telling you there is a decision; the badge
+    /// carries the count, and the request is the first thing in the popover when
+    /// you open it.
+    func requestPopover() {
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     /// Focuses the session a notification was about.

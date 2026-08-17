@@ -8,13 +8,16 @@ public struct PendingNotification: Codable, Sendable, Equatable {
         case single(sessionId: String)
         /// Several crossed at once — one message instead of a burst.
         case summary(sessionIds: [String])
+        /// An agent is asking permission to spend something.
+        case approval(requestId: String)
     }
 
     public var kind: Kind
     public var title: String
     public var body: String
     /// Session to focus when the notification's "Open" action is used. For a
-    /// summary this is the highest-priority one.
+    /// summary this is the highest-priority one; for an approval there is no
+    /// session, and the app opens its own popover instead.
     public var primarySessionId: String
 
     public init(kind: Kind, title: String, body: String, primarySessionId: String) {
@@ -22,6 +25,13 @@ public struct PendingNotification: Codable, Sendable, Equatable {
         self.title = title
         self.body = body
         self.primarySessionId = primarySessionId
+    }
+
+    /// Whether acting on this means answering a question rather than looking at
+    /// something. Drives whether the app opens the popover or focuses a window.
+    public var isDecision: Bool {
+        if case .approval = kind { return true }
+        return false
     }
 }
 
@@ -57,16 +67,77 @@ public final class NotificationPolicy: @unchecked Sendable {
     private var consecutiveHolds: [String: Int] = [:]
     private var lastNotifiedAt: [String: Date] = [:]
     private var recentNotifications: [Date] = []
+    private var announcedApprovals: Set<String> = []
     private var primed = false
 
     public init() {}
 
     /// Records state without ever notifying — used to prime at launch.
-    public func prime(with sessions: [Session]) {
+    ///
+    /// Approvals are primed too: relaunching the app should not re-announce a
+    /// request that has been sitting in the queue since yesterday. It is still
+    /// visible, and still counted; it just isn't news.
+    public func prime(with sessions: [Session], approvals: [ApprovalRequest] = []) {
         lock.lock()
         defer { lock.unlock() }
         for session in sessions { previousStatus[session.id] = session.status }
+        for request in approvals { announcedApprovals.insert(request.id) }
         primed = true
+    }
+
+    /// Notifications for agents' requests.
+    ///
+    /// None of the session rules apply here, and that is the point. A status
+    /// heuristic flaps, so it needs holds and a cooldown; a request is a discrete
+    /// event that either exists or doesn't. So this fires once per request, the
+    /// first time it is seen, and never again — no debounce to sit through, since
+    /// the whole cost of the delay is an agent doing nothing.
+    ///
+    /// Quiet hours are still respected. The request does not disappear or get
+    /// queued for 07:00 — it stays in the popover and in the badge, which is the
+    /// difference between a reminder and an alarm.
+    public func evaluate(approvals: [ApprovalRequest],
+                         configuration: Configuration,
+                         now: Date = Date()) -> [PendingNotification] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let pending = approvals.filter { $0.effectiveState(now: now) == .pending }
+        defer {
+            // Forget requests that have been decided, so the set cannot grow
+            // without bound across a long-running app.
+            let live = Set(pending.map(\.id))
+            announcedApprovals = announcedApprovals.intersection(live)
+            for request in pending { announcedApprovals.insert(request.id) }
+        }
+
+        guard primed else {
+            primed = true
+            return []
+        }
+        guard configuration.enableNotifications else { return [] }
+        if Self.isWithinQuietHours(now: now, configuration: configuration) { return [] }
+
+        let fresh = pending.filter { !announcedApprovals.contains($0.id) }
+        guard !fresh.isEmpty else { return [] }
+
+        if fresh.count >= 3 {
+            return [PendingNotification(
+                kind: .approval(requestId: fresh[0].id),
+                title: "\(fresh.count) agents are waiting on you",
+                body: fresh.prefix(3).map(\.requestedBy).joined(separator: ", "),
+                primarySessionId: fresh[0].id
+            )]
+        }
+
+        return fresh.map { request in
+            PendingNotification(
+                kind: .approval(requestId: request.id),
+                title: "\(request.requestedBy) is asking you",
+                body: request.summary,
+                primarySessionId: request.id
+            )
+        }
     }
 
     /// - Parameters:

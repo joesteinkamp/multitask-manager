@@ -57,7 +57,11 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
         content.title = notification.title
         content.body = notification.body
         content.categoryIdentifier = Self.categoryId
-        content.userInfo = ["sessionId": notification.primarySessionId]
+        // An approval has no session to focus; tapping it should open the
+        // popover, where the Approve and Decline buttons are.
+        content.userInfo = notification.isDecision
+            ? ["decisionId": notification.primarySessionId]
+            : ["sessionId": notification.primarySessionId]
         content.sound = nil   // The badge is the ambient channel; sound is not.
 
         // nil trigger delivers immediately.
@@ -80,8 +84,12 @@ final class NotificationPresenter: NSObject, UNUserNotificationCenterDelegate {
 
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                 didReceive response: UNNotificationResponse) async {
-        guard let sessionId = response.notification.request.content.userInfo["sessionId"] as? String
-        else { return }
+        let info = response.notification.request.content.userInfo
+        if info["decisionId"] is String {
+            await MainActor.run { Self.store?.requestPopover() }
+            return
+        }
+        guard let sessionId = info["sessionId"] as? String else { return }
         await MainActor.run { Self.store?.focus(sessionId: sessionId) }
     }
 }

@@ -235,3 +235,103 @@ struct ApprovalFailureTests {
         #expect(approvals.pending().count == 1)
     }
 }
+
+/// Notifications for requests. None of the session debounce rules apply, and
+/// these tests pin down why.
+@Suite("Approvals — notifying")
+struct ApprovalNotificationTests {
+
+    private var config: Configuration {
+        var c = Configuration()
+        c.enableNotifications = true
+        c.quietHoursStart = nil
+        c.quietHoursEnd = nil
+        return c
+    }
+
+    private func request(_ id: String, by who: String = "codex",
+                         at when: Date = Date()) -> ApprovalRequest {
+        ApprovalRequest(id: id, kind: .run, summary: "Run “Ship it” with claude",
+                        details: [], requestedBy: who, requestedAt: when,
+                        taskId: "t1", delegate: "claude")
+    }
+
+    @Test("A new request notifies on the first pass, with no hold to wait out")
+    func firesImmediately() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+
+        // A session would need two consecutive refreshes. A request must not:
+        // the entire cost of the delay is an agent sitting idle.
+        let posted = policy.evaluate(approvals: [request("ask-1")], configuration: config)
+        #expect(posted.count == 1)
+        #expect(posted.first?.isDecision == true)
+        #expect(posted.first?.title.contains("codex") == true)
+    }
+
+    @Test("The same request never notifies twice")
+    func neverRepeats() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+        let one = [request("ask-1")]
+
+        #expect(policy.evaluate(approvals: one, configuration: config).count == 1)
+        #expect(policy.evaluate(approvals: one, configuration: config).isEmpty)
+        #expect(policy.evaluate(approvals: one, configuration: config).isEmpty)
+    }
+
+    @Test("Requests already queued at launch are not announced")
+    func launchDoesNotReannounce() {
+        let policy = NotificationPolicy()
+        let existing = [request("ask-old", at: Date().addingTimeInterval(-3600))]
+
+        // Relaunching the app must not re-alert on yesterday's queue. It's still
+        // in the popover and still in the badge; it just isn't news.
+        policy.prime(with: [], approvals: existing)
+        #expect(policy.evaluate(approvals: existing, configuration: config).isEmpty)
+    }
+
+    @Test("Three at once become one message")
+    func coalesces() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+
+        let posted = policy.evaluate(
+            approvals: [request("a", by: "codex"), request("b", by: "claude"), request("c", by: "agy")],
+            configuration: config)
+
+        #expect(posted.count == 1)
+        #expect(posted.first?.title.contains("3 agents") == true)
+    }
+
+    @Test("Quiet hours suppress the alert but not the request")
+    func quietHours() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+        var quiet = config
+        // A window covering the whole day, so this doesn't depend on the clock.
+        quiet.quietHoursStart = 0
+        quiet.quietHoursEnd = 24 * 60 - 1
+
+        #expect(policy.evaluate(approvals: [request("ask-1")], configuration: quiet).isEmpty)
+    }
+
+    @Test("An expired request is not announced")
+    func expiredIsNotNews() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+        let stale = request("ask-old", at: Date().addingTimeInterval(-2 * 86_400))
+
+        #expect(policy.evaluate(approvals: [stale], configuration: config).isEmpty)
+    }
+
+    @Test("Notifications off means silence, and the request still stands")
+    func respectsThePreference() {
+        let policy = NotificationPolicy()
+        policy.prime(with: [], approvals: [])
+        var off = config
+        off.enableNotifications = false
+
+        #expect(policy.evaluate(approvals: [request("ask-1")], configuration: off).isEmpty)
+    }
+}

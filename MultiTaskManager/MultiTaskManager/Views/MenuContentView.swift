@@ -18,6 +18,17 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
 
+            // Asks come first, above even "what's next". While one of these
+            // sits here an agent is stopped, so this is the only thing in the
+            // app where the cost of not looking is measured in idle compute
+            // rather than in your own attention.
+            if !store.pendingApprovals.isEmpty {
+                Divider()
+                ApprovalsSection()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            }
+
             // The decision comes before the context: what to do, then which
             // project is in what state.
             if !store.nextUp.isEmpty || !store.awaitingMe.isEmpty {
@@ -31,6 +42,13 @@ struct MenuContentView: View {
                 emptyState
             } else {
                 projectList
+            }
+
+            if !store.runs.isEmpty {
+                Divider()
+                RunsSection()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
             }
 
             if !store.degraded.isEmpty {
@@ -47,15 +65,26 @@ struct MenuContentView: View {
     // MARK: Header
 
     private var header: some View {
-        let needing = store.needsAttentionCount
+        // Counted separately and named for what they are. `needsAttentionCount`
+        // drives the badge and now includes agents' asks, so reusing it here
+        // would have reported "3 projects need you" when two of the three were
+        // agents waiting on a decision — the wrong thing to go looking for.
+        let projectsNeeding = store.activeProjects.filter { $0.status == .needsYou }.count
+        let asks = store.pendingApprovals.count
         return VStack(alignment: .leading, spacing: 2) {
             Text("MultiTask Manager")
                 .font(.headline)
             HStack(spacing: 6) {
-                if needing > 0 {
-                    Label("\(needing) project\(needing == 1 ? "" : "s") need you",
+                if asks > 0 {
+                    Label(asks == 1 ? "An agent is asking you"
+                                    : "\(asks) agents are asking you",
+                          systemImage: "hand.raised.fill")
+                        .foregroundStyle(AppTheme.attentionColor)
+                        .font(.caption)
+                } else if projectsNeeding > 0 {
+                    Label("\(projectsNeeding) project\(projectsNeeding == 1 ? "" : "s") need you",
                           systemImage: "exclamationmark.circle.fill")
-                        .foregroundStyle(.orange)
+                        .foregroundStyle(AppTheme.attentionColor)
                         .font(.caption)
                 } else {
                     Label("Nothing waiting on you", systemImage: "checkmark.circle.fill")
