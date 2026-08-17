@@ -1,49 +1,62 @@
 import SwiftUI
+import MultiTaskCore
 
-/// Root of the menu bar popover: summary header, project-grouped session list,
-/// and footer actions.
+/// Root of the menu bar popover.
+///
+/// **Projects, not sessions.** The previous version listed sessions and grouped
+/// them under a project *name* — a string derived from a directory — which is a
+/// session monitor with a grouping feature. Here the project is the row and
+/// sessions are detail underneath it, and a project with nothing running still
+/// appears, because that is often the one that needs attention most.
 struct MenuContentView: View {
     @EnvironmentObject private var store: SessionStore
 
     @State private var isAdding = false
     @State private var newTitle = ""
+    @State private var showingPast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
 
-            if store.sessions.isEmpty {
+            if store.activeProjects.isEmpty {
                 emptyState
             } else {
-                sessionList
+                projectList
+            }
+
+            if !store.degraded.isEmpty {
+                Divider()
+                degradedNotice
             }
 
             Divider()
             footer
         }
-        .frame(width: 340)
+        .frame(width: 380)
     }
 
     // MARK: Header
 
     private var header: some View {
-        let attention = store.needsAttentionCount
+        let needing = store.needsAttentionCount
         return VStack(alignment: .leading, spacing: 2) {
             Text("MultiTask Manager")
                 .font(.headline)
             HStack(spacing: 6) {
-                if attention > 0 {
-                    Label("\(attention) need attention", systemImage: "exclamationmark.circle.fill")
+                if needing > 0 {
+                    Label("\(needing) project\(needing == 1 ? "" : "s") need you",
+                          systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(.orange)
                         .font(.caption)
                 } else {
-                    Label("All caught up", systemImage: "checkmark.circle.fill")
+                    Label("Nothing waiting on you", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .font(.caption)
                 }
                 Spacer()
-                Text("\(store.sessions.count) tracked")
+                Text("\(store.activeProjects.count) project\(store.activeProjects.count == 1 ? "" : "s")")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -53,31 +66,58 @@ struct MenuContentView: View {
 
     // MARK: List
 
-    private var sessionList: some View {
+    private var projectList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(store.groupedByProject, id: \.project) { group in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(group.project)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                        ForEach(sortedSessions(group.sessions)) { session in
-                            SessionRowView(session: session)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(liveProjects) { project in
+                    ProjectRowView(project: project)
                 }
+
+                if !dormantProjects.isEmpty {
+                    dormantDisclosure
+                }
+
                 if isAdding { addField }
             }
             .padding(.vertical, 8)
         }
-        .frame(maxHeight: 420)
+        .frame(maxHeight: 460)
     }
 
-    private func sortedSessions(_ sessions: [Session]) -> [Session] {
-        sessions.sorted { a, b in
-            if a.status.sortRank != b.status.sortRank { return a.status.sortRank < b.status.sortRank }
-            return a.lastActivity > b.lastActivity
+    /// Everything except the quiet ones, which collapse so they don't crowd out
+    /// what's live — but they stay one click away rather than disappearing.
+    private var liveProjects: [Project] {
+        store.activeProjects.filter { $0.status != .dormant }
+    }
+
+    private var dormantProjects: [Project] {
+        store.activeProjects.filter { $0.status == .dormant }
+    }
+
+    private var dormantDisclosure: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { showingPast.toggle() }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .rotationEffect(.degrees(showingPast ? 90 : 0))
+                    Text("\(dormantProjects.count) gone quiet")
+                        .font(.caption)
+                }
+                .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .help("Projects with no activity and nothing ready to pick up")
+
+            if showingPast {
+                ForEach(dormantProjects) { project in
+                    ProjectRowView(project: project)
+                }
+            }
         }
     }
 
@@ -89,9 +129,9 @@ struct MenuContentView: View {
                 Image(systemName: "moon.stars")
                     .font(.largeTitle)
                     .foregroundStyle(.secondary)
-                Text("No active sessions detected")
+                Text("No projects tracked yet")
                     .font(.callout)
-                Text("Start a Claude Code or Codex session, or add one manually.")
+                Text("Start a Claude Code or Codex session in a project, or add one by hand.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -104,7 +144,7 @@ struct MenuContentView: View {
 
     private var addField: some View {
         HStack {
-            TextField("Name this task…", text: $newTitle, onCommit: commitAdd)
+            TextField("Name this piece of work…", text: $newTitle, onCommit: commitAdd)
                 .textFieldStyle(.roundedBorder)
             Button("Add", action: commitAdd)
                 .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -118,28 +158,38 @@ struct MenuContentView: View {
         isAdding = false
     }
 
+    // MARK: Degraded
+
+    /// "Nothing is running" and "I can't see anything" must not look the same.
+    private var degradedNotice: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(store.degraded, id: \.self) { reason in
+                Label(reason.message, systemImage: "eye.trianglebadge.exclamationmark")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
     // MARK: Footer
 
     private var footer: some View {
         HStack(spacing: 12) {
-            Button {
-                isAdding.toggle()
-            } label: {
+            Button { isAdding.toggle() } label: {
                 Label("Add", systemImage: "plus.circle")
             }
             .buttonStyle(.plain)
 
-            Button {
-                store.refresh()
-            } label: {
+            Button { store.refresh() } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.plain)
 
             if store.hiddenCount > 0 {
-                Button {
-                    store.clearHidden()
-                } label: {
+                Button { store.clearHidden() } label: {
                     Label("Restore \(store.hiddenCount)", systemImage: "arrow.uturn.backward")
                 }
                 .buttonStyle(.plain)
@@ -149,9 +199,7 @@ struct MenuContentView: View {
 
             SettingsButton()
 
-            Button {
-                NSApplication.shared.terminate(nil)
-            } label: {
+            Button { NSApplication.shared.terminate(nil) } label: {
                 Image(systemName: "power")
             }
             .buttonStyle(.plain)

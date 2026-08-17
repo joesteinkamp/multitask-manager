@@ -1,107 +1,85 @@
 import SwiftUI
+import MultiTaskCore
 
-/// A single session row: status dot, title, metadata, and an actions menu.
+/// A session inside a project row: status dot, what it's doing, and actions.
+///
+/// Sessions are now *detail* rather than the top level, so this is deliberately
+/// quieter than it used to be — smaller type, no project name (the parent row
+/// already said it), and the briefing collapsed to the one line that changes.
 struct SessionRowView: View {
     @EnvironmentObject private var store: SessionStore
     let session: Session
 
     @State private var isRenaming = false
     @State private var renameText = ""
-    @State private var pulse = false
-    @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                disclosure
-                statusDot
+        HStack(alignment: .top, spacing: 6) {
+            Image(systemName: session.status.symbolName)
+                .foregroundStyle(session.status.color)
+                .font(.system(size: 9))
+                .frame(width: 12)
+                .padding(.top, 2)
 
-                if isRenaming {
-                    TextField("Name", text: $renameText, onCommit: commitRename)
-                        .textFieldStyle(.roundedBorder)
-                } else {
-                    Button(action: { store.activate(session) }) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            HStack(spacing: 4) {
-                                if session.isPinned {
-                                    Image(systemName: "pin.fill").font(.caption2).foregroundStyle(.secondary)
-                                }
-                                Text(session.title)
-                                    .font(.callout)
-                                    .lineLimit(1)
+            if isRenaming {
+                TextField("Name", text: $renameText, onCommit: commitRename)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.caption)
+            } else {
+                Button { store.activate(session) } label: {
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack(spacing: 4) {
+                            if session.isPinned {
+                                Image(systemName: "pin.fill").font(.system(size: 8))
+                                    .foregroundStyle(.tertiary)
                             }
-                            Text(subtitle)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            Text(session.title)
+                                .font(.caption)
+                                .lineLimit(1)
+                            if let waiting = session.waiting {
+                                Image(systemName: waiting.symbolName)
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(.orange)
+                                    .help(waiting.label)
+                            }
+                        }
+                        Text(subtitle)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        if let now = session.context?.now {
+                            Text(now)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.tertiary)
                                 .lineLimit(1)
                         }
                     }
-                    .buttonStyle(.plain)
                 }
-
-                Spacer(minLength: 4)
-                actionsMenu
+                .buttonStyle(.plain)
             }
 
-            if isExpanded, let context = session.context {
-                ProjectBriefView(context: context)
-                    .padding(.leading, 22)
-                    .padding(.trailing, 4)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+            Spacer(minLength: 4)
+            actionsMenu
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 3)
         .contentShape(Rectangle())
     }
 
-    // MARK: Disclosure
-
-    /// A chevron that reveals the project briefing, shown only when there's a
-    /// briefing to reveal; otherwise a spacer keeps rows aligned.
-    @ViewBuilder
-    private var disclosure: some View {
-        if session.context != nil {
-            Button {
-                withAnimation(.easeInOut(duration: 0.18)) { isExpanded.toggle() }
-            } label: {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                    .frame(width: 12, height: 12)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help(isExpanded ? "Hide briefing" : "Show goal · now · next")
-        } else {
-            Color.clear.frame(width: 12, height: 12)
-        }
-    }
-
-    // MARK: Status dot
-
-    private var statusDot: some View {
-        Image(systemName: session.status.symbolName)
-            .foregroundStyle(session.status.color)
-            .font(.system(size: 11))
-            .opacity(isLive && pulse ? 0.35 : 1)
-            .animation(isLive ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default, value: pulse)
-            .onAppear { if isLive { pulse = true } }
-            .frame(width: 14)
-    }
-
-    /// True when activity is recent enough to show a live pulse.
-    private var isLive: Bool {
-        session.status == .working &&
-        Date().timeIntervalSince(session.lastActivity) < Preferences.shared.activeThreshold
-    }
-
+    /// Leads with the reason when there is one — "Needs approval" tells you more
+    /// than "Needs attention" ever could.
     private var subtitle: String {
-        "\(session.status.label) · \(session.source.label) · \(RelativeTime.string(from: session.lastActivity, status: session.status))"
+        var parts: [String] = []
+        if let reason = session.reason, !reason.isEmpty {
+            parts.append(reason)
+        } else if let waiting = session.waiting {
+            parts.append(waiting.label)
+        } else {
+            parts.append(session.status.label)
+        }
+        parts.append(session.source.label)
+        parts.append(RelativeTime.string(from: session.lastActivity, status: session.status))
+        if let tool = session.lastToolName { parts.append(tool) }
+        return parts.joined(separator: " · ")
     }
-
-    // MARK: Actions
 
     private var actionsMenu: some View {
         Menu {
@@ -114,8 +92,9 @@ struct SessionRowView: View {
             Divider()
             Button("Remove", role: .destructive) { store.remove(session) }
         } label: {
-            Image(systemName: "ellipsis.circle")
-                .foregroundStyle(.secondary)
+            Image(systemName: "ellipsis")
+                .font(.system(size: 9))
+                .foregroundStyle(.tertiary)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -128,8 +107,9 @@ struct SessionRowView: View {
     }
 }
 
-/// The expandable per-project briefing: goal, what's happening now, and what to do
-/// next. Every line is read from files on disk — no model involved.
+/// The per-project briefing — goal, now, next — assembled from files on disk
+/// with no model involved. Kept for the settings preview and any surface that
+/// wants the long form.
 struct ProjectBriefView: View {
     let context: ProjectContext
 
@@ -157,11 +137,7 @@ struct ProjectBriefView: View {
         .padding(.vertical, 4)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.secondary.opacity(0.08))
-        )
-        .padding(.bottom, 2)
+        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
     }
 
     @ViewBuilder
@@ -197,25 +173,5 @@ struct ProjectBriefView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-    }
-}
-
-/// Formats activity timestamps as compact relative strings.
-enum RelativeTime {
-    static func string(from date: Date, status: SessionStatus) -> String {
-        let seconds = max(0, Date().timeIntervalSince(date))
-        let elapsed = compact(seconds)
-        switch status {
-        case .needsAttention: return "waiting \(elapsed)"
-        case .working: return seconds < 5 ? "now" : "\(elapsed) ago"
-        default: return "\(elapsed) ago"
-        }
-    }
-
-    private static func compact(_ seconds: TimeInterval) -> String {
-        if seconds < 60 { return "\(Int(seconds))s" }
-        if seconds < 3600 { return "\(Int(seconds / 60))m" }
-        if seconds < 86_400 { return "\(Int(seconds / 3600))h" }
-        return "\(Int(seconds / 86_400))d"
     }
 }

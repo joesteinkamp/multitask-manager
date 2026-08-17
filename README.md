@@ -253,13 +253,16 @@ Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/A
 │   ├── Client/                   # EngineClient protocol + InProcessEngine
 │   └── Wire/                     # daemon protocol: envelope, codec, frame reader
 ├── Sources/mtm/                  # the CLI
-└── Tests/                        # 199 tests, incl. opt-in checks against real harness data
+└── Tests/                        # 203 tests, incl. opt-in checks against real harness data
 
-MultiTaskManager/                 # the macOS app
+MultiTaskManager/                 # the macOS app — links MultiTaskCore
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
-├── Models/ Detection/ Store/     # ← still the app's own copies; see below
-├── Support/                      # Preferences, LaunchAtLogin
-└── Views/                        # MenuContentView, SessionRowView, SettingsView
+├── Detection/                    # RunningAppsDetector — the one that needs AppKit
+├── Store/                        # SessionStore — thin observable wrapper
+├── Support/                      # Preferences (ConfigurationProviding), theme,
+│                                 #   notification delivery, LaunchAtLogin
+└── Views/                        # MenuContentView, ProjectRowView, SessionRowView,
+                                  #   SettingsView
 ```
 
 The engine lives in `MultiTaskCore` so the popover, a window, `mtm` and a future
@@ -267,12 +270,17 @@ daemon can be faces of one implementation rather than four. Because the core
 imports Foundation only, it builds and tests on Linux — which is what makes the
 detection logic verifiable in CI on every push instead of only on a Mac.
 
-**The app has not yet been migrated onto the package.** `MultiTaskManager/`
-still contains its original copies of the models and detectors, and building the
-app uses those. Moving it over means editing `project.pbxproj` to add the
-package dependency and drop the duplicated files — a step that can only be
-verified by compiling on a Mac, and one the implementation plan is explicit
-should land in a single tested change rather than half-done.
+**The app is now a client of the package.** `MultiTaskManager/` no longer holds
+copies of the models, detectors or merge logic — it links `MultiTaskCore` as a
+local Swift package and keeps only what genuinely needs AppKit or SwiftUI: the
+running-apps detector, the observable store, notification delivery, and the
+views. The eleven files that remain are all Mac-specific by necessity.
+
+> **Not yet compiled.** The migration was written on a Linux machine, so
+> everything below the UI is verified — 203 tests, including a suite that
+> compiles the app's exact call shapes into the core — but nothing has been
+> through `xcodebuild`. Expect to fix a small number of SwiftUI-level errors on
+> the first build.
 
 Detectors conform to `SessionDetector` — implement `detect()` and register it in
 `DetectionEngine.makeDetectors()`, or inject it when the detector needs AppKit

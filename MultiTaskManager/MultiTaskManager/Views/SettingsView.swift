@@ -1,21 +1,26 @@
 import SwiftUI
 import AppKit
+import MultiTaskCore
 
 struct SettingsView: View {
     var body: some View {
         TabView {
             DetectorSettings()
-                .tabItem { Label("Detection", systemImage: "antenna.radiowaves.left.and.right") }
+                .tabItem { Label("Signals", systemImage: "antenna.radiowaves.left.and.right") }
             ThresholdSettings()
                 .tabItem { Label("Status", systemImage: "timer") }
+            NotificationSettings()
+                .tabItem { Label("Notifications", systemImage: "bell") }
             DevFolderSettings()
                 .tabItem { Label("Dev Folders", systemImage: "folder") }
             AppSettings()
                 .tabItem { Label("Apps", systemImage: "app.badge") }
+            HealthSettings()
+                .tabItem { Label("Health", systemImage: "stethoscope") }
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(width: 460, height: 360)
+        .frame(width: 480, height: 400)
     }
 }
 
@@ -24,21 +29,137 @@ private struct DetectorSettings: View {
 
     var body: some View {
         Form {
-            Section("Auto-detection sources") {
+            Section("Where sessions come from") {
                 Toggle("Claude Code (CLI) — ~/.claude/projects", isOn: $prefs.enableClaudeCode)
                 Toggle("Codex (CLI) — ~/.codex", isOn: $prefs.enableCodex)
                 Toggle("AI desktop apps (Claude, ChatGPT, Cursor…)", isOn: $prefs.enableRunningApps)
                 Toggle("Dev folder file activity", isOn: $prefs.enableDevFolders)
                 Toggle("Hook status files (optional precise signal)", isOn: $prefs.enableHooks)
             }
+            Section("Harness signals") {
+                Toggle("Harness audit log — real activity, and when a run ends", isOn: $prefs.enableAuditLog)
+                Toggle("Orchestration waves — ~/.ai-context", isOn: $prefs.enableWaves)
+                Toggle("Worktrees and stalled converges (runs git)", isOn: $prefs.enableWorktrees)
+                Text("The audit log is what makes “finished” a fact rather than a guess: it records an explicit end-of-session event, where file timestamps can only show that something went quiet.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section {
                 Toggle("Hide idle sessions", isOn: $prefs.hideIdle)
             }
             Section("Project briefing") {
                 Toggle("Show goal / now / next per project", isOn: $prefs.enableProjectContext)
-                Text("Reads each project's README/CLAUDE/AGENTS/PROJECT/PRODUCT/GOAL for the goal, the live transcript for what it's working on now, and ROADMAP/TODO checkboxes for what's next. Expand a session row to see it.")
+                Text("A project's goal comes from the One-liner in its PRODUCT.md when it has one, and is scraped from README/CLAUDE/AGENTS otherwise. Now comes from the live transcript; Next from ROADMAP/TODO checkboxes, which also give the progress count.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+}
+
+/// The policy behind these lives in the core and is tested there; this pane only
+/// sets its inputs.
+private struct NotificationSettings: View {
+    @ObservedObject private var prefs = Preferences.shared
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Notify when a project needs me", isOn: $prefs.enableNotifications)
+                if store.notificationsDenied {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                        Text("macOS denied notification permission — the badge still works.")
+                            .font(.caption)
+                        Button("Open System Settings") {
+                            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+                                NSWorkspace.shared.open(url)
+                            }
+                        }
+                        .font(.caption)
+                    }
+                }
+            }
+            Section("Restraint") {
+                Stepper(value: $prefs.notificationCooldown, in: 60...3600, step: 60) {
+                    HStack {
+                        Text("Don't repeat a session for")
+                        Spacer()
+                        Text("\(Int(prefs.notificationCooldown / 60))m").foregroundStyle(.secondary)
+                    }
+                }
+                Text("A crossing must also hold across two refreshes before it notifies, and three or more at once arrive as a single message. Those two rules aren't adjustable — they're what stop a flapping timeout from becoming an alert every few seconds.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Section("Quiet hours") {
+                Toggle("Stay quiet overnight", isOn: $prefs.quietHoursEnabled)
+                if prefs.quietHoursEnabled {
+                    minutePicker("From", value: $prefs.quietHoursStart)
+                    minutePicker("Until", value: $prefs.quietHoursEnd)
+                    Text("Notifications inside quiet hours are dropped, not queued — a backlog arriving at 7am is the burst this exists to prevent.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
+    private func minutePicker(_ label: String, value: Binding<Int>) -> some View {
+        Stepper(value: value, in: 0...(23 * 60 + 30), step: 30) {
+            HStack {
+                Text(label)
+                Spacer()
+                Text(String(format: "%02d:%02d", value.wrappedValue / 60, value.wrappedValue % 60))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+    }
+}
+
+/// What the app can and can't currently see. "Nothing is running" and "I can't
+/// read anything" must never look the same.
+private struct HealthSettings: View {
+    @ObservedObject private var prefs = Preferences.shared
+    @EnvironmentObject private var store: SessionStore
+
+    var body: some View {
+        Form {
+            Section("Harness audit log") {
+                TextField("Path (blank uses $AI_TOOL_LOG, then the default)",
+                          text: $prefs.auditLogPath)
+                Text(Configuration.defaultAuditLogPath)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            Section("Sources") {
+                if store.degraded.isEmpty {
+                    Label("Everything readable", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.callout)
+                } else {
+                    ForEach(store.degraded, id: \.self) { reason in
+                        Label(reason.message, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            Section("Now") {
+                LabeledContent("Projects", value: "\(store.activeProjects.count)")
+                LabeledContent("Sessions", value: "\(store.sessions.count)")
+                LabeledContent("Waves", value: "\(store.waves.count)")
+                LabeledContent("Repositories scanned", value: "\(store.repositories.count)")
+                LabeledContent("Last refresh",
+                               value: store.lastRefresh == .distantPast ? "—"
+                                                                        : RelativeTime.ago(store.lastRefresh))
             }
         }
         .formStyle(.grouped)

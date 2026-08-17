@@ -1,246 +1,201 @@
 import Foundation
 import AppKit
 import Combine
+import MultiTaskCore
 
-/// Central view model. Periodically runs the enabled detectors on a background
-/// queue, merges results with persisted user overrides, classifies each session
-/// with the stagnation heuristic, and publishes a sorted list for the UI.
+/// The app's view model: subscribes to the engine and republishes what SwiftUI
+/// needs.
+///
+/// It used to *be* the engine — detectors, merge logic, the status heuristic and
+/// a timer in one `@MainActor` class. All of that moved to `MultiTaskCore`,
+/// where it can be tested. What's left here is the part that genuinely belongs
+/// to a Mac app: `@Published` properties, activating a window, and revealing a
+/// folder in Finder.
 @MainActor
 final class SessionStore: ObservableObject {
+    /// **Projects are the primary unit.** Sessions are still published because
+    /// rows drill into them, but the popover leads with these.
+    @Published private(set) var projects: [Project] = []
     @Published private(set) var sessions: [Session] = []
+    @Published private(set) var waves: [Wave] = []
+    @Published private(set) var repositories: [RepositoryState] = []
+    @Published private(set) var degraded: [DegradedReason] = []
     @Published private(set) var lastRefresh: Date = .distantPast
+    /// Set when notification authorization was denied, so Settings can say so
+    /// rather than silently never notifying.
+    @Published var notificationsDenied = false
 
     private let prefs = Preferences.shared
     private let overridesStore = OverridesStore.shared
-    private var overrides: UserOverrides
+    private let projectStore = ProjectStore()
+    private let notifier = NotificationPresenter()
 
-    private var timer: Timer?
-    private let work = DispatchQueue(label: "com.multitaskmanager.detect", qos: .utility)
-    private var isRefreshing = false
+    private var engine: InProcessEngine!
+    private var overrides: UserOverrides
+    private var eventTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
 
-    /// Count of sessions currently flagged as needing attention. Drives the badge.
+    /// Drives the menu bar badge.
     var needsAttentionCount: Int {
-        sessions.filter { $0.status == .needsAttention }.count
+        projects.filter { $0.status == .needsYou && $0.record.lifecycle.isActive }.count
     }
+
+    var activeProjects: [Project] {
+        projects.filter { $0.record.lifecycle.isActive }
+    }
+
+    /// What to do first, across everything.
+    var triageQueue: [Session] {
+        AttentionTriage.waitingSessions(sessions)
+    }
+
+    var hiddenCount: Int { overrides.hidden.count }
 
     init() {
         overrides = overridesStore.load()
 
-        // Restart the timer whenever the cadence preference changes.
+        let detection = DetectionEngine(
+            configuration: prefs,
+            additionalDetectors: [RunningAppsDetector(configuration: prefs)],
+            projectStore: projectStore
+        )
+        engine = InProcessEngine(configuration: prefs,
+                                 engine: detection,
+                                 overridesStore: overridesStore)
+
+        // Restart the engine's cadence when the interval preference changes.
         prefs.$refreshInterval
             .dropFirst()
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.startTimer() }
-            }
+            .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
+            .sink { [weak self] _ in Task { await self?.restart() } }
             .store(in: &cancellables)
 
-        // Begin detecting at launch so the menu bar badge is live before the user
-        // ever opens the popover.
         start()
     }
 
     // MARK: Lifecycle
 
     func start() {
-        startTimer()
-        refresh()
-    }
-
-    private func startTimer() {
-        timer?.invalidate()
-        let interval = max(1.0, prefs.refreshInterval)
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
-    }
-
-    // MARK: Refresh pipeline
-
-    func refresh() {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-
-        let detectors = makeDetectors()
-        let snapshot = overrides
-        let contextEnabled = prefs.enableProjectContext
-
-        work.async { [weak self] in
-            let raw = detectors.flatMap { $0.detect() }
-            // Read project briefings (goal/now/next) off the main thread so the file
-            // I/O never blocks the UI. Cached by file mtime inside the reader.
-            let enriched = contextEnabled ? ProjectContextReader.shared.attach(to: raw) : raw
-            Task { @MainActor in
+        eventTask?.cancel()
+        let engine = engine!
+        eventTask = Task { [weak self] in
+            // Prime first so launching the app doesn't announce every session
+            // that was already quiet.
+            await engine.primeNotifications()
+            await engine.start()
+            for await event in engine.subscribe() {
                 guard let self else { return }
-                self.sessions = self.merge(raw: enriched, overrides: snapshot)
-                self.lastRefresh = Date()
-                self.isRefreshing = false
+                switch event {
+                case .snapshot(let snapshot):
+                    await self.apply(snapshot)
+                case .notify(let notification):
+                    await self.deliver(notification)
+                }
             }
         }
     }
 
-    /// Builds the active detector set from preferences.
-    private func makeDetectors() -> [SessionDetector] {
-        var detectors: [SessionDetector] = []
-        if prefs.enableClaudeCode { detectors.append(ClaudeCodeDetector()) }
-        if prefs.enableCodex { detectors.append(CodexDetector()) }
-        if prefs.enableRunningApps {
-            detectors.append(RunningAppsDetector(
-                bundleAllowlist: prefs.bundleAllowlist,
-                nameKeywords: prefs.appNameKeywords
-            ))
-        }
-        if prefs.enableDevFolders {
-            detectors.append(DevFolderDetector(roots: prefs.devFolders))
-        }
-        if prefs.enableHooks { detectors.append(HookStatusReader()) }
-        return detectors
+    private func restart() async {
+        await engine.stop()
+        start()
     }
 
-    /// Dedupe detected sessions, fold in hook overrides, drop hidden ones, append
-    /// manual entries, apply renames/pins, classify, and sort.
-    private func merge(raw: [Session], overrides: UserOverrides) -> [Session] {
-        // Split hook records from regular detections.
-        let hookRecords = raw.filter { $0.id.hasPrefix("hook:") }
-        let detected = raw.filter { !$0.id.hasPrefix("hook:") }
-
-        // Dedupe regular detections by id, keeping the most recent activity.
-        var byId: [String: Session] = [:]
-        for session in detected {
-            if let existing = byId[session.id], existing.lastActivity >= session.lastActivity { continue }
-            byId[session.id] = session
-        }
-
-        // Apply hook statuses: match by projectPath; otherwise keep standalone.
-        for record in hookRecords {
-            if let path = record.projectPath,
-               let matchKey = byId.first(where: { $0.value.projectPath == path })?.key {
-                byId[matchKey]?.hookStatus = record.hookStatus
-                byId[matchKey]?.lastActivity = max(byId[matchKey]!.lastActivity, record.lastActivity)
-            } else {
-                byId[record.id] = record
-            }
-        }
-
-        var result = Array(byId.values)
-
-        // Remove user-hidden sessions.
-        result.removeAll { overrides.hidden.contains($0.id) }
-
-        // Append manual sessions (not subject to hidden — removing deletes them).
-        result.append(contentsOf: overrides.manual)
-
-        // Apply renames, pins, and classify.
-        let now = Date()
-        result = result.map { session in
-            var s = session
-            if let renamed = overrides.renames[s.id] { s.title = renamed }
-            s.isPinned = overrides.pinned.contains(s.id)
-            s.status = classify(s, now: now)
-            return s
-        }
-
-        if prefs.hideIdle {
-            result.removeAll { $0.status == .idle && !$0.isPinned }
-        }
-
-        return sortSessions(result)
+    private func apply(_ snapshot: EngineSnapshot) {
+        projects = snapshot.projects
+        sessions = snapshot.sessions
+        waves = snapshot.waves
+        repositories = snapshot.repositories
+        degraded = snapshot.degraded
+        lastRefresh = snapshot.refreshedAt
     }
 
-    /// The stagnation heuristic. Hook status wins when present; otherwise classify
-    /// by how long since the last activity signal.
-    private func classify(_ session: Session, now: Date) -> SessionStatus {
-        if let hook = session.hookStatus { return hook }
-        let gap = now.timeIntervalSince(session.lastActivity)
-        if gap >= prefs.idleThreshold { return .idle }
-        if gap >= prefs.attentionThreshold { return .needsAttention }
-        return .working
+    private func deliver(_ notification: PendingNotification) async {
+        let granted = await notifier.deliver(notification)
+        if !granted { notificationsDenied = true }
     }
 
-    private func sortSessions(_ sessions: [Session]) -> [Session] {
-        sessions.sorted { a, b in
-            if a.isPinned != b.isPinned { return a.isPinned }
-            if a.status.sortRank != b.status.sortRank { return a.status.sortRank < b.status.sortRank }
-            return a.lastActivity > b.lastActivity
+    /// Forces a pass now, rather than waiting for the cadence.
+    func refresh() {
+        Task { [engine] in _ = try? await engine?.act(.refresh) }
+    }
+
+    // MARK: Actions
+
+    /// Every mutation goes through the engine's action set rather than editing
+    /// overrides here, so the CLI, the app and (later) an agent over MCP all
+    /// take the same path and hit the same gates.
+    private func perform(_ action: EngineAction) {
+        Task { [weak self] in
+            guard let self else { return }
+            _ = try? await self.engine.act(action)
+            self.overrides = self.overridesStore.load()
         }
     }
-
-    /// Sessions grouped by project for sectioned display.
-    var groupedByProject: [(project: String, sessions: [Session])] {
-        let groups = Dictionary(grouping: sessions) { $0.projectName }
-        return groups
-            .map { (project: $0.key, sessions: $0.value) }
-            .sorted { lhs, rhs in
-                let l = lhs.sessions.map(\.status.sortRank).min() ?? Int.max
-                let r = rhs.sessions.map(\.status.sortRank).min() ?? Int.max
-                if l != r { return l < r }
-                return lhs.project.localizedCaseInsensitiveCompare(rhs.project) == .orderedAscending
-            }
-    }
-
-    // MARK: User actions
 
     func addManual(title: String, projectPath: String?) {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        let session = Session(
-            id: "manual:\(UUID().uuidString)",
-            title: trimmed,
-            projectName: trimmed,
-            projectPath: projectPath,
-            source: .manual,
-            lastActivity: Date(),
-            isManual: true
-        )
-        overrides.manual.append(session)
-        persistAndRefresh()
+        perform(.addManual(title: title, projectPath: projectPath))
     }
 
     func remove(_ session: Session) {
-        if session.isManual {
-            overrides.manual.removeAll { $0.id == session.id }
-        } else {
-            overrides.hidden.insert(session.id)
-        }
-        overrides.renames[session.id] = nil
-        overrides.pinned.remove(session.id)
-        persistAndRefresh()
+        perform(session.isManual ? .removeManual(sessionId: session.id) : .hide(sessionId: session.id))
     }
 
     func rename(_ session: Session, to newTitle: String) {
-        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        if session.isManual, let idx = overrides.manual.firstIndex(where: { $0.id == session.id }) {
-            overrides.manual[idx].title = trimmed
-        } else {
-            overrides.renames[session.id] = trimmed
-        }
-        persistAndRefresh()
+        perform(.rename(sessionId: session.id, title: newTitle))
     }
 
     func togglePin(_ session: Session) {
-        if overrides.pinned.contains(session.id) {
-            overrides.pinned.remove(session.id)
-        } else {
-            overrides.pinned.insert(session.id)
-        }
-        persistAndRefresh()
+        perform(session.isPinned ? .unpin(sessionId: session.id) : .pin(sessionId: session.id))
     }
 
-    /// Restores everything the user previously removed.
-    func clearHidden() {
-        overrides.hidden.removeAll()
-        persistAndRefresh()
+    func clearHidden() { perform(.clearHidden) }
+
+    func toggleMute(_ project: Project) {
+        guard let path = project.path else { return }
+        perform(isMuted(project) ? .unmute(projectPath: path) : .mute(projectPath: path))
     }
 
-    var hiddenCount: Int { overrides.hidden.count }
+    func isMuted(_ project: Project) -> Bool {
+        guard let path = project.path else { return false }
+        return overrides.mutedProjects.contains(path)
+    }
 
-    /// Brings the underlying work to the foreground: activates the app for desktop
-    /// sessions, or reveals the project folder in Finder for file-based ones.
+    // MARK: Project lifecycle
+
+    func archive(_ project: Project) {
+        var record = project.record
+        record.lifecycle = .archived
+        projectStore.save(record)
+        refresh()
+    }
+
+    func park(_ project: Project, days: Int = 7) {
+        var record = project.record
+        record.lifecycle = .parked(until: Date().addingTimeInterval(Double(days) * 86_400))
+        projectStore.save(record)
+        refresh()
+    }
+
+    func unarchive(_ project: Project) {
+        var record = project.record
+        record.lifecycle = .active
+        projectStore.save(record)
+        refresh()
+    }
+
+    func togglePin(_ project: Project) {
+        var record = project.record
+        record.isPinned.toggle()
+        projectStore.save(record)
+        refresh()
+    }
+
+    // MARK: Opening things
+
+    /// Brings the underlying work to the foreground: activates the app for
+    /// desktop sessions, or reveals the project folder in Finder otherwise.
     func activate(_ session: Session) {
-        if let pid = session.pid,
-           let app = NSRunningApplication(processIdentifier: pid) {
+        if let pid = session.pid, let app = NSRunningApplication(processIdentifier: pid) {
             app.activate(options: [.activateAllWindows])
             return
         }
@@ -249,13 +204,19 @@ final class SessionStore: ObservableObject {
             NSWorkspace.shared.open(url)
             return
         }
-        if let path = session.projectPath {
-            NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
-        }
+        if let path = session.projectPath { reveal(path) }
     }
 
-    private func persistAndRefresh() {
-        overridesStore.save(overrides)
-        refresh()
+    func activate(_ project: Project) {
+        if let path = project.path { reveal(path) }
+    }
+
+    func reveal(_ path: String) {
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
+    }
+
+    /// Focuses the session a notification was about.
+    func focus(sessionId: String) {
+        if let session = sessions.first(where: { $0.id == sessionId }) { activate(session) }
     }
 }

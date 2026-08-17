@@ -8,23 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		BF0000000000000000000001 /* MultiTaskManagerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000001 /* MultiTaskManagerApp.swift */; };
-		BF0000000000000000000002 /* SessionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000002 /* SessionStatus.swift */; };
-		BF0000000000000000000003 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000003 /* Session.swift */; };
-		BF0000000000000000000004 /* SessionDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000004 /* SessionDetector.swift */; };
-		BF0000000000000000000005 /* ClaudeCodeDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000005 /* ClaudeCodeDetector.swift */; };
-		BF0000000000000000000006 /* CodexDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000006 /* CodexDetector.swift */; };
 		BF0000000000000000000007 /* RunningAppsDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000007 /* RunningAppsDetector.swift */; };
-		BF0000000000000000000008 /* DevFolderDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000008 /* DevFolderDetector.swift */; };
-		BF0000000000000000000009 /* HookStatusReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000009 /* HookStatusReader.swift */; };
-		BF000000000000000000000A /* UserOverrides.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000A /* UserOverrides.swift */; };
 		BF000000000000000000000B /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000B /* SessionStore.swift */; };
 		BF000000000000000000000C /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000C /* Preferences.swift */; };
 		BF000000000000000000000D /* LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000D /* LaunchAtLogin.swift */; };
 		BF000000000000000000000E /* MenuContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000E /* MenuContentView.swift */; };
 		BF000000000000000000000F /* SessionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE000000000000000000000F /* SessionRowView.swift */; };
 		BF0000000000000000000010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000010 /* SettingsView.swift */; };
-		BF0000000000000000000011 /* ProjectContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000011 /* ProjectContext.swift */; };
-		BF0000000000000000000012 /* ProjectContextReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000012 /* ProjectContextReader.swift */; };
+		BF0000000000000000000013 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000013 /* AppTheme.swift */; };
+		BF0000000000000000000014 /* NotificationPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000014 /* NotificationPresenter.swift */; };
+		BF0000000000000000000015 /* ProjectRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000015 /* ProjectRowView.swift */; };
+		BF0000000000000000000016 /* MultiTaskCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000002 /* MultiTaskCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -32,23 +26,16 @@
 		AAAA00000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AAAA00000000000000000016 /* MultiTaskManager.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MultiTaskManager.entitlements; sourceTree = "<group>"; };
 		FE0000000000000000000001 /* MultiTaskManagerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultiTaskManagerApp.swift; sourceTree = "<group>"; };
-		FE0000000000000000000002 /* SessionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStatus.swift; sourceTree = "<group>"; };
-		FE0000000000000000000003 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
-		FE0000000000000000000004 /* SessionDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionDetector.swift; sourceTree = "<group>"; };
-		FE0000000000000000000005 /* ClaudeCodeDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeDetector.swift; sourceTree = "<group>"; };
-		FE0000000000000000000006 /* CodexDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexDetector.swift; sourceTree = "<group>"; };
 		FE0000000000000000000007 /* RunningAppsDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunningAppsDetector.swift; sourceTree = "<group>"; };
-		FE0000000000000000000008 /* DevFolderDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DevFolderDetector.swift; sourceTree = "<group>"; };
-		FE0000000000000000000009 /* HookStatusReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookStatusReader.swift; sourceTree = "<group>"; };
-		FE000000000000000000000A /* UserOverrides.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserOverrides.swift; sourceTree = "<group>"; };
 		FE000000000000000000000B /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		FE000000000000000000000C /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		FE000000000000000000000D /* LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLogin.swift; sourceTree = "<group>"; };
 		FE000000000000000000000E /* MenuContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuContentView.swift; sourceTree = "<group>"; };
 		FE000000000000000000000F /* SessionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRowView.swift; sourceTree = "<group>"; };
 		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
-		FE0000000000000000000011 /* ProjectContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContext.swift; sourceTree = "<group>"; };
-		FE0000000000000000000012 /* ProjectContextReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectContextReader.swift; sourceTree = "<group>"; };
+		FE0000000000000000000013 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		FE0000000000000000000014 /* NotificationPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresenter.swift; sourceTree = "<group>"; };
+		FE0000000000000000000015 /* ProjectRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BF0000000000000000000016 /* MultiTaskCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -82,7 +70,6 @@
 			isa = PBXGroup;
 			children = (
 				FE0000000000000000000001 /* MultiTaskManagerApp.swift */,
-				AAAA0000000000000000000A /* Models */,
 				AAAA0000000000000000000B /* Detection */,
 				AAAA0000000000000000000C /* Store */,
 				AAAA0000000000000000000D /* Support */,
@@ -93,26 +80,10 @@
 			path = MultiTaskManager;
 			sourceTree = "<group>";
 		};
-		AAAA0000000000000000000A /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				FE0000000000000000000002 /* SessionStatus.swift */,
-				FE0000000000000000000003 /* Session.swift */,
-				FE0000000000000000000011 /* ProjectContext.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
 		AAAA0000000000000000000B /* Detection */ = {
 			isa = PBXGroup;
 			children = (
-				FE0000000000000000000004 /* SessionDetector.swift */,
-				FE0000000000000000000005 /* ClaudeCodeDetector.swift */,
-				FE0000000000000000000006 /* CodexDetector.swift */,
 				FE0000000000000000000007 /* RunningAppsDetector.swift */,
-				FE0000000000000000000008 /* DevFolderDetector.swift */,
-				FE0000000000000000000009 /* HookStatusReader.swift */,
-				FE0000000000000000000012 /* ProjectContextReader.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -120,7 +91,6 @@
 		AAAA0000000000000000000C /* Store */ = {
 			isa = PBXGroup;
 			children = (
-				FE000000000000000000000A /* UserOverrides.swift */,
 				FE000000000000000000000B /* SessionStore.swift */,
 			);
 			path = Store;
@@ -131,6 +101,8 @@
 			children = (
 				FE000000000000000000000C /* Preferences.swift */,
 				FE000000000000000000000D /* LaunchAtLogin.swift */,
+				FE0000000000000000000013 /* AppTheme.swift */,
+				FE0000000000000000000014 /* NotificationPresenter.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -139,6 +111,7 @@
 			isa = PBXGroup;
 			children = (
 				FE000000000000000000000E /* MenuContentView.swift */,
+				FE0000000000000000000015 /* ProjectRowView.swift */,
 				FE000000000000000000000F /* SessionRowView.swift */,
 				FE0000000000000000000010 /* SettingsView.swift */,
 			);
@@ -161,6 +134,9 @@
 			dependencies = (
 			);
 			name = MultiTaskManager;
+			packageProductDependencies = (
+				CC0000000000000000000002 /* MultiTaskCore */,
+			);
 			productName = MultiTaskManager;
 			productReference = AAAA00000000000000000006 /* MultiTaskManager.app */;
 			productType = "com.apple.product-type.application";
@@ -189,6 +165,9 @@
 				Base,
 			);
 			mainGroup = AAAA00000000000000000007 /* Main */;
+			packageReferences = (
+				CC0000000000000000000001 /* XCLocalSwiftPackageReference "../Packages/MultiTaskCore" */,
+			);
 			productRefGroup = AAAA00000000000000000008 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -214,23 +193,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				BF0000000000000000000001 /* MultiTaskManagerApp.swift in Sources */,
-				BF0000000000000000000002 /* SessionStatus.swift in Sources */,
-				BF0000000000000000000003 /* Session.swift in Sources */,
-				BF0000000000000000000004 /* SessionDetector.swift in Sources */,
-				BF0000000000000000000005 /* ClaudeCodeDetector.swift in Sources */,
-				BF0000000000000000000006 /* CodexDetector.swift in Sources */,
 				BF0000000000000000000007 /* RunningAppsDetector.swift in Sources */,
-				BF0000000000000000000008 /* DevFolderDetector.swift in Sources */,
-				BF0000000000000000000009 /* HookStatusReader.swift in Sources */,
-				BF000000000000000000000A /* UserOverrides.swift in Sources */,
 				BF000000000000000000000B /* SessionStore.swift in Sources */,
 				BF000000000000000000000C /* Preferences.swift in Sources */,
 				BF000000000000000000000D /* LaunchAtLogin.swift in Sources */,
+				BF0000000000000000000013 /* AppTheme.swift in Sources */,
+				BF0000000000000000000014 /* NotificationPresenter.swift in Sources */,
 				BF000000000000000000000E /* MenuContentView.swift in Sources */,
+				BF0000000000000000000015 /* ProjectRowView.swift in Sources */,
 				BF000000000000000000000F /* SessionRowView.swift in Sources */,
 				BF0000000000000000000010 /* SettingsView.swift in Sources */,
-				BF0000000000000000000011 /* ProjectContext.swift in Sources */,
-				BF0000000000000000000012 /* ProjectContextReader.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -346,6 +318,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		CC0000000000000000000001 /* XCLocalSwiftPackageReference "../Packages/MultiTaskCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/MultiTaskCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CC0000000000000000000002 /* MultiTaskCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MultiTaskCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = AAAA00000000000000000001 /* Project object */;
 }
