@@ -436,8 +436,13 @@ struct LauncherSpawnTests {
         let launcher = Launcher(runStore: store)
 
         let started = try launcher.start(harmlessRun(dir, command: ["sh", "-c", "echo hello-from-run"]))
-        #expect(started.state == .running)
         #expect(started.pid != nil)
+        // NOT `== .running`. `start` returns the record as it stands on disk, and
+        // `echo` can be reaped before `start` returns — the termination handler
+        // then has the truer answer. Asserting `.running` made this test flaky
+        // roughly one run in twenty, and it was the assertion that was wrong:
+        // reporting a finished child as running to win a race would be worse.
+        #expect(started.state == .running || started.state.isTerminal)
 
         // Give the child a moment to finish and flush.
         var tail: String?
