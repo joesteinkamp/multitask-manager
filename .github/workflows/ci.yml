@@ -10,6 +10,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A stale DesignTokens.swift is a design system that has quietly forked from
+  # DESIGN.json, and it should fail in seconds rather than be discovered when the
+  # two clients sit side by side.
+  #
+  # Its own job, on the plain runner, because the `swift:6.0` container has no
+  # python3 — running it there exits 127, which is how this step failed the first
+  # time it ran. The Swift-side DesignTokensTests skips when python3 is absent,
+  # so it did not catch this either; that skip is why the check is also here.
+  design:
+    name: Design tokens
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: DesignTokens.swift matches DESIGN.json
+        run: python3 Scripts/generate-tokens.py --check
+
   # The core imports Foundation only, so it builds and tests on Linux. This job is
   # the fast one — it runs on every push in well under a minute and catches almost
   # everything, because almost all of the logic lives in the core.
@@ -19,11 +35,6 @@ jobs:
     container: swift:6.0
     steps:
       - uses: actions/checkout@v4
-      # Before the build: a stale DesignTokens.swift is a design system that has
-      # quietly forked from DESIGN.json, and it should fail here in two seconds
-      # rather than be discovered when the two clients sit side by side.
-      - name: Design tokens match DESIGN.json
-        run: python3 Scripts/generate-tokens.py --check
       - name: Build
         working-directory: Packages/MultiTaskCore
         run: swift build
@@ -39,10 +50,14 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      # 6.0 (Sept 2024) does not build against the MSVC the runner now ships
+      # (14.51): every compile dies with "cyclic dependency in module 'ucrt'",
+      # inside Microsoft's own headers rather than anywhere in this repo. A newer
+      # toolchain is the documented fix.
       - uses: compnerd/gha-setup-swift@main
         with:
-          branch: swift-6.0-release
-          tag: 6.0-RELEASE
+          branch: swift-6.1-release
+          tag: 6.1-RELEASE
       - name: Build
         working-directory: Packages/MultiTaskCore
         run: swift build
