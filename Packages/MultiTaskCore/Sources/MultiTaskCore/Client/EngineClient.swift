@@ -57,6 +57,14 @@ public enum EngineAction: Codable, Sendable, Equatable {
     case cancelRun(runId: String)
     case provisionIsolation(taskId: String, agent: String, confirm: String?)
 
+    // Approval flow. Asking costs nothing, so `requestApproval` is ungated and
+    // available to agents over MCP. Deciding is the gate itself, and is
+    // deliberately **not** reachable from MCP: approving is what mints the
+    // confirmation token, inside the engine, where no caller can get at it.
+    case requestApproval(kind: String, taskId: String, delegate: String?,
+                         requestedBy: String, rationale: String?)
+    case decideApproval(id: String, approve: Bool, note: String?)
+
     /// Fields for a new task. A struct rather than a dozen associated values so
     /// the MCP server and the CLI can decode one shape.
     public struct CreateTask: Codable, Sendable, Equatable {
@@ -127,13 +135,17 @@ public struct ActionResult: Codable, Sendable, Equatable {
     public var confirmation: ConfirmationRequest?
     /// Set by control actions that produced one.
     public var runId: String?
+    /// Set when an action filed or decided an approval request.
+    public var approval: ApprovalRequest?
 
     public init(ok: Bool, snapshot: EngineSnapshot? = nil,
-                confirmation: ConfirmationRequest? = nil, runId: String? = nil) {
+                confirmation: ConfirmationRequest? = nil, runId: String? = nil,
+                approval: ApprovalRequest? = nil) {
         self.ok = ok
         self.snapshot = snapshot
         self.confirmation = confirmation
         self.runId = runId
+        self.approval = approval
     }
 
     /// True when nothing happened and approval is what's missing.

@@ -195,7 +195,54 @@ public struct MCPServer: Sendable {
 
             Tool(name: "project_status",
                  description: "Everything about one project: status and why, progress, open tasks, live sessions.",
-                 schema: object(["projectId": string("Project id or name prefix.")], required: ["projectId"]))
+                 schema: object(["projectId": string("Project id or name prefix.")], required: ["projectId"])),
+
+            Tool(name: "request_run",
+                 description: """
+                 Ask the human for permission to hand a task to a delegate.
+
+                 This does NOT start anything. It files a request that appears in                  the human's app as something needing their decision. There is no                  tool to approve your own request — that is deliberate, and                  looking for one is not a productive use of your turn.
+
+                 1. Give `rationale`: why this work, why now, why this delegate.                  A request with no reason takes longer to approve than to write.
+                 2. Then move on to other work. Do not poll; check                  list_my_requests when you next need to know.
+                 3. If it is declined, do not re-file the same request. Read the                  note and change something first.
+                 """,
+                 schema: object([
+                    "taskId": string("Task id, or any unique prefix."),
+                    "delegate": string("Which delegate should run it. Defaults to the task's assignee."),
+                    "requestedBy": string("Your own name, so the human knows who asked."),
+                    "rationale": string("Why this should happen. Write it as if the reader has not been following along.")
+                 ], required: ["taskId", "requestedBy"])),
+
+            Tool(name: "request_isolation",
+                 description: """
+                 Ask the human for permission to create an isolated git worktree                  and context directory for a task, so an editing delegate can                  work without colliding with anyone else.
+
+                 Same shape as request_run: this files a request and starts                  nothing. Ask for this before requesting a run when the work                  edits files and other agents are active in the same repository.
+                 """,
+                 schema: object([
+                    "taskId": string("Task id, or any unique prefix."),
+                    "agent": string("Agent name — becomes the ai/<agent> branch."),
+                    "requestedBy": string("Your own name."),
+                    "rationale": string("Why isolation is needed here.")
+                 ], required: ["taskId", "requestedBy"])),
+
+            Tool(name: "list_my_requests",
+                 description: """
+                 The state of approval requests: pending, approved, declined, or                  expired. Call this to find out what the human decided, rather                  than asking them again.
+                 """,
+                 schema: object([
+                    "requestedBy": string("Restrict to your own requests. Omit to see all."),
+                    "includeDecided": ["type": "boolean", "description": "Include decided requests. Default true."]
+                 ])),
+
+            Tool(name: "list_runs",
+                 description: """
+                 Delegate runs, newest first, with state and exit code. Use this                  to find out how a run you asked for turned out.
+                 """,
+                 schema: object([
+                    "limit": ["type": "integer", "description": "How many to return. Default 10."]
+                 ]))
         ]
     }
 
@@ -218,6 +265,10 @@ public struct MCPServer: Sendable {
             case "claim_task":   return (try await claimTask(arguments), false)
             case "complete_task": return (try await completeTask(arguments), false)
             case "project_status": return (try await projectStatus(arguments), false)
+            case "request_run":    return (try await requestRun(arguments, kind: "run"), false)
+            case "request_isolation": return (try await requestRun(arguments, kind: "provision"), false)
+            case "list_my_requests": return (try await listRequests(arguments), false)
+            case "list_runs":      return (try await listRuns(arguments), false)
             default:
                 return ("No tool named \(name). Call tools/list to see what exists.", true)
             }
@@ -446,4 +497,77 @@ public struct MCPServer: Sendable {
         }
         return lines.joined(separator: "\n")
     }
+
+    // MARK: Asking, not doing
+
+    /// Files an approval request. The reply is written to be read by an agent
+    /// that will otherwise try to find a way to proceed anyway: it says plainly
+    /// that nothing started, that no self-approval exists, and what to do next.
+    private func requestRun(_ args: [String: Any], kind: String) async throws -> String {
+        guard let taskId = args["taskId"] as? String else { return "No taskId given." }
+        guard let requestedBy = args["requestedBy"] as? String, !requestedBy.isEmpty else {
+            return "No requestedBy given. Say who is asking — the human needs to know."
+        }
+        let delegate = (args["delegate"] as? String) ?? (args["agent"] as? String)
+        let rationale = args["rationale"] as? String
+
+        let result = try await client.act(.requestApproval(
+            kind: kind, taskId: taskId, delegate: delegate,
+            requestedBy: requestedBy, rationale: rationale))
+
+        guard let request = result.approval else {
+            return "The request was not filed."
+        }
+
+        var lines = ["filed \(request.id) — PENDING. Nothing has started."]
+        lines.append("  \(request.summary)")
+        for detail in request.details { lines.append("  \(detail)") }
+        if request.rationale == nil {
+            lines.append("  no rationale given — this will take the human longer to decide")
+        }
+        lines.append("")
+        lines.append("The human decides this in their app. You cannot approve it yourself, "
+                     + "and there is no tool that would let you.")
+        lines.append("Do not wait on it. Pick up other work, and check list_my_requests later.")
+        return lines.joined(separator: "\n")
+    }
+
+    private func listRequests(_ args: [String: Any]) async throws -> String {
+        let snapshot = try await client.list()
+        let requestedBy = args["requestedBy"] as? String
+        let includeDecided = args["includeDecided"] as? Bool ?? true
+
+        var requests = includeDecided ? snapshot.approvals : snapshot.pendingApprovals
+        if let requestedBy { requests = requests.filter { $0.requestedBy == requestedBy } }
+        guard !requests.isEmpty else { return "No requests." }
+
+        return requests.prefix(20).map { request in
+            var line = "\(request.id) · \(request.effectiveState().rawValue.uppercased()) · \(request.summary)"
+            line += "\n    asked by \(request.requestedBy)"
+            if let runId = request.runId { line += " · started \(runId)" }
+            if let note = request.note { line += "\n    note: \(note)" }
+            if request.effectiveState() == .expired {
+                line += "\n    expired without a decision — ask again if it still matters"
+            }
+            if request.effectiveState() == .denied {
+                line += "\n    declined — do not re-file this unchanged"
+            }
+            return line
+        }.joined(separator: "\n")
+    }
+
+    private func listRuns(_ args: [String: Any]) async throws -> String {
+        let limit = args["limit"] as? Int ?? 10
+        let runs = try await client.list().runs
+        guard !runs.isEmpty else { return "No runs yet." }
+
+        return runs.prefix(limit).map { run in
+            var line = "\(run.id) · \(run.state.rawValue)"
+            if let code = run.exitCode { line += " · exit \(code)" }
+            line += " · \(run.delegate)"
+            if let note = run.note { line += " · \(note)" }
+            return line + "\n    \(run.shortCommand)"
+        }.joined(separator: "\n")
+    }
+
 }

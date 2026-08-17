@@ -22,6 +22,7 @@ public actor InProcessEngine: EngineClient {
     private let launcher: Launcher
     private let provisioner: Provisioner
     private let auditWriter: AuditWriter
+    private let approvals: ApprovalStore
     private let policy: NotificationPolicy
 
     private var overrides: UserOverrides
@@ -38,6 +39,7 @@ public actor InProcessEngine: EngineClient {
                 launcher: Launcher? = nil,
                 provisioner: Provisioner = Provisioner(),
                 auditWriter: AuditWriter? = nil,
+                approvals: ApprovalStore = ApprovalStore(),
                 policy: NotificationPolicy = NotificationPolicy()) {
         self.configurationProvider = configuration
         self.engine = engine ?? DetectionEngine(configuration: configuration)
@@ -48,6 +50,7 @@ public actor InProcessEngine: EngineClient {
         self.launcher = launcher ?? Launcher(runStore: runStore)
         self.provisioner = provisioner
         self.auditWriter = auditWriter ?? AuditWriter(configuration: configuration.configuration)
+        self.approvals = approvals
         self.policy = policy
         self.overrides = overridesStore.load()
     }
@@ -276,6 +279,13 @@ public actor InProcessEngine: EngineClient {
         case .provisionIsolation(let taskId, let agent, let confirm):
             return try await provision(taskId: taskId, agent: agent, confirm: confirm)
 
+        case .requestApproval(let kind, let taskId, let delegate, let requestedBy, let rationale):
+            return try await requestApproval(kind: kind, taskId: taskId, delegate: delegate,
+                                             requestedBy: requestedBy, rationale: rationale)
+
+        case .decideApproval(let id, let approve, let note):
+            return try await decideApproval(id: id, approve: approve, note: note)
+
         case .deleteTask(let taskId):
             guard let task = taskStore.resolve(taskId) else {
                 throw TaskStoreError.notFound(taskId)
@@ -292,6 +302,24 @@ public actor InProcessEngine: EngineClient {
 
     // MARK: Control
 
+    /// The run a task *would* produce, without starting anything.
+    ///
+    /// Both the confirmation text and the token derive from this, so a request
+    /// and its approval can never describe one command and run another.
+    private func previewRun(task: TaskRecord, delegate: String,
+                            workingDirectory: String) throws -> RunRecord {
+        let context = FileSupport.homeDirectory
+            .appendingPathComponent(".ai-context", isDirectory: true)
+            .appendingPathComponent("\(FileSupport.lastComponent(of: workingDirectory))-\(task.id)")
+            .path
+        let prompt = Provisioner.brief(task: task, agent: delegate, contextDirectory: context)
+        let command = try Launcher.command(delegate: delegate, prompt: prompt,
+                                           extraDirectories: [context])
+        return RunRecord(id: RunRecord.identifier(), taskId: task.id,
+                         projectId: task.projectId, delegate: delegate,
+                         command: command, workingDirectory: workingDirectory)
+    }
+
     /// Runs a task with a delegate. **Gated**: without a matching confirmation
     /// token this describes what would happen and does nothing.
     private func runTask(taskId: String, delegate: String?, confirm: String?) async throws -> ActionResult {
@@ -307,16 +335,9 @@ public actor InProcessEngine: EngineClient {
             ?? { if case .agent(let name) = task.assignee { return name } else { return nil } }()
             ?? "claude"
 
-        let context = FileSupport.homeDirectory
-            .appendingPathComponent(".ai-context", isDirectory: true)
-            .appendingPathComponent("\(FileSupport.lastComponent(of: workingDirectory))-\(task.id)")
-            .path
-        let prompt = Provisioner.brief(task: task, agent: chosen, contextDirectory: context)
-        let command = try Launcher.command(delegate: chosen, prompt: prompt, extraDirectories: [context])
-
-        var run = RunRecord(id: RunRecord.identifier(), taskId: task.id,
-                            projectId: task.projectId, delegate: chosen,
-                            command: command, workingDirectory: workingDirectory)
+        // One place builds the command, so the text a person approves and the
+        // token that authorises it can never describe different runs.
+        var run = try previewRun(task: task, delegate: chosen, workingDirectory: workingDirectory)
 
         // The gate. Nothing has been spawned at this point.
         guard let confirm, !confirm.isEmpty else {
@@ -393,6 +414,156 @@ public actor InProcessEngine: EngineClient {
     /// Runs, newest first.
     public func runs() -> [RunRecord] { runStore.load() }
 
+    /// Requests still waiting on a person, newest first.
+    public func pendingApprovals(now: Date = Date()) -> [ApprovalRequest] {
+        approvals.pending(now: now)
+    }
+
+    public func approvalRequests() -> [ApprovalRequest] { approvals.load() }
+
+    // MARK: Approvals
+
+    /// Files a request for permission. **Ungated** — asking spends nothing, and a
+    /// gate on asking would only teach agents to act without asking.
+    private func requestApproval(kind: String, taskId: String, delegate: String?,
+                                 requestedBy: String, rationale: String?) async throws -> ActionResult {
+        guard let parsed = ApprovalRequest.Kind(rawValue: kind) else {
+            throw LaunchError.unknownDelegate(kind)
+        }
+        guard let task = taskStore.resolve(taskId) else { throw LaunchError.taskNotFound(taskId) }
+
+        let snapshot = await currentSnapshot()
+        guard let workingDirectory = snapshot.projects.first(where: { $0.id == task.projectId })?.path else {
+            throw LaunchError.noWorkingDirectory
+        }
+        let chosen = delegate
+            ?? { if case .agent(let name) = task.assignee { return name } else { return nil } }()
+            ?? "claude"
+
+        // The description is built the same way the direct gate builds it, so a
+        // person sees the same detail whether the request came from an agent or
+        // from their own hands. A second wording would be a second gate.
+        var summary: String
+        var details: [String]
+        switch parsed {
+        case .run:
+            let run = try previewRun(task: task, delegate: chosen, workingDirectory: workingDirectory)
+            let confirmation = Launcher.confirmation(for: run, task: task)
+            summary = confirmation.summary
+            details = confirmation.details
+        case .provision:
+            summary = "Create an isolated worktree for \(chosen)"
+            details = [
+                "Worktree: \(Provisioner.worktreePath(repository: workingDirectory, agent: chosen))",
+                "Branch: \(Provisioner.branchName(for: chosen))",
+                "From: \(workingDirectory)"
+            ]
+        }
+
+        // Asking twice for the same thing is noise, not emphasis: an agent that
+        // retries would otherwise fill the queue with duplicates of one decision.
+        if let existing = approvals.pending().first(where: {
+            $0.kind == parsed && $0.taskId == task.id && $0.delegate == chosen
+        }) {
+            return ActionResult(ok: true, snapshot: snapshot, approval: existing)
+        }
+
+        let request = ApprovalRequest(
+            id: ApprovalRequest.identifier(), kind: parsed,
+            summary: summary, details: details,
+            requestedBy: requestedBy, rationale: rationale,
+            taskId: task.id, projectId: task.projectId, delegate: chosen)
+        approvals.save(request)
+        decisions.record(.other, "\(requestedBy) asked to \(summary.lowercased())",
+                         actor: requestedBy, projectId: task.projectId, taskId: task.id)
+
+        return ActionResult(ok: true, snapshot: await refreshNow(), approval: request)
+    }
+
+    /// A person's decision on a request.
+    ///
+    /// Approving here is what mints the confirmation token, and it happens
+    /// **inside** the engine — the token is never returned to a caller, so the
+    /// approval path cannot be replayed by whoever asked for it. This action is
+    /// intentionally absent from the MCP surface.
+    private func decideApproval(id: String, approve: Bool, note: String?) async throws -> ActionResult {
+        guard var request = approvals.request(id: id) else { throw LaunchError.taskNotFound(id) }
+
+        // Expiry is enforced here, not merely displayed: a request that aged out
+        // while nobody was looking must not become approvable by scrolling back.
+        if request.hasExpired() {
+            request.state = .expired
+            request.note = "Expired before it was decided — ask again if it still matters"
+            approvals.save(request)
+            return ActionResult(ok: false, snapshot: await currentSnapshot(), approval: request)
+        }
+        guard request.state == .pending else {
+            return ActionResult(ok: false, snapshot: await currentSnapshot(), approval: request)
+        }
+
+        request.decidedAt = Date()
+        request.note = note
+
+        guard approve else {
+            request.state = .denied
+            approvals.save(request)
+            decisions.record(.other, "Declined: \(request.summary)",
+                             projectId: request.projectId, taskId: request.taskId)
+            return ActionResult(ok: true, snapshot: await refreshNow(), approval: request)
+        }
+
+        request.state = .approved
+        guard let taskId = request.taskId else {
+            approvals.save(request)
+            return ActionResult(ok: false, snapshot: await currentSnapshot(), approval: request)
+        }
+
+        // Carry it out, minting the token here so it never leaves the engine.
+        //
+        // Note what happens when this throws — a dirty tree, a delegate that
+        // isn't installed: the request is *not* saved as approved, so it stays
+        // pending and remains a live decision. That is deliberate. An approval
+        // consumed by an attempt that never happened would leave the person
+        // believing they had said yes to something, with nothing running and
+        // nothing to say yes to again.
+        let outcome: ActionResult
+        switch request.kind {
+        case .run:
+            guard let task = taskStore.resolve(taskId),
+                  let workingDirectory = await currentSnapshot().projects
+                    .first(where: { $0.id == task.projectId })?.path else {
+                throw LaunchError.taskNotFound(taskId)
+            }
+            let preview = try previewRun(task: task, delegate: request.delegate ?? "claude",
+                                         workingDirectory: workingDirectory)
+            outcome = try await runTask(taskId: taskId, delegate: request.delegate,
+                                       confirm: Launcher.token(for: preview))
+        case .provision:
+            guard let workingDirectory = await currentSnapshot().projects
+                    .first(where: { $0.id == request.projectId })?.path else {
+                throw LaunchError.noWorkingDirectory
+            }
+            let agent = request.delegate ?? "claude"
+            outcome = try await provision(
+                taskId: taskId, agent: agent,
+                confirm: Self.provisionToken(repository: workingDirectory, agent: agent, task: taskId))
+        }
+
+        request.runId = outcome.runId
+        if !outcome.ok {
+            // Approved but refused downstream — a dirty tree, a missing delegate.
+            // Recorded on the request so the reason survives the moment.
+            request.note = [note, "Approved, but it did not start"]
+                .compactMap { $0 }.joined(separator: " · ")
+        }
+        approvals.save(request)
+        decisions.record(.other, "Approved: \(request.summary)",
+                         projectId: request.projectId, taskId: request.taskId)
+
+        return ActionResult(ok: outcome.ok, snapshot: await refreshNow(),
+                            runId: outcome.runId, approval: request)
+    }
+
     // MARK: Tasks
 
     /// Creates a task, or updates in place when its external reference is
@@ -462,7 +633,12 @@ public actor InProcessEngine: EngineClient {
             runStore.save(finished)
             auditWriter.recordEnd(finished)
         }
-        let snapshot = await engine.refresh(overrides: overrides)
+        var snapshot = await engine.refresh(overrides: overrides)
+        // The detection engine knows nothing about control: it reads the machine.
+        // Runs and approvals are this layer's own state, so they are attached
+        // here rather than threaded through detection that has no use for them.
+        snapshot.runs = runStore.load()
+        snapshot.approvals = approvals.load()
         let previous = latest
         latest = snapshot
 

@@ -14,7 +14,7 @@ struct MTM: AsyncParsableCommand {
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
         subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
-                      Run.self, Runs.self, Provision.self,
+                      Run.self, Runs.self, Provision.self, Asks.self,
                       Log.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
@@ -142,13 +142,15 @@ struct ProjectListPayload: Encodable {
     var refreshedAt: Date
 }
 
-struct ProjectsAdd: ParsableCommand {
+struct ProjectsAdd: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "add",
         abstract: "Track a project — including one that has no repository yet."
     )
 
-    @Argument(help: "Project name.")
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Project name, or a directory to track.")
     var name: String
 
     @Option(name: .long, help: "Repository or working directory, if it has one.")
@@ -157,15 +159,50 @@ struct ProjectsAdd: ParsableCommand {
     @Option(name: .long, help: "External reference, e.g. linear:ENG-412.")
     var ref: String?
 
-    func run() throws {
+    func run() async throws {
         let store = ProjectStore()
-        let resolved = path.map { FileSupport.expandingTilde($0) }
-        let id = resolved.map(ProjectRecord.identifier(forPath:))
-            ?? ProjectRecord.identifier(forName: name)
 
-        store.save(ProjectRecord(id: id, name: name, path: resolved, externalRef: ref))
-        print("Tracking \(name) (\(id))")
+        // `mtm projects add ~/projects/thing` is how everyone types this, so a
+        // directory in the name position means the directory — not a project
+        // named after a path with no checkout attached, which is what it used to
+        // produce, complete with a cheerful "this is an idea, not a checkout".
+        var resolved = path.map { FileSupport.expandingTilde($0) }
+        var displayName = name
         if resolved == nil {
+            let candidate = FileSupport.expandingTilde(name)
+            if FileSupport.isDirectory(URL(fileURLWithPath: candidate)) {
+                resolved = candidate
+                displayName = FileSupport.lastComponent(of: FileSupport.normalise(candidate))
+            }
+        }
+
+        // Detection already surfaces any repository with a live session in it, so
+        // adding one by hand would otherwise produce two rows for one project —
+        // under different ids, which no amount of squinting reconciles.
+        if let resolved {
+            let existing = try await options.client().list().projects.first {
+                $0.path.map { FileSupport.pathsEqual($0, resolved) } ?? false
+            }
+            if let existing {
+                print("Already tracking \(existing.name) (\(existing.id)) at \(resolved).")
+                switch existing.record.lifecycle {
+                case .active: break
+                case .archived: print("It's archived — `mtm projects add` won't revive it.")
+                case .parked(let until):
+                    print("It's parked until \(Format.stamp(until)) — `mtm projects add` won't revive it.")
+                }
+                return
+            }
+        }
+
+        let id = resolved.map(ProjectRecord.identifier(forPath:))
+            ?? ProjectRecord.identifier(forName: displayName)
+
+        store.save(ProjectRecord(id: id, name: displayName, path: resolved, externalRef: ref))
+        print("Tracking \(displayName) (\(id))")
+        if let resolved {
+            print("Directory: \(resolved)")
+        } else {
             print("No path set — this is an idea, not a checkout. That's allowed.")
         }
     }
@@ -1081,5 +1118,130 @@ struct Provision: AsyncParsableCommand {
         _ = try await client.act(.provisionIsolation(taskId: task.id, agent: agent,
                                                      confirm: confirmation.token))
         print("Provisioned.")
+    }
+}
+
+// MARK: - asks
+
+/// The human's half of the approval flow.
+///
+/// Agents file requests over MCP and cannot decide them; this is where deciding
+/// happens. It lives in the CLI as well as the app because a decision you can
+/// only make in one place is a decision that waits for you to be in that place.
+struct Asks: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "asks",
+        abstract: "Requests from agents waiting on your decision.",
+        subcommands: [AsksApprove.self, AsksDeny.self]
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Flag(name: .long, help: "Include requests already decided.")
+    var all = false
+
+    func run() async throws {
+        let snapshot = try await options.client().list()
+        let requests = all ? snapshot.approvals : snapshot.pendingApprovals
+        guard !requests.isEmpty else {
+            print(all ? "No requests." : "Nothing waiting on you.")
+            return
+        }
+
+        for request in requests.prefix(20) {
+            let state = request.effectiveState()
+            print("  \(state.rawValue.uppercased().padded(to: 9)) \(request.id)")
+            print("            \(request.summary)")
+            print("            asked by \(request.requestedBy) · \(Format.duration(Date().timeIntervalSince(request.requestedAt)) + " ago")")
+            if let rationale = request.rationale { print("            because: \(rationale)") }
+            for detail in request.details { print("            \(detail)") }
+            if let note = request.note { print("            note: \(note)") }
+            print("")
+        }
+        if !all, !requests.isEmpty {
+            print("Approve with `mtm asks approve <id>`, decline with `mtm asks deny <id> --note \"why\"`.")
+        }
+    }
+}
+
+struct AsksApprove: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "approve",
+        abstract: "Approve a request and carry it out."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Request id, or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Anything to record alongside the decision.")
+    var note: String?
+
+    func run() async throws {
+        let result: ActionResult
+        do {
+            result = try await options.client().act(.decideApproval(id: id, approve: true, note: note))
+        } catch {
+            // The request is still pending — nothing was consumed — so say so
+            // rather than leaving the reader wondering what state they are in.
+            print("Could not carry it out: \(error)")
+            print("The request is still waiting on you. Fix that and approve it again.")
+            throw ExitCode.failure
+        }
+        guard let request = result.approval else {
+            print("No request \(id).")
+            throw ExitCode.failure
+        }
+
+        switch request.effectiveState() {
+        case .expired:
+            print("\(request.id) expired before it was decided. Ask the agent to request it again.")
+            throw ExitCode.failure
+        case .pending:
+            print("\(request.id) was not decided.")
+            throw ExitCode.failure
+        case .denied:
+            print("\(request.id) was already declined.")
+            throw ExitCode.failure
+        case .approved:
+            if let runId = request.runId {
+                print("Approved. Started \(runId).")
+                print("Output: \(RunStore().stdoutURL(for: runId).path)")
+            } else {
+                // Approved and then refused downstream — a dirty tree, a delegate
+                // that isn't installed. Saying "approved" alone would be a lie.
+                print("Approved, but it did not start.")
+                if let note = request.note { print(note) }
+                throw ExitCode.failure
+            }
+        }
+    }
+}
+
+struct AsksDeny: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "deny",
+        abstract: "Decline a request."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Argument(help: "Request id, or any unique prefix.")
+    var id: String
+
+    @Option(name: .long, help: "Why. The agent reads this, so it decides whether they ask again.")
+    var note: String?
+
+    func run() async throws {
+        let result = try await options.client().act(.decideApproval(id: id, approve: false, note: note))
+        guard let request = result.approval else {
+            print("No request \(id).")
+            throw ExitCode.failure
+        }
+        print("Declined \(request.id).")
+        if note == nil {
+            print("No reason given — the agent may well ask again for the same thing.")
+        }
     }
 }

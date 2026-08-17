@@ -34,13 +34,26 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
     /// so "nothing is running" and "I can't see anything" read differently.
     public var degraded: [DegradedReason] = []
     public var audit = AuditSummary()
+    /// Delegate runs, newest first.
+    public var runs: [RunRecord] = []
+    /// Requests from agents for permission to spend something. Carried in the
+    /// snapshot because "an agent is asking you something" is exactly the kind of
+    /// thing this app exists to put in front of you, rather than something you
+    /// have to go looking for.
+    public var approvals: [ApprovalRequest] = []
     public var refreshedAt: Date = .distantPast
 
     public init() {}
 
+    /// Requests still awaiting a person, newest first.
+    public var pendingApprovals: [ApprovalRequest] {
+        approvals.filter { $0.effectiveState() == .pending }
+    }
+
     public var needsAttentionCount: Int {
         sessions.filter { $0.status == .needsAttention }.count
             + repositories.filter(\.needsAttention).count
+            + pendingApprovals.count
     }
 
     /// Projects competing for attention — archived and parked ones excluded.
@@ -122,7 +135,9 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
                 "\($0.path)|\($0.conflictMarkers.joined(separator: ","))|"
                 + $0.worktrees.map { "\($0.branch ?? "-"):\($0.ahead)/\($0.behind)" }.joined(separator: ",")
             },
-            degraded: degraded.map { "\($0.detectorId)|\($0.message)" }
+            degraded: degraded.map { "\($0.detectorId)|\($0.message)" },
+            runs: runs.map { "\($0.id)|\($0.state.rawValue)|\($0.exitCode.map(String.init) ?? "")" },
+            approvals: approvals.map { "\($0.id)|\($0.effectiveState().rawValue)" }
         )
     }
 }
@@ -135,6 +150,12 @@ public struct SnapshotDigest: Equatable, Sendable {
     public var waves: [String]
     public var repositories: [String]
     public var degraded: [String]
+    /// Runs and approvals participate in the digest so a new request from an
+    /// agent actually reaches the app. Leaving them out would suppress the push
+    /// that puts the decision in front of a person, which is the one thing that
+    /// must not be optimised away.
+    public var runs: [String]
+    public var approvals: [String]
 }
 
 /// The detection engine: runs detectors, enriches with every signal available, and

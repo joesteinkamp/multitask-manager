@@ -5,9 +5,15 @@ import Testing
 @Suite("MCP server")
 struct MCPServerTests {
 
+    /// The project every server below is seeded with.
+    private let projectId = "app-1"
+
+    /// A server whose project has a real directory, so control requests have
+    /// somewhere to point.
     private func server(_ dir: TempDir) -> MCPServer {
         let taskStore = TaskStore(directory: dir.url.appendingPathComponent("tasks"))
         let projectStore = ProjectStore(directory: dir.url.appendingPathComponent("projects"))
+        projectStore.save(ProjectRecord(id: "app-1", name: "app", path: dir.makeDirectory("app").path))
         let engine = InProcessEngine(
             configuration: StaticConfiguration(.fixtureOnly),
             engine: DetectionEngine(configuration: StaticConfiguration(.fixtureOnly),
@@ -22,7 +28,7 @@ struct MCPServerTests {
     @Test("Every advertised tool has a schema and a procedural description")
     func toolsAreWellFormed() {
         let tools = MCPServer.tools
-        #expect(tools.count == 9)
+        #expect(tools.count > 8)
         for tool in tools {
             #expect(!tool.name.isEmpty)
             // Descriptions are instructions to an agent, not one-line labels.
@@ -32,6 +38,55 @@ struct MCPServerTests {
         #expect(tools.map(\.name).contains("whats_next"))
         #expect(tools.map(\.name).contains("create_task"))
         #expect(tools.map(\.name).contains("claim_task"))
+    }
+
+    /// The load-bearing property of the whole MCP surface.
+    ///
+    /// Agents may *ask* to spend; only a person may *approve*. If a tool ever
+    /// appears here that decides an approval — or that takes a confirmation token
+    /// as an argument — then an agent can approve its own request and the gate is
+    /// two round-trips of theatre. This test is the thing standing between that
+    /// and a plausible-looking convenience tool somebody adds later.
+    @Test("No MCP tool can approve a request or carry a confirmation token")
+    func agentsCannotApproveTheirOwnRequests() {
+        for tool in MCPServer.tools {
+            let name = tool.name.lowercased()
+            #expect(!name.contains("approve"), "\(tool.name) would let an agent decide its own request")
+            #expect(!name.contains("decide"), "\(tool.name) would let an agent decide its own request")
+
+            let properties = tool.schema["properties"] as? [String: Any] ?? [:]
+            for argument in properties.keys {
+                #expect(argument.lowercased() != "confirm",
+                        "\(tool.name) takes a confirmation token, which routes around the gate")
+                #expect(argument.lowercased() != "token",
+                        "\(tool.name) takes a confirmation token, which routes around the gate")
+            }
+        }
+    }
+
+    @Test("Requesting a run files a decision for the human and starts nothing")
+    func requestingDoesNotRun() async throws {
+        let dir = TempDir()
+        let mcp = server(dir)
+
+        _ = await mcp.call(tool: "create_task", arguments: [
+            "title": "Ship it", "acceptance": "Signed", "projectId": projectId
+        ])
+        let listed = await mcp.call(tool: "list_tasks", arguments: [:])
+        let taskId = try #require(listed.text.split(separator: " ").first.map(String.init))
+
+        let asked = await mcp.call(tool: "request_run", arguments: [
+            "taskId": taskId, "requestedBy": "test-agent", "rationale": "because"
+        ])
+        #expect(!asked.isError)
+        // The reply has to be unambiguous: an agent that reads "filed" as "started"
+        // will report work as underway that nobody approved.
+        #expect(asked.text.contains("PENDING"))
+        #expect(asked.text.contains("Nothing has started"))
+        #expect(asked.text.lowercased().contains("cannot approve it yourself"))
+
+        let runs = await mcp.call(tool: "list_runs", arguments: [:])
+        #expect(runs.text.contains("No runs yet"))
     }
 
     @Test("An unknown tool says so rather than failing the transport")

@@ -80,8 +80,38 @@ public enum FileSupport {
         if let override = ProcessInfo.processInfo.environment["MTM_HOME"], !override.isEmpty {
             return URL(fileURLWithPath: expandingTilde(override), isDirectory: true)
         }
+        // A test that constructs a store without passing a directory would
+        // otherwise write into the state the user actually relies on — and it
+        // did: the decision log accumulated 70KB of test fixtures in a real home
+        // before this guard existed. Relying on every test to remember an
+        // override is a convention, and conventions are exactly what leaks.
+        if isRunningTests {
+            return temporaryTestStateDirectory
+        }
         return homeDirectory.appendingPathComponent(".multitaskmanager", isDirectory: true)
     }
+
+    /// True when this process is a test bundle rather than the app or the CLI.
+    ///
+    /// Reads the executable path, which SwiftPM and Xcode both name distinctively,
+    /// rather than a variable a test could forget to set.
+    static let isRunningTests: Bool = {
+        let executable = CommandLine.arguments.first ?? ""
+        return executable.hasSuffix(".xctest")
+            || executable.contains(".xctest/")
+            || lastComponent(of: executable).hasSuffix("PackageTests")
+    }()
+
+    /// One throwaway root per test process, so tests still share state with each
+    /// other within a run — which some of them rely on — while sharing none of it
+    /// with the user.
+    private static let temporaryTestStateDirectory: URL = {
+        let url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+            .appendingPathComponent("mtm-tests-\(ProcessInfo.processInfo.processIdentifier)",
+                                    isDirectory: true)
+        try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }()
 
     /// Whether a directory is specific enough to be somebody's *project*.
     ///
