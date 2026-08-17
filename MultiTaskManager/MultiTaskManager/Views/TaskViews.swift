@@ -52,8 +52,8 @@ struct NextUpView: View {
     private var nextSection: some View {
         VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Label("Do next", systemImage: "arrow.right.circle.fill")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.accentColor)
+                .font(AppTheme.rowDetail.weight(.semibold))
+                .foregroundStyle(AppTheme.readyColor)
 
             ForEach(Array(store.nextUp.prefix(3).enumerated()), id: \.element.id) { index, item in
                 TaskRowView(task: item.task, reason: item.reason, isLead: index == 0)
