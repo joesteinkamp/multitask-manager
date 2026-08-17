@@ -30,7 +30,7 @@ public struct GitRunner: Sendable {
         if let path = ShellEnvironment.searchPath(in: ProcessInfo.processInfo.environment) {
             for directory in path.split(separator: separator) where !directory.isEmpty {
                 let candidate = String(directory) + (FileSupport.isWindows ? "\\" : "/") + executable
-                if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+                if FileManager.default.isExecutableFile(atPath: FileSupport.nativePath(candidate)) { return candidate }
             }
         }
         let fallbacks = ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git", "/bin/git",
@@ -160,7 +160,7 @@ public final class WorktreeReader: @unchecked Sendable {
     public func read(repository path: String, now: Date = Date()) -> RepositoryState? {
         let repo = FileSupport.expandingTilde(path)
         let gitPath = repo + "/.git"
-        guard FileSupport.fileManager.fileExists(atPath: gitPath) else { return nil }
+        guard FileSupport.exists(atPath: gitPath) else { return nil }
 
         let gitMtime = FileSupport.modificationDate(ofPath: gitPath)
         lock.lock()
@@ -264,7 +264,7 @@ public final class WorktreeReader: @unchecked Sendable {
     /// fold fails. Surfaced, never resolved — auto-resolving a merge conflict is
     /// exactly the kind of thing the harness rules forbid.
     static func conflictMarkers(in directory: String) -> [String] {
-        guard let entries = try? FileSupport.fileManager.contentsOfDirectory(atPath: directory) else { return [] }
+        guard let entries = try? FileSupport.fileManager.contentsOfDirectory(atPath: FileSupport.nativePath(directory)) else { return [] }
         return entries.filter { $0.hasPrefix(".converge-conflict-") }.sorted()
     }
 }

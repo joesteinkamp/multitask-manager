@@ -80,6 +80,13 @@ public final class ProjectStore: @unchecked Sendable {
             .sorted { $0.id < $1.id }
     }
 
+    /// Why the last save failed, if it did.
+    ///
+    /// Reported rather than thrown so callers that legitimately cannot handle a
+    /// disk failure mid-refresh keep working, while anything that cares — a
+    /// test, `mtm doctor` — can still find out.
+    public private(set) var lastWriteError: String?
+
     public func save(_ record: ProjectRecord) {
         lock.lock()
         defer { lock.unlock() }
@@ -91,7 +98,16 @@ public final class ProjectStore: @unchecked Sendable {
             body = FrontMatter.parse(existing).body
         }
         let text = Self.encode(record, body: body)
-        try? text.write(to: url, atomically: true, encoding: .utf8)
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            lastWriteError = nil
+        } catch {
+            // Previously `try?`. A store that silently fails to persist turns
+            // every downstream symptom into a mystery — which is exactly what
+            // happened on Windows, where a saved project could not be read back
+            // and the reason had been discarded at the point it was known.
+            lastWriteError = "Could not write \(url.lastPathComponent): \(error)"
+        }
     }
 
     public func delete(id: String) {

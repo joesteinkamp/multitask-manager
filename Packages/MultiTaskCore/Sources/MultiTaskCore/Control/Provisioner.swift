@@ -68,7 +68,7 @@ public struct Provisioner: Sendable {
         guard git.isAvailable else { throw ProvisionError.gitUnavailable }
         let repo = FileSupport.expandingTilde(repository)
 
-        guard FileSupport.fileManager.fileExists(atPath: repo + "/.git") else {
+        guard FileSupport.exists(atPath: repo + "/.git") else {
             throw ProvisionError.notARepository(repo)
         }
         guard let head = git.run(["rev-parse", "--abbrev-ref", "HEAD"], in: repo) else {
@@ -87,7 +87,7 @@ public struct Provisioner: Sendable {
             throw ProvisionError.branchExists(branch)
         }
         let worktree = Self.worktreePath(repository: repo, agent: agent)
-        if FileSupport.fileManager.fileExists(atPath: worktree) {
+        if FileSupport.exists(atPath: worktree) {
             throw ProvisionError.worktreeExists(worktree)
         }
     }

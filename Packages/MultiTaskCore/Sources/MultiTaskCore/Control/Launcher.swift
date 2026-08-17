@@ -82,6 +82,14 @@ public final class Launcher: @unchecked Sendable {
     private final class Live {
         let process: Process
         let exited = DispatchSemaphore(value: 0)
+        /// Set by `cancel` before it signals the child.
+        ///
+        /// Cancellation is something this launcher *knows*, not something to
+        /// re-derive from the OS afterwards. `terminationReason` was carrying
+        /// that meaning, and it does not mean the same thing on every platform:
+        /// on Windows a plain `exit 3` came back as `.uncaughtSignal`, so a
+        /// failed run was filed as cancelled.
+        var wasCancelled = false
         init(process: Process) { self.process = process }
     }
 
@@ -239,12 +247,24 @@ public final class Launcher: @unchecked Sendable {
             guard var record = store.run(id: runId) else { return }
             record.endedAt = Date()
             record.exitCode = finished.terminationStatus
-            switch finished.terminationReason {
-            case .uncaughtSignal:
+
+            if handle.wasCancelled {
                 record.state = .cancelled
-                record.note = record.note ?? "Stopped by a signal"
-            default:
+                record.note = record.note ?? "Stopped on request"
+            } else {
+                #if !os(Windows)
+                // Killed by something else — the OOM killer, a person with
+                // `kill`. Worth distinguishing, and only meaningful where
+                // `terminationReason` reliably means what it says.
+                if finished.terminationReason == .uncaughtSignal {
+                    record.state = .cancelled
+                    record.note = record.note ?? "Stopped by a signal"
+                } else {
+                    record.state = finished.terminationStatus == 0 ? .finished : .failed
+                }
+                #else
                 record.state = finished.terminationStatus == 0 ? .finished : .failed
+                #endif
             }
             store.save(record)
         }
@@ -313,6 +333,10 @@ public final class Launcher: @unchecked Sendable {
         lock.unlock()
 
         if let handle {
+            // Recorded before the signal, so the handler — which may fire on
+            // another thread the moment terminate() lands — already knows this
+            // was deliberate.
+            handle.wasCancelled = true
             // Ask first, insist after — and wait on the termination handler, never
             // on `isRunning` or `waitUntilExit()`. Both report the child as alive
             // long after it has died on Linux, which made every cancel burn its

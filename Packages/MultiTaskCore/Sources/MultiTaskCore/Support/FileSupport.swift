@@ -71,6 +71,36 @@ public enum FileSupport {
         return result
     }
 
+    /// A path string in the form this platform's own APIs expect.
+    ///
+    /// `URL.path` hands back forward slashes on Windows, and those strings get
+    /// stored in config and passed back to path-taking APIs — where Windows may
+    /// not recognise them. That round-trip is why a freshly written audit log
+    /// still reported as missing: the file was created through a URL and then
+    /// looked for through a forward-slash string.
+    ///
+    /// Separators only. This does not resolve, absolutise, or clean the path.
+    public static func nativePath(_ path: String) -> String {
+        #if os(Windows)
+        return path.replacingOccurrences(of: "/", with: "\\")
+        #else
+        return path
+        #endif
+    }
+
+    /// Whether something exists at `path`, asked the way the platform expects.
+    ///
+    /// Prefer this over `fileManager.fileExists(atPath:)` anywhere the path came
+    /// from a `URL`, a config file, or another process.
+    public static func exists(atPath path: String) -> Bool {
+        fileManager.fileExists(atPath: nativePath(path))
+    }
+
+    /// A URL for a path string that may have come back from `URL.path`.
+    public static func url(forPath path: String) -> URL {
+        URL(fileURLWithPath: nativePath(path))
+    }
+
     /// Root for everything this app owns: projects, tasks, runs, the socket.
     ///
     /// `$MTM_HOME` overrides it, which is what lets tests and demos run against a
@@ -148,14 +178,14 @@ public enum FileSupport {
     }
 
     public static func modificationDate(ofPath path: String) -> Date {
-        guard let attrs = try? fileManager.attributesOfItem(atPath: path),
+        guard let attrs = try? fileManager.attributesOfItem(atPath: nativePath(path)),
               let date = attrs[.modificationDate] as? Date
         else { return .distantPast }
         return date
     }
 
     public static func fileSize(ofPath path: String) -> UInt64 {
-        guard let attrs = try? fileManager.attributesOfItem(atPath: path),
+        guard let attrs = try? fileManager.attributesOfItem(atPath: nativePath(path)),
               let size = attrs[.size] as? NSNumber
         else { return 0 }
         return size.uint64Value
@@ -169,7 +199,7 @@ public enum FileSupport {
     /// fallback, rotation would never be detected there and the reader would
     /// hold a stale offset forever.
     public static func fileIdentity(ofPath path: String) -> (device: UInt64, inode: UInt64) {
-        guard let attrs = try? fileManager.attributesOfItem(atPath: path) else { return (0, 0) }
+        guard let attrs = try? fileManager.attributesOfItem(atPath: nativePath(path)) else { return (0, 0) }
         let device = (attrs[.systemNumber] as? NSNumber)?.uint64Value ?? 0
         let inode = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
         if device != 0 || inode != 0 { return (device, inode) }
@@ -191,12 +221,14 @@ public enum FileSupport {
 
     public static func isDirectory(_ url: URL) -> Bool {
         var isDir: ObjCBool = false
-        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDir) else { return false }
+        // `url.path` is forward-slashed on Windows; feeding that straight back to
+        // a path API is the round-trip that made real directories look absent.
+        guard fileManager.fileExists(atPath: nativePath(url.path), isDirectory: &isDir) else { return false }
         return isDir.boolValue
     }
 
     public static func exists(_ url: URL) -> Bool {
-        fileManager.fileExists(atPath: url.path)
+        fileManager.fileExists(atPath: nativePath(url.path))
     }
 
     /// Reads up to `limit` bytes from the start of a file as UTF-8 text.
