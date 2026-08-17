@@ -1,0 +1,17 @@
+{
+  "": {
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/master.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.derived/MultiTaskCoreTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/MultiTaskCoreTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/MultiTaskCoreTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/MultiTaskCoreTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/MultiTaskCoreTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.derived/all-discovered-tests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/all-discovered-tests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/all-discovered-tests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/all-discovered-tests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCorePackageDiscoveredTests.build/all-discovered-tests.swiftdeps"
+  }
+}

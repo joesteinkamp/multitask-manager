@@ -403,7 +403,7 @@ struct ProjectStoreTests {
         // file surface as an unexplained read error three lines later.
         #expect(store.lastWriteError == nil, "\(store.lastWriteError ?? "")")
         let file = dir.url.appendingPathComponent("a.md")
-        try #require(FileSupport.exists(atPath: file.path),
+        try #require(FileManager.default.fileExists(atPath: file.path),
                      "ProjectStore.save reported success but wrote nothing to \(file.path)")
 
         // Someone — a person or an agent — adds notes under the front matter.

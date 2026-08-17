@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParserToolInfo-tool.build/master.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParserToolInfo/ToolInfo.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParserToolInfo-tool.build/ToolInfo.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParserToolInfo-tool.build/ToolInfo.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParserToolInfo-tool.build/ToolInfo~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParserToolInfo-tool.build/ToolInfo.swiftdeps"
+  }
+}

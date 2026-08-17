@@ -1,0 +1,113 @@
+{
+  "": {
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/master.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/AppWiringCompileTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AppWiringCompileTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AppWiringCompileTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AppWiringCompileTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AppWiringCompileTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/ApprovalTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ApprovalTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ApprovalTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ApprovalTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ApprovalTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/AuditLogReaderTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AuditLogReaderTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AuditLogReaderTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AuditLogReaderTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/AuditLogReaderTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/ControlTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ControlTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ControlTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ControlTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ControlTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/DesignTokensTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DesignTokensTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DesignTokensTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DesignTokensTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DesignTokensTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/DetectionEngineTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DetectionEngineTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DetectionEngineTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DetectionEngineTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/DetectionEngineTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/ExpectError.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ExpectError.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ExpectError.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ExpectError~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ExpectError.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/Fixtures.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Fixtures.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Fixtures.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Fixtures~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Fixtures.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/InProcessEngineTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/InProcessEngineTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/InProcessEngineTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/InProcessEngineTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/InProcessEngineTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/MCPServerTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MCPServerTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MCPServerTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MCPServerTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MCPServerTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/MarkdownTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MarkdownTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MarkdownTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MarkdownTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/MarkdownTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/NotificationPolicyTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/NotificationPolicyTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/NotificationPolicyTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/NotificationPolicyTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/NotificationPolicyTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/Phase1FeatureTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Phase1FeatureTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Phase1FeatureTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Phase1FeatureTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/Phase1FeatureTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/ProjectContextReaderTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectContextReaderTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectContextReaderTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectContextReaderTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectContextReaderTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/ProjectTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/ProjectTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/RealDataSmokeTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/RealDataSmokeTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/RealDataSmokeTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/RealDataSmokeTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/RealDataSmokeTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/TaskTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/TaskTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/TaskTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/TaskTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/TaskTests.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/Tests/MultiTaskCoreTests/WireProtocolTests.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/WireProtocolTests.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/WireProtocolTests.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/WireProtocolTests~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/MultiTaskCoreTests.build/WireProtocolTests.swiftdeps"
+  }
+}

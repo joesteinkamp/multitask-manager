@@ -143,7 +143,7 @@ public final class AuditLogReader: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard FileSupport.exists(atPath: path) else {
+        guard FileSupport.fileManager.fileExists(atPath: path) else {
             index.degraded = DegradedReason(
                 detectorId: "auditLog",
                 message: "No harness audit log at \(path) — status falls back to file activity"
@@ -151,7 +151,7 @@ public final class AuditLogReader: @unchecked Sendable {
             return index
         }
 
-        guard let handle = try? FileHandle(forReadingFrom: FileSupport.url(forPath: path)) else {
+        guard let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path)) else {
             index.degraded = DegradedReason(
                 detectorId: "auditLog",
                 message: "Cannot read \(path)"

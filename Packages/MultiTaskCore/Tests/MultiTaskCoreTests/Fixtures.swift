@@ -152,16 +152,48 @@ enum Fixtures {
 }
 
 /// A throwaway directory that cleans itself up.
+/// A throwaway directory for one test.
+///
+/// **Deliberately does not delete itself in `deinit`.** It used to, and that is
+/// a trap: ARC may release the `TempDir` after its last *textual* use, so a test
+/// that hands `dir.url` to a store and then reads a file back can have the tree
+/// deleted out from under it mid-test. It surfaces as "file doesn't exist"
+/// somewhere unrelated, on whichever platform's optimiser releases earliest —
+/// which is why two Windows tests failed intermittently while Linux never did.
+///
+/// Instead everything lands under one per-process root, swept on first use.
+/// Nothing accumulates, and no test has to remember to keep a variable alive.
 final class TempDir {
     let url: URL
 
+    /// One root per test process. Creating it also clears out earlier runs.
+    private static let root: URL = {
+        let base = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let prefix = "mtm-fixtures-"
+
+        // An hour of grace, so a suite running concurrently on the same machine
+        // is never pulled out from under.
+        let cutoff = Date().addingTimeInterval(-3600)
+        if let entries = try? FileManager.default.contentsOfDirectory(
+            at: base, includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]) {
+            for entry in entries where entry.lastPathComponent.hasPrefix(prefix) {
+                let modified = (try? entry.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate
+                if let modified, modified > cutoff { continue }
+                try? FileManager.default.removeItem(at: entry)
+            }
+        }
+
+        let root = base.appendingPathComponent(prefix + UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }()
+
     init() {
-        url = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("mtm-tests-" + UUID().uuidString, isDirectory: true)
+        url = Self.root.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
     }
-
-    deinit { try? FileManager.default.removeItem(at: url) }
 
     @discardableResult
     func write(_ contents: String, to relativePath: String) -> URL {
@@ -251,4 +283,26 @@ extension Session {
                 harnessSessionId: harnessSessionId, hookStatus: hookStatus,
                 waiting: waiting, evidence: evidence, status: status, isPinned: isPinned)
     }
+}
+
+/// What this machine's filesystem will actually let a test do.
+///
+/// Probed once, at runtime, so a test can be *skipped* rather than failed where
+/// the capability is absent. A test that cannot run is not a defect; one that
+/// silently compares against "now" because a timestamp never moved is worse
+/// than one that reports itself skipped.
+enum FilesystemCapabilities {
+    /// Whether setting a file's modification date into the past sticks.
+    ///
+    /// Windows does not, which is why the wave-staleness test cannot run there.
+    static let canBackdate: Bool = {
+        let dir = TempDir()
+        let file = dir.write("probe", to: "probe.txt")
+        let past = Date().addingTimeInterval(-86_400)
+        guard (try? FileManager.default.setAttributes([.modificationDate: past],
+                                                      ofItemAtPath: file.path)) != nil else { return false }
+        let written = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date
+        guard let written else { return false }
+        return abs(written.timeIntervalSince(past)) < 2
+    }()
 }

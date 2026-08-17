@@ -57,7 +57,7 @@ public final class ShellEnvironment: @unchecked Sendable {
         let separator: Character = FileSupport.isWindows ? ";" : ":"
         for directory in path.split(separator: separator) where !directory.isEmpty {
             let candidate = String(directory) + (FileSupport.isWindows ? "\\" : "/") + executable
-            if FileSupport.fileManager.isExecutableFile(atPath: FileSupport.nativePath(candidate)) { return candidate }
+            if FileSupport.fileManager.isExecutableFile(atPath: candidate) { return candidate }
         }
         return nil
     }

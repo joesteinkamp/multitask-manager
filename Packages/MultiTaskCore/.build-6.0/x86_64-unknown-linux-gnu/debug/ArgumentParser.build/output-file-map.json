@@ -1,0 +1,317 @@
+{
+  "": {
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/master.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/BashCompletionsGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/BashCompletionsGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/BashCompletionsGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/BashCompletionsGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/BashCompletionsGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/CompletionsGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionsGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionsGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionsGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionsGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/FishCompletionsGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/FishCompletionsGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/FishCompletionsGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/FishCompletionsGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/FishCompletionsGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/ZshCompletionsGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ZshCompletionsGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ZshCompletionsGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ZshCompletionsGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ZshCompletionsGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Argument.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Argument.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Argument.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Argument~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Argument.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentDiscussion.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDiscussion.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDiscussion.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDiscussion~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDiscussion.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentHelp.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentHelp.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentHelp.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentHelp~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentHelp.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentVisibility.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentVisibility.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentVisibility.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentVisibility~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentVisibility.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/CompletionKind.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionKind.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionKind.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionKind~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CompletionKind.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Errors.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Errors.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Errors.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Errors~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Errors.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Flag.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Flag.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Flag.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Flag~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Flag.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/NameSpecification.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NameSpecification.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NameSpecification.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NameSpecification~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NameSpecification.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Option.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Option.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Option.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Option~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Option.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/OptionGroup.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/OptionGroup.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/OptionGroup.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/OptionGroup~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/OptionGroup.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ParentCommand.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParentCommand.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParentCommand.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParentCommand~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParentCommand.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/AsyncParsableCommand.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncParsableCommand.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncParsableCommand.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncParsableCommand~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncParsableCommand.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandConfiguration.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandConfiguration.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandConfiguration~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandConfiguration.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/CommandGroup.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandGroup.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandGroup.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandGroup~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandGroup.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/EnumerableFlag.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/EnumerableFlag.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/EnumerableFlag.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/EnumerableFlag~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/EnumerableFlag.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ExpressibleByArgument.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ExpressibleByArgument.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ExpressibleByArgument.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ExpressibleByArgument~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ExpressibleByArgument.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableArguments.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArguments.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArguments.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArguments~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArguments.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableCommand.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableCommand.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableCommand.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableCommand~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableCommand.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDecoder.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDecoder.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDecoder.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDecoder~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDecoder.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDefinition.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDefinition.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDefinition.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDefinition~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentDefinition.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentSet.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentSet.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentSet.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentSet~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ArgumentSet.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/CommandParser.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandParser.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandParser.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandParser~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CommandParser.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/InputKey.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputKey.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputKey.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputKey~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputKey.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/InputOrigin.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputOrigin.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputOrigin.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputOrigin~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/InputOrigin.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/Name.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Name.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Name.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Name~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Name.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/Parsed.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Parsed.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Parsed.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Parsed~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Parsed.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ParsedValues.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsedValues.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsedValues.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsedValues~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsedValues.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ParserError.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParserError.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParserError.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParserError~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParserError.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/SplitArguments.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SplitArguments.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SplitArguments.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SplitArguments~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SplitArguments.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/DumpHelpGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/DumpHelpGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/DumpHelpGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/DumpHelpGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/DumpHelpGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/HelpCommand.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpCommand.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpCommand.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpCommand~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpCommand.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/HelpGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/HelpGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/MessageInfo.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/MessageInfo.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/MessageInfo.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/MessageInfo~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/MessageInfo.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/UsageGenerator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UsageGenerator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UsageGenerator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UsageGenerator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UsageGenerator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/CollectionExtensions.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CollectionExtensions.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CollectionExtensions.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CollectionExtensions~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CollectionExtensions.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Foundation.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Foundation.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Foundation.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Foundation~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Foundation.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Mutex.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Mutex.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Mutex.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Mutex~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Mutex.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Platform.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Platform.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Platform.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Platform~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Platform.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/SequenceExtensions.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SequenceExtensions.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SequenceExtensions.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SequenceExtensions~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SequenceExtensions.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/StringExtensions.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/StringExtensions.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/StringExtensions.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/StringExtensions~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/StringExtensions.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/SwiftExtensions.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SwiftExtensions.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SwiftExtensions.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SwiftExtensions~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/SwiftExtensions.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Tree.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Tree.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Tree.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Tree~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/Tree.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/AsyncCompletionsValidator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncCompletionsValidator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncCompletionsValidator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncCompletionsValidator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/AsyncCompletionsValidator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/CodingKeyValidator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CodingKeyValidator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CodingKeyValidator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CodingKeyValidator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/CodingKeyValidator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/NonsenseFlagsValidator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NonsenseFlagsValidator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NonsenseFlagsValidator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NonsenseFlagsValidator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/NonsenseFlagsValidator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/ParsableArgumentsValidation.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArgumentsValidation.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArgumentsValidation.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArgumentsValidation~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/ParsableArgumentsValidation.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/PositionalArgumentsValidator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/PositionalArgumentsValidator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/PositionalArgumentsValidator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/PositionalArgumentsValidator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/PositionalArgumentsValidator.swiftdeps"
+  },
+  "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/UniqueNamesValidator.swift": {
+    "dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UniqueNamesValidator.d",
+    "object": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UniqueNamesValidator.swift.o",
+    "swiftmodule": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UniqueNamesValidator~partial.swiftmodule",
+    "swift-dependencies": "/home/jsteinka/projects/multitask-manager/Packages/MultiTaskCore/.build-6.0/x86_64-unknown-linux-gnu/debug/ArgumentParser.build/UniqueNamesValidator.swiftdeps"
+  }
+}

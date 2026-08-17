@@ -262,28 +262,20 @@ struct WaveReaderTests {
         #expect(tokens.contains("/home/u/other"))
     }
 
-    @Test("A wave untouched for more than a week collapses into past waves")
+    /// Skipped where the filesystem will not backdate a timestamp — Windows.
+    /// Staleness is read from mtimes, so there is nothing to exercise there, and
+    /// reporting the test as skipped is more honest than failing it. Previously
+    /// this failed the run, which is how it showed up as a Windows "bug".
+    @Test("A wave untouched for more than a week collapses into past waves",
+          .enabled(if: FilesystemCapabilities.canBackdate))
     func staleness() throws {
         let dir = TempDir()
         makeWave(dir)
         let old = now.addingTimeInterval(-30 * 24 * 3600)
-        var backdated = true
         for file in ["TASK.md", "STATE.md", "agents/codex.md", "agents/agy.md"] {
-            backdated = dir.setModificationDate(old, of: "app-audit-reader/\(file)") && backdated
+            dir.setModificationDate(old, of: "app-audit-reader/\(file)")
         }
-        backdated = dir.setModificationDate(old, of: "app-audit-reader") && backdated
-
-        // Staleness is read from mtimes, so this test can only run where the
-        // filesystem lets us set them — which Windows does not. Skip there
-        // rather than fail: a test that cannot run is not a defect, and one that
-        // compares against timestamps that silently stayed at "now" is worse
-        // than one that admits it did not run.
-        guard backdated else {
-            withKnownIssue("This filesystem will not backdate timestamps, so staleness cannot be exercised") {
-                Issue.record("skipped")
-            }
-            return
-        }
+        dir.setModificationDate(old, of: "app-audit-reader")
 
         let wave = try #require(WaveReader(root: dir.url).read(now: now).first)
         #expect(wave.isStale)
