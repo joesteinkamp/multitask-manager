@@ -180,6 +180,16 @@ final class SessionStore: ObservableObject {
         return overrides.mutedProjects.contains(path)
     }
 
+    /// Every muted project path, for the list in Settings.
+    ///
+    /// Muting happens on a project's row, which is the right place for it — but
+    /// a muted project stops being somewhere you look, so the row you would undo
+    /// it from is the row you no longer visit. Without a list, muting is a
+    /// one-way door.
+    var mutedProjectPaths: [String] { overrides.mutedProjects.sorted() }
+
+    func unmute(path: String) { perform(.unmute(projectPath: path)) }
+
     // MARK: Tasks
 
     /// Captures a piece of work. `acceptance` is optional here but strongly

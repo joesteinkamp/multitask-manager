@@ -111,23 +111,39 @@ that was:
 
 All thresholds and the refresh cadence are adjustable in **Settings → Status**.
 
-Where that timestamp comes from is decided by precedence, strongest first. Each
-step is optional; with none of them available the app behaves exactly as it did
-when the transcript's modification time was the only signal.
+Timing is the *bottom* of the stack, not the whole of it. When better signals
+exist, they win — highest first:
 
-1. **A hook status file** — the harness told us outright.
-2. **A `SessionEnd` record in the harness audit log** — the run is definitively
-   over. This is the one signal that makes "finished" a fact rather than an
-   inference.
-3. **The age of the session's last audit-log event** — the agent's own tool
-   calls, which keep ticking through a long operation that never writes to the
-   transcript.
-4. **The transcript's modification time** — the original heuristic, still the
-   floor.
+1. **Hook status file** — the harness saying what it's doing, and why.
+2. **Audit `SessionEnd` record** — the run finished. A fact, not an inference.
+3. **Audit last-event age** — tool calls are a truer pulse than file timestamps.
+4. **Transcript mtime** — always available, so the list never degrades.
 
-Steps 2 and 3 read `~/.ai-logs/tool-calls.jsonl` (override with `$AI_TOOL_LOG`)
-and join to a session by the harness's own session id. Run `mtm doctor` to see
-how many of your sessions join precisely.
+Every layer above the last is optional. Remove all of them and the app behaves
+exactly as the table describes.
+
+### Optional: the harness audit log
+
+If you run the harness's `log-tool.sh` hook, the app tails
+`~/.ai-logs/tool-calls.jsonl` (or `$AI_TOOL_LOG`) and uses its records as the
+activity signal — including knowing when a session has genuinely *finished*
+rather than merely gone quiet. It reads only bytes appended since the last
+refresh, tolerates the interleaved lines that stock macOS's missing `flock`
+produces, and never retains the `input`/`response` fields.
+
+Enable it under **Settings → Detection → Harness audit log**, where the parse
+health (records read, unparseable lines skipped) is also shown. A menu bar app
+doesn't inherit your shell environment, so set the path explicitly there if
+`$AI_TOOL_LOG` is non-standard.
+
+Records join to a session by the harness's own session id, falling back to the
+working directory. `mtm doctor` reports how many of your sessions join precisely:
+
+```
+Audit log:      ~/.ai-logs/tool-calls.jsonl
+                1228 records read, 13 live session(s), 0 malformed line(s)
+Precise joins:  3 of 5
+```
 
 ### Optional: precise signals via hooks
 
@@ -139,6 +155,25 @@ timing. Drop a small JSON file into `~/.multitaskmanager/status/`:
 { "projectPath": "/Users/you/dev/app", "project": "app",
   "status": "needsAttention", "updatedAt": 1719240000 }
 ```
+
+Contract **v2** adds four optional fields:
+
+```json
+{ "schemaVersion": 2, "projectPath": "/Users/you/dev/app", "project": "app",
+  "status": "needsAttention", "sessionId": "abc123",
+  "waiting": "approval", "reason": "wants to run the migration",
+  "updatedAt": 1719240000 }
+```
+
+| Field | Purpose |
+| --- | --- |
+| `schemaVersion` | Absent means v1, which parses exactly as before. |
+| `sessionId` | The harness session id, used to join precisely to the audit log. |
+| `waiting` | `approval` \| `question` \| `done` \| `error` — *why* it stopped. |
+| `reason` | Short free text, shown in the row and used as the notification body. |
+
+`waiting` is the field worth adding first: only the hook can tell an approval
+gate apart from a finished run, and the two deserve very different urgency.
 
 For example, a Claude Code **Stop** hook (in `~/.claude/settings.json`) that marks
 a project as waiting when the agent finishes:
@@ -185,6 +220,27 @@ genuinely outranks a finished run, and only the hook knows which it is:
 
 A record with no `schemaVersion` parses exactly as it always did, so there's no
 rush to upgrade a working hook.
+## Notifications
+
+When a session crosses into **needs attention**, the app tells you — so you find
+out you're the bottleneck without watching the menu bar.
+
+Notification fatigue is the thing most likely to kill this feature, so a crossing
+has to survive four filters before it interrupts you:
+
+- **Edges only.** `working → needs attention`. Going idle never notifies.
+- **Held for two refreshes.** The timing heuristic flaps; this absorbs it.
+- **Per-session cooldown** (default 10 minutes). One session can't nag.
+- **Coalesced.** Three or more crossings within 30 seconds arrive as a single
+  "4 sessions need you" instead of a burst.
+
+Clicking a notification focuses the session. Mute a noisy project from its row's
+`⋯` menu, and set **quiet hours** in **Settings → Notifications**. If macOS has
+notifications blocked for the app, that pane says so and links to System Settings
+— the badge and the popover keep working either way.
+
+Permission is requested the first time a notification would actually be sent, not
+at launch, so the prompt arrives with its reason already visible on screen.
 
 ## Project briefings
 

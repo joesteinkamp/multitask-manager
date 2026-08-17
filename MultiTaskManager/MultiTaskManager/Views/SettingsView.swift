@@ -95,6 +95,28 @@ private struct NotificationSettings: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if !store.mutedProjectPaths.isEmpty {
+                Section("Muted projects") {
+                    // The only place a mute can be undone. Muting is done from a
+                    // project's row, and a muted project is by definition one you
+                    // have stopped looking at — so without this list it is a
+                    // one-way door.
+                    ForEach(store.mutedProjectPaths, id: \.self) { path in
+                        HStack {
+                            Text(FileSupport.lastComponent(of: path))
+                                .font(AppTheme.rowDetail)
+                            Text(path)
+                                .font(AppTheme.rowMeta)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.head)
+                            Spacer(minLength: AppTheme.tightSpacing)
+                            Button("Unmute") { store.unmute(path: path) }
+                                .controlSize(.small)
+                        }
+                    }
+                }
+            }
             Section("Quiet hours") {
                 Toggle("Stay quiet overnight", isOn: $prefs.quietHoursEnabled)
                 if prefs.quietHoursEnabled {
