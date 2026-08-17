@@ -253,7 +253,7 @@ Packages/MultiTaskCore/           # the engine — Foundation only, no SwiftUI/A
 │   ├── Client/                   # EngineClient protocol + InProcessEngine
 │   └── Wire/                     # daemon protocol: envelope, codec, frame reader
 ├── Sources/mtm/                  # the CLI
-└── Tests/                        # 250 tests, incl. opt-in checks against real harness data
+└── Tests/                        # 271 tests, incl. opt-in checks against real harness data
 
 MultiTaskManager/                 # the macOS app — links MultiTaskCore
 ├── MultiTaskManagerApp.swift     # @main, MenuBarExtra + Settings scenes
@@ -313,6 +313,7 @@ swift build --package-path Packages/MultiTaskCore -c release
 | `mtm watch` | streams status changes and notifications until interrupted |
 | `mtm waves [--all]` | orchestration waves under `~/.ai-context` |
 | `mtm roster` | delegates available, and how the routing table ranks them |
+| `mtm log` | what happened and why — the decision record |
 | `mtm doctor` | which signals are readable, and how many sessions join precisely |
 
 Project arguments accept any unique id or name prefix — `mtm show multi` is

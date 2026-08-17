@@ -509,3 +509,92 @@ struct ProjectStatusWithTasksTests {
         #expect(!result.reason.contains("9 items"))
     }
 }
+
+@Suite("DecisionLog")
+struct DecisionLogTests {
+    let now = Fixtures.auditNow
+
+    @Test("Records why, and reads back most recent first")
+    func recordAndRead() {
+        let dir = TempDir()
+        let log = DecisionLog(directory: dir.url)
+
+        log.record(.taskCreated, "Filed \"Ship the build\"", taskId: "t1", at: now)
+        log.record(.taskEscalated, "\"Ship the build\" needs a human: no signing cert",
+                   taskId: "t1", at: now.addingTimeInterval(60))
+
+        let recent = log.recent()
+        #expect(recent.count == 2)
+        #expect(recent[0].category == .taskEscalated)
+        #expect(recent[0].summary.contains("no signing cert"))
+    }
+
+    @Test("Filters by project, so one project's history is readable on its own")
+    func filterByProject() {
+        let dir = TempDir()
+        let log = DecisionLog(directory: dir.url)
+        log.record(.taskCreated, "A", projectId: "p1", at: now)
+        log.record(.taskCreated, "B", projectId: "p2", at: now)
+
+        #expect(log.recent(projectId: "p1").map(\.summary) == ["A"])
+    }
+
+    @Test("A corrupt line is skipped, not fatal")
+    func corruptLineTolerated() throws {
+        let dir = TempDir()
+        let log = DecisionLog(directory: dir.url)
+        log.record(.other, "good", at: now)
+
+        let file = dir.url.appendingPathComponent("decisions.jsonl")
+        let existing = try String(contentsOf: file, encoding: .utf8)
+        try (existing + "{ not json\n").write(to: file, atomically: true, encoding: .utf8)
+
+        #expect(log.recent().map(\.summary) == ["good"])
+    }
+
+    @Test("Pruning drops what has outlived its usefulness as narration")
+    func pruning() {
+        let dir = TempDir()
+        let log = DecisionLog(directory: dir.url)
+        log.record(.other, "ancient", at: now.addingTimeInterval(-200 * 86_400))
+        log.record(.other, "recent", at: now)
+
+        log.prune(now: now)
+        #expect(log.recent().map(\.summary) == ["recent"])
+    }
+
+    @Test("The engine narrates the decisions it takes, and only those")
+    func engineNarrates() async throws {
+        let dir = TempDir()
+        let taskStore = TaskStore(directory: dir.url.appendingPathComponent("tasks"))
+        let log = DecisionLog(directory: dir.url)
+        let engine = InProcessEngine(
+            configuration: StaticConfiguration(.fixtureOnly),
+            engine: DetectionEngine(configuration: StaticConfiguration(.fixtureOnly),
+                                    projectStore: ProjectStore(directory: dir.url.appendingPathComponent("p")),
+                                    taskStore: taskStore),
+            overridesStore: OverridesStore(directory: dir.url.appendingPathComponent("s")),
+            taskStore: taskStore,
+            decisions: log
+        )
+
+        let created = try await engine.act(.createTask(.init(title: "Ship it", state: "ready")))
+        let id = try #require(created.snapshot?.tasks.first?.id)
+
+        // A plain state change is mechanical — it must NOT be narrated.
+        _ = try await engine.act(.updateTask(.init(taskId: id, state: "running")))
+        // An escalation is a decision.
+        _ = try await engine.act(.updateTask(.init(taskId: id, waiting: "approval",
+                                                    waitingReason: "no cert")))
+        _ = try await engine.act(.completeTask(taskId: id, note: nil))
+
+        let entries = log.recent()
+        let categories = entries.map(\.category)
+        #expect(categories.contains(.taskCreated))
+        #expect(categories.contains(.taskEscalated))
+        #expect(categories.contains(.taskCompleted))
+        // Three decisions, not four: the state tick produced no line.
+        #expect(entries.count == 3)
+        #expect(entries.first { $0.category == .taskEscalated }?.summary.contains("no cert") == true)
+    }
+}

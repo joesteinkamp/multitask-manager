@@ -14,7 +14,7 @@ struct MTM: AsyncParsableCommand {
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
         subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
-                      List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
+                      Log.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
 }
@@ -505,6 +505,13 @@ enum Format {
         return "\(s / 86_400)d"
     }
 
+    static func stamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
     static func time(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -889,4 +896,32 @@ func resolve(_ needle: String, in tasks: [TaskRecord]) -> TaskRecord? {
     print(matches.isEmpty ? "No task matching \"\(needle)\"."
                           : "\"\(needle)\" matches \(matches.count): \(matches.map(\.title).joined(separator: ", "))")
     return nil
+}
+
+// MARK: - log
+
+struct Log: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "What happened, and why — the decision record."
+    )
+
+    @Option(name: .long, help: "How many entries.")
+    var limit: Int = 20
+
+    @Option(name: .long, help: "Restrict to one project id.")
+    var project: String?
+
+    func run() throws {
+        let decisions = DecisionLog().recent(limit: limit, projectId: project)
+        guard !decisions.isEmpty else {
+            print("Nothing recorded yet. The log fills as work is filed, handed over, escalated and finished.")
+            return
+        }
+        for decision in decisions {
+            print("  \(Format.stamp(decision.at))  \(decision.category.label.padded(to: 11)) \(decision.summary)")
+            if decision.actor != "me" {
+                print("  \(String(repeating: " ", count: 18))by \(decision.actor)")
+            }
+        }
+    }
 }

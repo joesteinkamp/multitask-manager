@@ -216,7 +216,7 @@ public struct WaveReader: Sendable {
         var bestMention: String?
         var bestMentionLength = 0
         for token in pathTokens(in: taskText) {
-            for project in candidates where token == project || token.hasPrefix(project + "/") {
+            for project in candidates where FileSupport.path(token, isInside: project) {
                 if project.count > bestMentionLength {
                     bestMention = project
                     bestMentionLength = project.count

@@ -17,6 +17,7 @@ public actor InProcessEngine: EngineClient {
     private let engine: DetectionEngine
     private let overridesStore: OverridesStore
     private let taskStore: TaskStore
+    private let decisions: DecisionLog
     private let policy: NotificationPolicy
 
     private var overrides: UserOverrides
@@ -28,11 +29,13 @@ public actor InProcessEngine: EngineClient {
                 engine: DetectionEngine? = nil,
                 overridesStore: OverridesStore = OverridesStore(),
                 taskStore: TaskStore = TaskStore(),
+                decisions: DecisionLog = DecisionLog(),
                 policy: NotificationPolicy = NotificationPolicy()) {
         self.configurationProvider = configuration
         self.engine = engine ?? DetectionEngine(configuration: configuration)
         self.overridesStore = overridesStore
         self.taskStore = taskStore
+        self.decisions = decisions
         self.policy = policy
         self.overrides = overridesStore.load()
     }
@@ -186,11 +189,25 @@ public actor InProcessEngine: EngineClient {
         // Task actions write to the task store rather than to overrides, and
         // return early so they don't trigger an overrides save.
         case .createTask(let fields):
-            _ = try create(fields)
+            let created = try create(fields)
+            decisions.record(.taskCreated, "Filed \"\(created.title)\"",
+                             actor: fields.origin ?? "me",
+                             projectId: created.projectId, taskId: created.id)
             return ActionResult(ok: true, snapshot: await refreshNow())
 
         case .updateTask(let fields):
-            _ = try update(fields)
+            let before = taskStore.resolve(fields.taskId)
+            let updated = try update(fields)
+            // Narrate only what's worth reading back in three months: an
+            // escalation and a reassignment are decisions; a state tick is not.
+            if updated.waiting != nil, before?.waiting == nil {
+                decisions.record(.taskEscalated,
+                                 "\"\(updated.title)\" needs a human: \(updated.waitingReason ?? updated.waiting!.label)",
+                                 projectId: updated.projectId, taskId: updated.id)
+            } else if let assignee = fields.assignee, before?.assignee != updated.assignee {
+                decisions.record(.taskAssigned, "\"\(updated.title)\" handed to \(assignee)",
+                                 projectId: updated.projectId, taskId: updated.id)
+            }
             return ActionResult(ok: true, snapshot: await refreshNow())
 
         case .claimTask(let taskId, let owner):
@@ -198,6 +215,8 @@ public actor InProcessEngine: EngineClient {
                 throw TaskStoreError.notFound(taskId)
             }
             _ = try taskStore.save(TaskQueue.claim(task, by: owner))
+            decisions.record(.taskAssigned, "\(owner) took \"\(task.title)\"",
+                             actor: owner, projectId: task.projectId, taskId: task.id)
             return ActionResult(ok: true, snapshot: await refreshNow())
 
         case .completeTask(let taskId, let note):
@@ -215,6 +234,9 @@ public actor InProcessEngine: EngineClient {
                 task.body = task.body.isEmpty ? note : task.body + "\n\n" + note
             }
             _ = try taskStore.save(task)
+            decisions.record(.taskCompleted, "Completed \"\(task.title)\"",
+                             actor: task.claimedBy ?? task.assignee.label,
+                             projectId: task.projectId, taskId: task.id)
             return ActionResult(ok: true, snapshot: await refreshNow())
 
         case .snoozeTask(let taskId, let days):
@@ -223,6 +245,8 @@ public actor InProcessEngine: EngineClient {
             }
             task.snoozedUntil = Date().addingTimeInterval(Double(days) * 86_400)
             _ = try taskStore.save(task)
+            decisions.record(.taskSnoozed, "Snoozed \"\(task.title)\" for \(days) day\(days == 1 ? "" : "s")",
+                             projectId: task.projectId, taskId: task.id)
             return ActionResult(ok: true, snapshot: await refreshNow())
 
         case .deleteTask(let taskId):
@@ -262,6 +286,12 @@ public actor InProcessEngine: EngineClient {
             body: fields.body ?? ""
         )
         return try taskStore.upsert(task, now: now)
+    }
+
+    /// Recent decisions, most recent first — the record of *why*, as opposed to
+    /// the audit trail's record of *that*.
+    public func recentDecisions(limit: Int = 50, projectId: String? = nil) -> [Decision] {
+        decisions.recent(limit: limit, projectId: projectId)
     }
 
     /// Applies a partial update. Absent fields are left alone rather than

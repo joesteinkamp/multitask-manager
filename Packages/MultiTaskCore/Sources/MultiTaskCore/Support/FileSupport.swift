@@ -13,12 +13,62 @@ public enum FileSupport {
         URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     }
 
+    /// True on platforms whose paths use `\` and compare case-insensitively.
+    public static var isWindows: Bool {
+        #if os(Windows)
+        return true
+        #else
+        return false
+        #endif
+    }
+
+    /// Both separators, always. A Windows path can legally contain either, and a
+    /// `\`-only or `/`-only split is wrong on exactly the platform it matters on.
+    static func isSeparator(_ character: Character) -> Bool {
+        character == "/" || character == "\\"
+    }
+
     /// Last path component of a plain string path, without bridging to `NSString`.
-    /// Trailing slashes are ignored, so `/a/b/` and `/a/b` both yield `b`.
+    ///
+    /// Handles both separators: given `C:\Users\joe\projects\app` a `/`-only
+    /// split returns the entire string, which would make every project name on
+    /// Windows the full path.
     public static func lastComponent(of path: String) -> String {
-        let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
-        guard let slash = trimmed.lastIndex(of: "/") else { return trimmed }
+        var trimmed = Substring(path)
+        while trimmed.count > 1, let last = trimmed.last, isSeparator(last) {
+            trimmed = trimmed.dropLast()
+        }
+        guard let slash = trimmed.lastIndex(where: isSeparator) else { return String(trimmed) }
         return String(trimmed[trimmed.index(after: slash)...])
+    }
+
+    /// Compares two paths for equality the way the host filesystem would.
+    ///
+    /// Case-insensitively on Windows, and with separators normalised, so
+    /// `C:/work/app` and `C:\Work\App` are one project rather than two.
+    public static func pathsEqual(_ a: String, _ b: String) -> Bool {
+        let left = normalise(a), right = normalise(b)
+        return isWindows ? left.compare(right, options: .caseInsensitive) == .orderedSame
+                         : left == right
+    }
+
+    /// Whether `path` is `root` or sits inside it.
+    public static func path(_ path: String, isInside root: String) -> Bool {
+        let normalisedRoot = normalise(root)
+        let normalisedPath = normalise(path)
+        if pathsEqual(normalisedPath, normalisedRoot) { return true }
+        let prefix = normalisedRoot.hasSuffix("/") ? normalisedRoot : normalisedRoot + "/"
+        return isWindows
+            ? normalisedPath.lowercased().hasPrefix(prefix.lowercased())
+            : normalisedPath.hasPrefix(prefix)
+    }
+
+    /// Separators unified and any trailing one dropped, for comparison only —
+    /// never for handing back to the filesystem.
+    public static func normalise(_ path: String) -> String {
+        var result = path.replacingOccurrences(of: "\\", with: "/")
+        while result.count > 1, result.hasSuffix("/") { result.removeLast() }
+        return result
     }
 
     /// Root for everything this app owns: projects, tasks, runs, the socket.
@@ -40,13 +90,15 @@ public enum FileSupport {
     /// produces a row nobody can ever satisfy. Note the rule excludes the home
     /// directory and its *ancestors* only: a project living at `/opt/work/repo`
     /// or on an external volume is perfectly normal and must not be filtered out.
-    public static func isPlausibleProjectPath(_ path: String) -> Bool {
-        let trimmed = path.hasSuffix("/") && path.count > 1 ? String(path.dropLast()) : path
+    public static func isPlausibleProjectPath(_ candidate: String) -> Bool {
+        let trimmed = normalise(candidate)
         guard trimmed != "/", !trimmed.isEmpty else { return false }
-        let home = homeDirectory.path
-        if trimmed == home { return false }
+        // A bare Windows drive root is the same kind of thing as "/".
+        if trimmed.count <= 3, trimmed.dropFirst().hasPrefix(":") { return false }
+        let home = normalise(homeDirectory.path)
+        if pathsEqual(trimmed, home) { return false }
         // An ancestor of home is a filesystem location, not a project.
-        return !home.hasPrefix(trimmed + "/")
+        return !Self.path(home, isInside: trimmed)
     }
 
     /// Expands a leading `~` against the real home directory.
@@ -79,13 +131,22 @@ public enum FileSupport {
         return size.uint64Value
     }
 
-    /// `(deviceId, inode)` for a path, used to notice log rotation. Zeroes when
-    /// unavailable, which callers treat as "can't tell" rather than "changed".
+    /// An identity for a file that changes when the file is replaced.
+    ///
+    /// `(device, inode)` where the platform has them. Windows does not, so this
+    /// falls back to `(creationDate, size)` — a rotated log gets a new creation
+    /// date, which is the signal the audit reader actually needs. Without the
+    /// fallback, rotation would never be detected there and the reader would
+    /// hold a stale offset forever.
     public static func fileIdentity(ofPath path: String) -> (device: UInt64, inode: UInt64) {
         guard let attrs = try? fileManager.attributesOfItem(atPath: path) else { return (0, 0) }
         let device = (attrs[.systemNumber] as? NSNumber)?.uint64Value ?? 0
         let inode = (attrs[.systemFileNumber] as? NSNumber)?.uint64Value ?? 0
-        return (device, inode)
+        if device != 0 || inode != 0 { return (device, inode) }
+
+        let created = (attrs[.creationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        let size = (attrs[.size] as? NSNumber)?.uint64Value ?? 0
+        return (UInt64(max(0, created)), size)
     }
 
     /// Directory contents (non-recursive), newest first.

@@ -165,10 +165,11 @@ public final class SessionActivityReader: @unchecked Sendable {
         "Write", "Edit", "MultiEdit", "NotebookEdit", "str_replace_editor", "apply_patch"
     ]
 
-    /// Files outside the project don't count as work on it.
+    /// Files outside the project don't count as work on it. Uses the shared
+    /// containment check, so a Windows path and a sibling directory whose name
+    /// merely starts the same way both behave.
     static func isInside(_ path: String, projectPath: String?) -> Bool {
         guard let projectPath, !projectPath.isEmpty else { return false }
-        let root = projectPath.hasSuffix("/") ? projectPath : projectPath + "/"
-        return path == projectPath || path.hasPrefix(root)
+        return FileSupport.path(path, isInside: projectPath)
     }
 }

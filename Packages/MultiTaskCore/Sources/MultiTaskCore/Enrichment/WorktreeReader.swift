@@ -16,9 +16,24 @@ public struct GitRunner: Sendable {
         self.timeout = timeout
     }
 
+    /// Finds git on `PATH` first, then in the usual places.
+    ///
+    /// A hardcoded candidate list can't work on Windows, and even on macOS it
+    /// misses a Homebrew-on-Intel or Nix install. `PATH` is what the user's shell
+    /// would use, which is the answer they expect.
     static func resolveGit() -> String {
-        let candidates = ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git", "/bin/git"]
-        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/git"
+        let executable = FileSupport.isWindows ? "git.exe" : "git"
+        let separator: Character = FileSupport.isWindows ? ";" : ":"
+
+        if let path = ProcessInfo.processInfo.environment["PATH"] {
+            for directory in path.split(separator: separator) where !directory.isEmpty {
+                let candidate = String(directory) + (FileSupport.isWindows ? "\\" : "/") + executable
+                if FileManager.default.isExecutableFile(atPath: candidate) { return candidate }
+            }
+        }
+        let fallbacks = ["/usr/bin/git", "/opt/homebrew/bin/git", "/usr/local/bin/git", "/bin/git",
+                         "C:\\Program Files\\Git\\cmd\\git.exe"]
+        return fallbacks.first { FileManager.default.isExecutableFile(atPath: $0) } ?? "/usr/bin/git"
     }
 
     public var isAvailable: Bool {

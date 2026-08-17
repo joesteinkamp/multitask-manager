@@ -176,3 +176,61 @@ struct MarkdownTaskTests {
         #expect(items.map(\.text) == ["Real task"])
     }
 }
+
+@Suite("Path handling — cross-platform")
+struct PathPortabilityTests {
+
+    @Test("Both separators are understood, so a Windows path yields a name")
+    func lastComponentHandlesBackslashes() {
+        // The bug this prevents: a `/`-only split returns the whole string, so
+        // every project name on Windows would be its full path.
+        #expect(FileSupport.lastComponent(of: #"C:\Users\joe\projects\app"#) == "app")
+        #expect(FileSupport.lastComponent(of: "/home/joe/projects/app") == "app")
+        #expect(FileSupport.lastComponent(of: #"C:\Users\joe\projects\app\"#) == "app")
+        #expect(FileSupport.lastComponent(of: "/home/joe/projects/app/") == "app")
+        // A mixed path is legal on Windows and must still resolve.
+        #expect(FileSupport.lastComponent(of: #"C:\Users\joe/projects/app"#) == "app")
+    }
+
+    @Test("Comparison normalises separators")
+    func normalisation() {
+        #expect(FileSupport.normalise(#"C:\work\app\"#) == "C:/work/app")
+        #expect(FileSupport.pathsEqual(#"C:\work\app"#, "C:/work/app"))
+        #expect(!FileSupport.pathsEqual("/a/b", "/a/c"))
+    }
+
+    @Test("Containment respects boundaries, not string prefixes")
+    func containment() {
+        #expect(FileSupport.path("/home/joe/app/src/x.swift", isInside: "/home/joe/app"))
+        #expect(FileSupport.path("/home/joe/app", isInside: "/home/joe/app"))
+        // The classic false positive: a sibling whose name starts the same way.
+        #expect(!FileSupport.path("/home/joe/app-other/x.swift", isInside: "/home/joe/app"))
+        #expect(FileSupport.path(#"C:\work\app\src"#, isInside: "C:/work/app"))
+    }
+
+    @Test("A drive root is no more a project than / is")
+    func driveRootIsNotAProject() {
+        #expect(!FileSupport.isPlausibleProjectPath("/"))
+        #expect(!FileSupport.isPlausibleProjectPath(#"C:\"#))
+        #expect(!FileSupport.isPlausibleProjectPath("C:"))
+        #expect(FileSupport.isPlausibleProjectPath(#"C:\work\app"#))
+    }
+
+    @Test("File identity falls back when the platform has no inodes")
+    func fileIdentityHasAFallback() {
+        let dir = TempDir()
+        dir.write("hello", to: "a.txt")
+        let identity = FileSupport.fileIdentity(ofPath: dir.path("a.txt"))
+        // On this platform inodes exist; the point is that *something* non-zero
+        // comes back, because a zero pair means rotation can never be detected.
+        #expect(identity.device != 0 || identity.inode != 0)
+        #expect(FileSupport.fileIdentity(ofPath: "/nonexistent") == (0, 0))
+    }
+
+    @Test("git is looked for on PATH, which is what the user's shell would use")
+    func gitFromPath() {
+        let resolved = GitRunner.resolveGit()
+        #expect(resolved.hasSuffix("git") || resolved.hasSuffix("git.exe"))
+        #expect(FileManager.default.isExecutableFile(atPath: resolved))
+    }
+}

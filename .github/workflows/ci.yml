@@ -26,6 +26,25 @@ jobs:
         working-directory: Packages/MultiTaskCore
         run: swift test
 
+  # Windows runs the engine headless — no UI binding involved, which is the part
+  # of Swift-on-Windows most likely to work. This job is the evidence for whether
+  # the Windows product is viable at all, so it lands green or it doesn't land.
+  windows:
+    name: MultiTaskCore (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          branch: swift-6.0-release
+          tag: 6.0-RELEASE
+      - name: Build
+        working-directory: Packages/MultiTaskCore
+        run: swift build
+      - name: Test
+        working-directory: Packages/MultiTaskCore
+        run: swift test
+
   # The app can only be built on macOS. It is the slower, scarcer runner, so it
   # runs second and only builds — the behaviour it would test already ran above.
   app:
