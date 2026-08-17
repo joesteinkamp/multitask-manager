@@ -14,6 +14,10 @@ xcuserdata/
 # Swift Package Manager
 .swiftpm/
 .build/
+# Scratch paths for verifying against a second Swift toolchain. Building a
+# different toolchain into the same .build mixes artifacts and produces link
+# errors, so those runs need their own directory — and it must not be committed.
+.build-*/
 
 # SwiftPM build products
 Packages/*/.build/
