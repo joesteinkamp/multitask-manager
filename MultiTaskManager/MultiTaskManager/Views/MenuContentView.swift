@@ -12,12 +12,19 @@ struct MenuContentView: View {
     @EnvironmentObject private var store: SessionStore
 
     @State private var isAdding = false
-    @State private var newTitle = ""
     @State private var showingPast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             header
+
+            // The decision comes before the context: what to do, then which
+            // project is in what state.
+            if !store.nextUp.isEmpty || !store.awaitingMe.isEmpty {
+                Divider()
+                NextUpView()
+            }
+
             Divider()
 
             if store.activeProjects.isEmpty {
@@ -131,7 +138,7 @@ struct MenuContentView: View {
                     .foregroundStyle(.secondary)
                 Text("No projects tracked yet")
                     .font(.callout)
-                Text("Start a Claude Code or Codex session in a project, or add one by hand.")
+                Text("Start a Claude Code or Codex session in a project, or capture a task to begin.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -143,19 +150,8 @@ struct MenuContentView: View {
     }
 
     private var addField: some View {
-        HStack {
-            TextField("Name this piece of work…", text: $newTitle, onCommit: commitAdd)
-                .textFieldStyle(.roundedBorder)
-            Button("Add", action: commitAdd)
-                .disabled(newTitle.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(.horizontal, 12)
-    }
-
-    private func commitAdd() {
-        store.addManual(title: newTitle, projectPath: nil)
-        newTitle = ""
-        isAdding = false
+        TaskComposer(projectId: nil) { isAdding = false }
+            .padding(.horizontal, 12)
     }
 
     // MARK: Degraded

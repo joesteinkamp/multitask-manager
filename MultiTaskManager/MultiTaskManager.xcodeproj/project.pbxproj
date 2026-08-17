@@ -18,6 +18,7 @@
 		BF0000000000000000000013 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000013 /* AppTheme.swift */; };
 		BF0000000000000000000014 /* NotificationPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000014 /* NotificationPresenter.swift */; };
 		BF0000000000000000000015 /* ProjectRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000015 /* ProjectRowView.swift */; };
+		BF0000000000000000000017 /* TaskViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000017 /* TaskViews.swift */; };
 		BF0000000000000000000016 /* MultiTaskCore in Frameworks */ = {isa = PBXBuildFile; productRef = CC0000000000000000000002 /* MultiTaskCore */; };
 /* End PBXBuildFile section */
 
@@ -35,6 +36,7 @@
 		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FE0000000000000000000013 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		FE0000000000000000000014 /* NotificationPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresenter.swift; sourceTree = "<group>"; };
+		FE0000000000000000000017 /* TaskViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskViews.swift; sourceTree = "<group>"; };
 		FE0000000000000000000015 /* ProjectRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRowView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -112,6 +114,7 @@
 			children = (
 				FE000000000000000000000E /* MenuContentView.swift */,
 				FE0000000000000000000015 /* ProjectRowView.swift */,
+				FE0000000000000000000017 /* TaskViews.swift */,
 				FE000000000000000000000F /* SessionRowView.swift */,
 				FE0000000000000000000010 /* SettingsView.swift */,
 			);
@@ -201,6 +204,7 @@
 				BF0000000000000000000014 /* NotificationPresenter.swift in Sources */,
 				BF000000000000000000000E /* MenuContentView.swift in Sources */,
 				BF0000000000000000000015 /* ProjectRowView.swift in Sources */,
+				BF0000000000000000000017 /* TaskViews.swift in Sources */,
 				BF000000000000000000000F /* SessionRowView.swift in Sources */,
 				BF0000000000000000000010 /* SettingsView.swift in Sources */,
 			);

@@ -117,6 +117,70 @@ struct AppWiringCompileTests {
         #expect(actions.count == 10)
     }
 
+    @Test("Every task action the popover can trigger exists on the engine")
+    func taskActionsUsedByTheApp() {
+        // Mirrors SessionStore's task surface. A rename in the core would
+        // otherwise break the app silently from this machine's point of view.
+        let actions: [EngineAction] = [
+            .createTask(.init(title: "t", projectId: "p", assignee: Assignee.me.encoded,
+                              acceptance: "done when", origin: "app", state: "ready")),
+            .completeTask(taskId: "t", note: nil),
+            .snoozeTask(taskId: "t", days: 7),
+            .deleteTask(taskId: "t"),
+            .updateTask(.init(taskId: "t", state: TaskState.running.rawValue)),
+            .updateTask(.init(taskId: "t", assignee: Assignee.agent("claude").encoded)),
+            .updateTask(.init(taskId: "t", waiting: ""))
+        ]
+        #expect(actions.count == 7)
+    }
+
+    @Test("The task fields the popover renders are all reachable")
+    func taskSurfaceUsedByViews() {
+        var task = TaskRecord(id: "t", title: "Ship it", assignee: .agent("codex"), state: .ready)
+        task.acceptance = "Signed and notarised"
+        task.waiting = .approval
+        task.waitingReason = "needs a cert"
+        task.claimedBy = "codex"
+
+        // Read by TaskRowView and NextUpView.
+        #expect(task.id == "t")
+        #expect(task.title == "Ship it")
+        #expect(task.state.label == "Ready")
+        #expect(task.assignee != .me)
+        #expect(task.assignee.label == "codex")
+        #expect(task.acceptance != nil)
+        #expect(task.waiting?.label == "Needs approval")
+        #expect(task.waitingReason == "needs a cert")
+        #expect(task.claimedBy != nil)
+
+        // The ranked answer the popover leads with.
+        let item = ReadyItem(task: task, reason: "Unblocks 2 other tasks", unblocks: 2)
+        #expect(item.id == "t")
+        #expect(item.reason.contains("Unblocks"))
+    }
+
+    @Test("The store's derived collections resolve from a snapshot")
+    func snapshotDerivations() async throws {
+        let dir = TempDir()
+        let taskStore = TaskStore(directory: dir.url.appendingPathComponent("tasks"))
+        _ = try taskStore.save(TaskRecord(id: "a", title: "A", assignee: .me, state: .ready))
+
+        let engine = InProcessEngine(
+            configuration: StaticConfiguration(.fixtureOnly),
+            engine: DetectionEngine(configuration: StaticConfiguration(.fixtureOnly),
+                                    projectStore: ProjectStore(directory: dir.url.appendingPathComponent("p")),
+                                    taskStore: taskStore),
+            overridesStore: OverridesStore(directory: dir.url.appendingPathComponent("s")),
+            taskStore: taskStore
+        )
+        let snapshot = try await engine.list()
+
+        // Exactly what SessionStore.apply(_:) computes.
+        #expect(snapshot.whatNext(for: .me, limit: 5).count == 1)
+        #expect(snapshot.tasksNeedingYou().isEmpty)
+        #expect(snapshot.tasks.count == 1)
+    }
+
     @Test("The project fields the popover renders are all reachable")
     func projectSurfaceUsedByViews() {
         let record = ProjectRecord(id: "a", name: "app", path: "/p")
@@ -136,5 +200,7 @@ struct AppWiringCompileTests {
         #expect(project.sessions.isEmpty)
         #expect(project.waves.isEmpty)
         #expect(project.nextSteps.isEmpty)
+        #expect(project.openTasks.isEmpty)
+        #expect(project.tasksNeedingYou.isEmpty)
     }
 }

@@ -12,6 +12,7 @@ struct ProjectRowView: View {
 
     @State private var isExpanded = false
     @State private var pulse = false
+    @State private var isCapturing = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -82,7 +83,7 @@ struct ProjectRowView: View {
     }
 
     private var hasDetail: Bool {
-        !project.sessions.isEmpty || !project.nextSteps.isEmpty
+        !project.sessions.isEmpty || !project.nextSteps.isEmpty || !project.openTasks.isEmpty
             || !project.waves.isEmpty || project.oneLiner != nil
     }
 
@@ -136,11 +137,41 @@ struct ProjectRowView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            // Tasks before sessions: the work is the point, the sessions are
+            // how it's being done.
+            if !project.openTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label("Tasks", systemImage: "checklist")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    ForEach(project.openTasks.prefix(5)) { task in
+                        TaskRowView(task: task)
+                    }
+                    if project.openTasks.count > 5 {
+                        Text("+\(project.openTasks.count - 5) more")
+                            .font(.caption2).foregroundStyle(.tertiary)
+                    }
+                }
+            }
+
+            if isCapturing {
+                TaskComposer(projectId: project.id) { isCapturing = false }
+            } else {
+                Button {
+                    isCapturing = true
+                } label: {
+                    Label("Add a task", systemImage: "plus.circle")
+                        .font(.caption2)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+            }
+
             ForEach(project.sessions) { session in
                 SessionRowView(session: session)
             }
 
-            if !project.nextSteps.isEmpty {
+            if !project.nextSteps.isEmpty && project.openTasks.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
                     Label("Next", systemImage: "arrow.right.circle")
                         .font(.caption2.weight(.semibold))
@@ -180,6 +211,7 @@ struct ProjectRowView: View {
 
     private var actionsMenu: some View {
         Menu {
+            Button("Add a task") { isExpanded = true; isCapturing = true }
             Button("Reveal in Finder") { store.activate(project) }
             Button(project.record.isPinned ? "Unpin" : "Pin") { store.togglePin(project) }
             Button(store.isMuted(project) ? "Unmute notifications" : "Mute notifications") {

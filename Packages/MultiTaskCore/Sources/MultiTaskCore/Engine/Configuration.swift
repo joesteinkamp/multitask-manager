@@ -27,6 +27,8 @@ public struct Configuration: Sendable, Equatable {
     public var enableAuditLog: Bool
     public var enableWaves: Bool
     public var enableWorktrees: Bool
+    /// Derive what each session changed from its transcript.
+    public var enableSessionActivity: Bool
 
     // MARK: Lists
 
@@ -70,6 +72,7 @@ public struct Configuration: Sendable, Equatable {
         enableAuditLog: Bool = true,
         enableWaves: Bool = true,
         enableWorktrees: Bool = true,
+        enableSessionActivity: Bool = true,
         devFolders: [String] = [],
         bundleAllowlist: [String] = [],
         appNameKeywords: [String] = [],
@@ -94,6 +97,7 @@ public struct Configuration: Sendable, Equatable {
         self.enableAuditLog = enableAuditLog
         self.enableWaves = enableWaves
         self.enableWorktrees = enableWorktrees
+        self.enableSessionActivity = enableSessionActivity
         self.devFolders = devFolders
         self.bundleAllowlist = bundleAllowlist
         self.appNameKeywords = appNameKeywords

@@ -113,7 +113,7 @@ public struct EngineSnapshot: Codable, Sendable, Equatable {
                 "\($0.id)|\($0.state.rawValue)|\($0.assignee.encoded)|\($0.waiting?.rawValue ?? "")|\($0.deps.joined(separator: ","))"
             },
             sessions: sessions.map {
-                "\($0.id)|\($0.status.rawValue)|\($0.waiting?.rawValue ?? "")|\($0.reason ?? "")|\($0.isPinned)|\($0.title)|\($0.evidence.rawValue)"
+                "\($0.activity?.touched.count ?? 0)|\($0.id)|\($0.status.rawValue)|\($0.waiting?.rawValue ?? "")|\($0.reason ?? "")|\($0.isPinned)|\($0.title)|\($0.evidence.rawValue)"
             },
             waves: waves.map {
                 "\($0.id)|\($0.progress ?? "")|\($0.doneCount)/\($0.delegates.count)|\($0.isStale)"
@@ -153,6 +153,7 @@ public actor DetectionEngine {
     private let projectStore: ProjectStore
     private let taskStore: TaskStore
     private let projectAssembler: ProjectAssembler
+    private let activityReader = SessionActivityReader()
     /// Detectors the host supplies — `RunningAppsDetector` needs AppKit, so it
     /// lives in the app and is injected here.
     private let additionalDetectors: [SessionDetector]
@@ -204,7 +205,19 @@ public actor DetectionEngine {
         let auditIndex = config.enableAuditLog ? auditReader.refresh(now: now) : AuditIndex()
         if let degraded = auditIndex.degraded { snapshot.degraded.append(degraded) }
 
-        let enriched = config.enableProjectContext ? contextReader.attach(to: raw) : raw
+        var enriched = config.enableProjectContext ? contextReader.attach(to: raw) : raw
+
+        // What each session actually did — files written and edited — read from
+        // the transcript already open for the "Now" line.
+        if config.enableSessionActivity {
+            enriched = enriched.map { session in
+                guard let transcript = session.transcriptPath else { return session }
+                var copy = session
+                copy.activity = activityReader.activity(forTranscript: transcript,
+                                                        projectPath: session.projectPath)
+                return copy
+            }
+        }
         snapshot.sessions = merge(raw: enriched, overrides: overrides, audit: auditIndex,
                                   config: config, now: now)
 

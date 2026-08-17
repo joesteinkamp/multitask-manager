@@ -252,6 +252,7 @@ struct Show: AsyncParsableCommand {
             for session in project.sessions {
                 let age = Format.duration(Date().timeIntervalSince(session.lastActivity))
                 print("  \(session.status.label.padded(to: 16)) \(age) ago  \(session.source.label)")
+                if let did = session.activity?.summary { print("      \(did)") }
                 if let now = session.context?.now { print("      \(ProjectContextReader.truncate(now, to: 88))") }
             }
         }

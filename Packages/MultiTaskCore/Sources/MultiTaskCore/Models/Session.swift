@@ -95,6 +95,10 @@ public struct Session: Identifiable, Codable, Hashable, Sendable {
     /// Last tool this session invoked, per the audit log. Transient.
     public var lastToolName: String?
 
+    /// What the session actually changed, derived from its own transcript.
+    /// Transient, recomputed each refresh.
+    public var activity: SessionActivity?
+
     /// Computed/last-published status. Filled in by `DetectionEngine`.
     public var status: SessionStatus = .unknown
 
@@ -107,8 +111,8 @@ public struct Session: Identifiable, Codable, Hashable, Sendable {
                 harnessSessionId: String? = nil, context: ProjectContext? = nil,
                 hookStatus: SessionStatus? = nil, waiting: WaitingReason? = nil,
                 reason: String? = nil, evidence: StatusEvidence = .none,
-                lastToolName: String? = nil, status: SessionStatus = .unknown,
-                isPinned: Bool = false) {
+                lastToolName: String? = nil, activity: SessionActivity? = nil,
+                status: SessionStatus = .unknown, isPinned: Bool = false) {
         self.id = id
         self.title = title
         self.projectName = projectName
@@ -126,6 +130,7 @@ public struct Session: Identifiable, Codable, Hashable, Sendable {
         self.reason = reason
         self.evidence = evidence
         self.lastToolName = lastToolName
+        self.activity = activity
         self.status = status
         self.isPinned = isPinned
     }

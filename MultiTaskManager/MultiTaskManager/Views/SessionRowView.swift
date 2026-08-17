@@ -47,6 +47,14 @@ struct SessionRowView: View {
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                        // What it changed beats what it was asked: "wrote 4
+                        // files" is evidence, the prompt is only intent.
+                        if let did = session.activity?.summary {
+                            Text(did)
+                                .font(.system(size: 9))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
                         if let now = session.context?.now {
                             Text(now)
                                 .font(.system(size: 9))

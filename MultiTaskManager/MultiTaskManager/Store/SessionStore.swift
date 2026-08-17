@@ -17,6 +17,12 @@ final class SessionStore: ObservableObject {
     /// rows drill into them, but the popover leads with these.
     @Published private(set) var projects: [Project] = []
     @Published private(set) var sessions: [Session] = []
+    /// The work — the unit this app manages. Sessions are how it observes.
+    @Published private(set) var tasks: [TaskRecord] = []
+    /// Ranked answer to "what should I do next", with the reason for each.
+    @Published private(set) var nextUp: [ReadyItem] = []
+    /// Tasks explicitly blocked on a person. Requests, not suggestions.
+    @Published private(set) var awaitingMe: [TaskRecord] = []
     @Published private(set) var waves: [Wave] = []
     @Published private(set) var repositories: [RepositoryState] = []
     @Published private(set) var degraded: [DegradedReason] = []
@@ -102,6 +108,9 @@ final class SessionStore: ObservableObject {
 
     private func apply(_ snapshot: EngineSnapshot) {
         projects = snapshot.projects
+        tasks = snapshot.tasks
+        nextUp = snapshot.whatNext(for: .me, limit: 5)
+        awaitingMe = snapshot.tasksNeedingYou()
         sessions = snapshot.sessions
         waves = snapshot.waves
         repositories = snapshot.repositories
@@ -159,6 +168,50 @@ final class SessionStore: ObservableObject {
         guard let path = project.path else { return false }
         return overrides.mutedProjects.contains(path)
     }
+
+    // MARK: Tasks
+
+    /// Captures a piece of work. `acceptance` is optional here but strongly
+    /// wanted: work filed without it gets delivered wrong and rejected, which
+    /// costs more than writing the line.
+    func addTask(title: String, projectId: String? = nil,
+                 assignee: Assignee = .me, acceptance: String? = nil) {
+        perform(.createTask(.init(
+            title: title,
+            projectId: projectId,
+            assignee: assignee.encoded,
+            acceptance: acceptance,
+            origin: "app",
+            state: "ready"
+        )))
+    }
+
+    func complete(_ task: TaskRecord) { perform(.completeTask(taskId: task.id, note: nil)) }
+
+    func snooze(_ task: TaskRecord, days: Int = 7) {
+        perform(.snoozeTask(taskId: task.id, days: days))
+    }
+
+    func delete(_ task: TaskRecord) { perform(.deleteTask(taskId: task.id)) }
+
+    func start(_ task: TaskRecord) {
+        perform(.updateTask(.init(taskId: task.id, state: TaskState.running.rawValue)))
+    }
+
+    /// Hands a task to a delegate. It does not *run* anything — assigning is
+    /// organising, and organising is free; starting a run is the gated step and
+    /// lives in Phase 3.
+    func assign(_ task: TaskRecord, to assignee: Assignee) {
+        perform(.updateTask(.init(taskId: task.id, assignee: assignee.encoded)))
+    }
+
+    /// Clears a task's request for a human, once you've dealt with it.
+    func resolveWaiting(_ task: TaskRecord) {
+        perform(.updateTask(.init(taskId: task.id, waiting: "")))
+    }
+
+    /// The delegates this machine can hand work to, for the assign menu.
+    lazy var delegates: [String] = RosterReader().read().delegates.map(\.name)
 
     // MARK: Project lifecycle
 

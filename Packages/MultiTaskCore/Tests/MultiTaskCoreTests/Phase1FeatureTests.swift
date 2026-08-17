@@ -383,3 +383,75 @@ struct RosterTests {
         #expect(roster.notes[0].contains("model-routing.md"))
     }
 }
+
+@Suite("SessionActivityReader — what a session did")
+struct SessionActivityTests {
+    /// A Claude Code transcript with real tool_use blocks.
+    static let transcript = """
+    {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/home/user/projects/app/README.md"}}]}}
+    {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Write","input":{"file_path":"/home/user/projects/app/Sources/New.swift"}}]}}
+    {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/home/user/projects/app/Sources/Old.swift"}}]}}
+    {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/home/user/.zshrc"}}]}}
+    {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"swift test"}}]}}
+    """
+
+    @Test("Separates files created from files edited")
+    func createdVersusEdited() {
+        let activity = SessionActivityReader.parse(Self.transcript, projectPath: "/home/user/projects/app")
+        #expect(activity.created.map(\.name) == ["New.swift"])
+        #expect(activity.edited.map(\.name) == ["Old.swift"])
+        #expect(activity.summary == "wrote 1 file, edited 1")
+    }
+
+    @Test("A file that was only read is not reported as changed")
+    func readsAreNotChanges() {
+        let activity = SessionActivityReader.parse(Self.transcript, projectPath: "/home/user/projects/app")
+        // README.md was Read, never written. Saying it changed would be a lie
+        // that makes the whole signal untrustworthy.
+        #expect(!activity.touched.contains { $0.name == "README.md" })
+        #expect(activity.toolCounts["Read"] == 1)   // still counted as activity
+    }
+
+    @Test("Files outside the project aren't work on it")
+    func outsideProjectIgnored() {
+        let activity = SessionActivityReader.parse(Self.transcript, projectPath: "/home/user/projects/app")
+        // The agent edited ~/.zshrc; that did not change this project.
+        #expect(!activity.touched.contains { $0.path.contains(".zshrc") })
+        #expect(SessionActivityReader.isInside("/home/user/projects/app/a.swift", projectPath: "/home/user/projects/app"))
+        #expect(!SessionActivityReader.isInside("/home/user/projects/app-other/a.swift", projectPath: "/home/user/projects/app"))
+    }
+
+    @Test("Counts tools, which distinguishes exploring from rewriting")
+    func toolHistogram() {
+        let activity = SessionActivityReader.parse(Self.transcript, projectPath: "/home/user/projects/app")
+        #expect(activity.toolCounts["Edit"] == 2)   // includes the one outside the project
+        #expect(activity.toolCounts["Bash"] == 1)
+        #expect(activity.messageCount == 5)
+    }
+
+    @Test("A session that only read things reports its dominant tool")
+    func readOnlySession() {
+        let readOnly = """
+        {"message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/p/a"}}]}}
+        {"message":{"content":[{"type":"tool_use","name":"Read","input":{"file_path":"/p/b"}}]}}
+        """
+        let activity = SessionActivityReader.parse(readOnly, projectPath: "/nowhere")
+        #expect(activity.touched.isEmpty)
+        #expect(activity.summary == "2× Read")
+    }
+
+    @Test("The Codex shape, nested under payload, parses the same way")
+    func codexShape() {
+        let codex = """
+        {"payload":{"content":[{"type":"tool_use","name":"Write","input":{"path":"/p/x.swift"}}]}}
+        """
+        let activity = SessionActivityReader.parse(codex, projectPath: "/p")
+        #expect(activity.created.map(\.name) == ["x.swift"])
+    }
+
+    @Test("No project path means nothing is attributable")
+    func noProject() {
+        let activity = SessionActivityReader.parse(Self.transcript, projectPath: nil)
+        #expect(activity.touched.isEmpty)
+    }
+}
