@@ -113,12 +113,20 @@ struct DesignTokensTests {
         do {
             try process.run()
         } catch {
-            // No python3 on this machine: skip rather than fail, since the value
-            // checks above still cover the contents.
+            // Not even `env` here. Skip rather than fail; the value checks above
+            // still cover the contents, and CI's `design` job runs the real check
+            // on a runner that has python3.
             return
         }
         let text = String(decoding: output.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
         process.waitUntilExit()
+
+        // 127 is `env` reporting that python3 is not installed — it is not the
+        // generator disagreeing with DESIGN.json. The earlier `catch` did not
+        // cover this: `env` itself launches fine and *exits* 127, so the guard
+        // never fired and the swift:6.0 container failed this test on every run.
+        guard process.terminationStatus != 127 else { return }
+
         #expect(process.terminationStatus == 0, "\(text)")
     }
 }
