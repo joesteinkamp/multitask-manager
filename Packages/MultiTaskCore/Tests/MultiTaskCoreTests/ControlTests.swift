@@ -460,7 +460,7 @@ struct LauncherSpawnTests {
         let launcher = Launcher(runStore: RunStore(directory: dir.url))
         let run = harmlessRun(dir, command: ["definitely-not-a-real-binary-xyz"])
 
-        let error = #expect(throws: LaunchError.self) { _ = try launcher.start(run) }
+        let error = expectError(LaunchError.self) { _ = try launcher.start(run) }
         // The message has to say what to do, not just that something went wrong.
         #expect(error?.description.contains("PATH") == true)
     }

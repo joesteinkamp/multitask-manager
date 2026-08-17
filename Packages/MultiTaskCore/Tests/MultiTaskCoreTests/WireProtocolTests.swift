@@ -69,7 +69,7 @@ struct MessageCodecTests {
         // commit is that this fails loudly instead of half-decoding.
         let future = Data(#"{"v":99,"id":"1","type":"req","method":"list"}"#.utf8)
 
-        let fault = #expect(throws: ProtocolFault.self) {
+        let fault = expectError(ProtocolFault.self) {
             try codec.decodeHeader(future)
         }
         #expect(fault?.code == .unsupportedVersion)
@@ -78,7 +78,7 @@ struct MessageCodecTests {
 
     @Test("Garbage is a malformed message, not a crash")
     func malformedMessage() {
-        let fault = #expect(throws: ProtocolFault.self) {
+        let fault = expectError(ProtocolFault.self) {
             try codec.decodeHeader(Data("not json at all".utf8))
         }
         #expect(fault?.code == .malformedMessage)
@@ -87,7 +87,7 @@ struct MessageCodecTests {
     @Test("Asking for a slot the message doesn't have is a clean parameter error")
     func missingSlot() throws {
         let frame = try codec.encodeRequest(id: "1", method: WireProtocol.methodHealth)
-        let fault = #expect(throws: ProtocolFault.self) {
+        let fault = expectError(ProtocolFault.self) {
             try codec.decodeParams(SessionQuery.self, from: frame)
         }
         #expect(fault?.code == .badParameters)

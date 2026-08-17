@@ -166,8 +166,8 @@ struct InProcessEngineActionTests {
         let engine = makeEngine(dir)
         let id = try #require(try await engine.list().sessions.first?.id)
 
-        let fault = await #expect(throws: ProtocolFault.self) {
-            try await engine.act(.rename(sessionId: id, title: "   "))
+        let fault = await expectError(ProtocolFault.self) {
+            _ = try await engine.act(.rename(sessionId: id, title: "   "))
         }
         #expect(fault?.code == .badParameters)
     }
