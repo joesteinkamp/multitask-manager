@@ -23,8 +23,6 @@ Every flow, including the three briefs (which have no command of their own), als
 
 ## Project-specific Claude notes
 
-**Still to write:** `CODE.md`.
-
 **`DESIGN.json` is generated-from, not edited-alongside.** It is the single source for every
 constant both interfaces share, and
 `Packages/MultiTaskCore/Sources/MultiTaskCore/Design/DesignTokens.swift` is generated from it by
@@ -34,6 +32,11 @@ UIs from drifting, since two hand-maintained constant files drift by two points 
 time, which nobody notices until the apps sit side by side.
 
 The Swift package lives at `Packages/MultiTaskCore` and is built and tested with a Linux
-toolchain (`swift test` from that directory). The macOS app has **not** yet been migrated onto
-the package — it still carries its own copies of the models and detectors, and that migration
-needs a Mac to verify.
+toolchain (`swift test` from that directory).
+
+**The app is migrated onto the package but has never been compiled.** Every app file imports
+`MultiTaskCore` and no model or detector is duplicated any more — what remains in the app target
+is views, the view model, and four genuinely platform-specific pieces (`NSWorkspace`,
+`ServiceManagement`, `UserNotifications`, `UserDefaults`). Every file parses with `swiftc -parse`
+on Linux, which catches syntax and nothing else; type-checking SwiftUI needs a Mac, so expect the
+first Xcode build to surface real errors.

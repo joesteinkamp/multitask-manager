@@ -168,15 +168,56 @@ core question is "what needs me", that must be a column, not a tag.**
 
 ### Already done
 
-Landed 2026-08-16 in `Packages/MultiTaskCore`, with 152 tests: **P6.1** (tests,
-written first), **P2.1** (core extracted), the Foundation-only logic of
-**P1.1–P1.6**, **P3.5** (triage), **P2.4** (the `mtm` CLI), and **P6.2** (CI).
-The macOS app has *not* been migrated onto the package — that is the outstanding
-piece of P2.1 and needs a Mac to verify.
+**2026-08-16, 152 tests.** **P6.1** (tests, written first), **P2.1** (core
+extracted), the Foundation-only logic of **P1.1–P1.6**, **P3.5** (triage),
+**P2.4** (the `mtm` CLI), and **P6.2** (CI).
+
+**2026-08-17, 330 tests.** The task layer (**P4.1–P4.7**), the MCP server
+(**P4.8**), Phase 3 control — gated runs, cancellation, worktree provisioning —
+and the design system (`DESIGN.json` plus a generated token file, checked in CI).
+
+The **approval queue** was not in the original plan and was pulled forward from
+Phase 5, because writing the MCP server made a hole in the design obvious: the
+confirmation-token gate assumes the party reading the description and the party
+replaying the token is a person. Over MCP that is false, and an agent handed a
+token simply calls again with it. So agents now `request_run`; only a person
+decides, and approving is what mints the token, inside the engine. There is no
+MCP tool that decides, and a test fails if one is ever added. This is the
+foundation Phase 5's standing authority has to be built on top of, rather than
+instead of.
+
+Everything above is exercised end to end through the CLI and the MCP server on
+Linux. **The macOS app has never been compiled** — every file parses, but
+type-checking needs a Mac. That, and migrating the app onto the package, is the
+outstanding piece of P2.1.
 
 The P1.2 spike is settled: the audit log's `session` matches 95 of 97 local
 Claude Code transcript ids and every Codex rollout, so the join is precise and
 `cwd` is a genuine fallback. See *Open questions* for what the real log taught us.
+
+### Bugs the build found that reading would not have
+
+Recorded because each one is a design lesson rather than a typo, and because a
+plan that only lists intentions reads as if nothing surprising happened:
+
+- **The gate could never be passed.** The confirmation token was a freshly minted
+  run id, so it differed between the describe pass and the do pass. Every
+  confirmed run was silently refused and the CLI exited 0 saying nothing — and
+  the whole suite stayed green, because the tests only ever checked refusal,
+  which is what a broken gate does perfectly. Tokens are now derived from the
+  request, so they are stable *and* bound: approving one run cannot authorise
+  another.
+- **`confirm == "yes"` was a literal that always passed.** Removed.
+- **`Process.isRunning` and `waitUntilExit()` are unreliable on Linux.** After
+  `terminate()` the termination handler fires at once with status 15, yet
+  `isRunning` still answers `true` seconds later and `waitUntilExit` blocks for
+  the child's *full original lifetime* — a `sleep 30` killed at 200ms held the
+  caller 30 seconds. Everything waits on the handler now; the suite went from 31s
+  to 4.4s.
+- **Tests were writing to the real `~/.multitaskmanager`.** 378 fixture decisions
+  ("Do a thing", "Vague work") had accumulated in a live home and would have
+  appeared in the app's own feed. Stores now resolve to a per-process temp root
+  under a test bundle — a mechanism, not a convention each test must remember.
 
 ### What remains
 
