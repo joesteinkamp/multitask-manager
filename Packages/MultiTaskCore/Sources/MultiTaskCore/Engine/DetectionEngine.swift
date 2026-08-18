@@ -206,6 +206,12 @@ public actor DetectionEngine {
     // MARK: Refresh
 
     public func refresh(overrides: UserOverrides = .empty, now: Date = Date()) async -> EngineSnapshot {
+        // Drop rows for directories that are gone. A project that cannot be
+        // opened cannot be acted on, and leaving it there makes every count in
+        // the interface wrong — the header said four projects while one of them
+        // pointed at nothing.
+        projectStore.forgetVanished()
+
         let config = configurationProvider.configuration
         var snapshot = EngineSnapshot()
 

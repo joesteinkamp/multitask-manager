@@ -344,7 +344,10 @@ final class SessionStore: ObservableObject {
         let record = ProjectRecord(
             id: ProjectRecord.identifier(forPath: url.path),
             name: FileSupport.lastComponent(of: path),
-            path: url.path
+            path: url.path,
+            // Marked, so the cleanup that removes vanished *discovered* projects
+            // can never remove one the user chose.
+            origin: "manual"
         )
         projectStore.save(record)
         refresh()

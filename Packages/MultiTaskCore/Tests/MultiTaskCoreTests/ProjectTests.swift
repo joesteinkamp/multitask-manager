@@ -660,3 +660,100 @@ struct ProjectReasonTests {
     }
 }
 
+
+@Suite("Worktrees belong to their repository")
+struct WorktreeAttributionTests {
+
+    /// A repository with a worktree beside it, laid out the way git does.
+    private func repoAndWorktree(_ dir: TempDir) -> (repo: String, worktree: String) {
+        let repo = dir.makeDirectory("app")
+        dir.write("ref: refs/heads/main\n", to: "app/.git/HEAD")
+
+        let worktree = dir.makeDirectory("app-claude")
+        // A worktree's `.git` is a *file*, not a directory.
+        dir.write("gitdir: \(repo.path)/.git/worktrees/app-claude\n", to: "app-claude/.git")
+        return (repo.path, worktree.path)
+    }
+
+    @Test("A worktree resolves to the repository it is a checkout of")
+    func resolvesToRepository() {
+        let dir = TempDir()
+        let (repo, worktree) = repoAndWorktree(dir)
+        #expect(FileSupport.mainRepository(ofWorktree: worktree) == FileSupport.normalise(repo))
+    }
+
+    @Test("An ordinary repository is not a worktree")
+    func repositoryIsNotAWorktree() {
+        let dir = TempDir()
+        let (repo, _) = repoAndWorktree(dir)
+        // Its `.git` is a directory, which is the whole distinction.
+        #expect(FileSupport.mainRepository(ofWorktree: repo) == nil)
+    }
+
+    @Test("A gitdir pointing somewhere else is left alone")
+    func submodulesAreNotWorktrees() {
+        let dir = TempDir()
+        let sub = dir.makeDirectory("vendor/lib")
+        // Submodules also use a `.git` file, and must not be mistaken for a
+        // worktree and folded into a parent that has nothing to do with them.
+        dir.write("gitdir: ../../.git/modules/lib\n", to: "vendor/lib/.git")
+        #expect(FileSupport.mainRepository(ofWorktree: sub.path) == nil)
+    }
+
+    @Test("Discovering a worktree records the repository, not the worktree")
+    func discoveryFoldsWorktrees() throws {
+        let dir = TempDir()
+        let (repo, worktree) = repoAndWorktree(dir)
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+
+        let record = try #require(store.ensure(path: worktree))
+        #expect(FileSupport.pathsEqual(record.path ?? "", repo))
+        #expect(record.name == "app")
+        // One project, not two — the worktree and the repository are one thing.
+        #expect(store.load().count == 1)
+        #expect(store.ensure(path: repo)?.id == record.id)
+    }
+}
+
+@Suite("Forgetting projects that are gone")
+struct VanishedProjectTests {
+
+    @Test("A discovered project whose directory is gone is dropped")
+    func dropsVanished() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        let real = dir.makeDirectory("still-here")
+
+        store.save(ProjectRecord(id: "here", name: "still-here", path: real.path))
+        store.save(ProjectRecord(id: "gone", name: "gone", path: dir.path("never-existed")))
+
+        let removed = store.forgetVanished()
+        #expect(removed.map(\.id) == ["gone"])
+        #expect(store.load().map(\.id) == ["here"])
+    }
+
+    @Test("A project the user added by hand is never dropped")
+    func keepsManualProjects() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        // Deliberate even though the path is missing: they said this is a
+        // project, and an unmounted volume or a repo not yet cloned is their
+        // business, not ours to tidy away.
+        store.save(ProjectRecord(id: "mine", name: "mine",
+                                 path: dir.path("not-cloned-yet"), origin: "manual"))
+
+        #expect(store.forgetVanished().isEmpty)
+        #expect(store.load().count == 1)
+    }
+
+    @Test("A project with no path is left alone")
+    func keepsPathlessProjects() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        // An idea rather than a checkout — there is no directory to be missing.
+        store.save(ProjectRecord(id: "idea", name: "Redesign onboarding"))
+
+        #expect(store.forgetVanished().isEmpty)
+        #expect(store.load().count == 1)
+    }
+}

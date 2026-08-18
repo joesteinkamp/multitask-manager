@@ -168,6 +168,39 @@ public enum FileSupport {
         "AGENTS.md", "CLAUDE.md", "PRODUCT.md", "README.md"
     ]
 
+    /// The repository a git worktree belongs to, or `nil` if this is not one.
+    ///
+    /// A worktree's `.git` is a *file* rather than a directory, holding a line
+    /// like `gitdir: /path/to/repo/.git/worktrees/<name>`. Reading it is how a
+    /// worktree can be attributed to the project it is a checkout of.
+    ///
+    /// This matters here because the whole parallel-agent workflow puts agents in
+    /// `../<repo>-<agent>` worktrees. Treated as directories in their own right,
+    /// each one becomes a separate project with a name nobody chose — which is
+    /// how `practical-chaplygin-eb0c7d` ended up as a row of its own.
+    public static func mainRepository(ofWorktree path: String) -> String? {
+        let gitPath = normalise(path) + "/.git"
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: gitPath, isDirectory: &isDirectory),
+              !isDirectory.boolValue,
+              let contents = try? String(contentsOfFile: gitPath, encoding: .utf8) else {
+            return nil
+        }
+
+        guard let line = Markdown.lines(of: contents).first(where: { $0.hasPrefix("gitdir:") }) else {
+            return nil
+        }
+        let gitDir = normalise(line.dropFirst("gitdir:".count)
+            .trimmingCharacters(in: .whitespaces))
+
+        // `/repo/.git/worktrees/<name>` → `/repo`. A `gitdir:` pointing anywhere
+        // else is a submodule or something stranger, and is left alone rather
+        // than guessed at.
+        guard let range = gitDir.range(of: "/.git/worktrees/") else { return nil }
+        let repository = String(gitDir[gitDir.startIndex..<range.lowerBound])
+        return repository.isEmpty ? nil : repository
+    }
+
     /// Whether a directory *looks like* a project, as opposed to merely being one
     /// a session ran in.
     ///
