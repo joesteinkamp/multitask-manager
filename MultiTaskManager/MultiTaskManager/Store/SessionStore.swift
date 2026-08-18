@@ -436,8 +436,24 @@ final class SessionStore: ObservableObject {
         return false
     }
 
-    func activate(_ project: Project) {
-        if let path = project.path { reveal(path) }
+    /// Goes to where the project's work is happening.
+    ///
+    /// Same order as a session, and for the same reason: a project row is a way
+    /// into the work, and the work is in a terminal. Revealing the folder was the
+    /// only behaviour here, which answered "where does this live" rather than
+    /// "take me to it".
+    @discardableResult
+    func activate(_ project: Project) -> Bool {
+        guard let path = project.path else { return false }
+        if focusTerminal(forProjectPath: path) { return true }
+
+        // Nothing is running there. Finder is the right answer now — but only if
+        // the directory still exists: revealing a path that has been moved or
+        // deleted opens something arbitrary, which is how a stale row ended up
+        // opening ~/Applications.
+        guard FileSupport.isDirectory(URL(fileURLWithPath: path)) else { return false }
+        reveal(path)
+        return true
     }
 
     func reveal(_ path: String) {

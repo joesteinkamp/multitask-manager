@@ -422,13 +422,60 @@ struct ProjectStoreTests {
     @Test("ensure() creates a record once and returns the same one after")
     func ensureIsIdempotent() throws {
         let dir = TempDir()
-        let store = ProjectStore(directory: dir.url)
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        // A directory that looks like a project, since discovery now requires it.
+        let project = dir.makeDirectory("app")
+        dir.write("# App\n", to: "app/README.md")
 
-        let first = store.ensure(path: "/home/user/projects/app", now: now)
-        let second = store.ensure(path: "/home/user/projects/app", now: now)
+        let first = try #require(store.ensure(path: project.path, now: now))
+        let second = try #require(store.ensure(path: project.path, now: now))
 
         #expect(first.id == second.id)
         #expect(store.load().count == 1)
+    }
+
+    @Test("Discovery ignores directories that are not projects")
+    func discoveryIsSelective() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+
+        // A session ran here, but nobody manages it: no marker of any kind.
+        let bare = dir.makeDirectory("just-a-folder")
+        #expect(store.ensure(path: bare.path) == nil)
+        #expect(store.load().isEmpty)
+
+        // The user saying so is enough, marker or not.
+        let named = store.ensure(path: bare.path, discovered: false)
+        #expect(named?.name == "just-a-folder")
+        #expect(store.load().count == 1)
+    }
+
+    @Test("A marker of any kind is enough to count as a project")
+    func markersCount() throws {
+        for marker in ["README.md", "package.json", "Package.swift", "Cargo.toml", "AGENTS.md"] {
+            let dir = TempDir()
+            let project = dir.makeDirectory("thing")
+            dir.write("x", to: "thing/\(marker)")
+            #expect(FileSupport.looksLikeProject(project.path), "\(marker) should mark a project")
+        }
+    }
+
+    @Test("Tool-state directories are never projects, even with a marker")
+    func excludedLocations() {
+        let dir = TempDir()
+        // A path *through* a dot-directory is tool state, not work — this is the
+        // shape that produced a row for a skills folder six levels inside
+        // ~/.hermes. The marker is present and deliberately not enough.
+        let hidden = dir.makeDirectory(".hermes/profiles/x/skills/thing")
+        dir.write("x", to: ".hermes/profiles/x/skills/thing/README.md")
+        #expect(!FileSupport.looksLikeProject(hidden.path))
+
+        // A scratch directory is excluded by having no marker, not by where it
+        // lives — so a real repository cloned somewhere temporary still counts.
+        let scratch = dir.makeDirectory("scratchpad")
+        #expect(!FileSupport.looksLikeProject(scratch.path))
+        dir.write("x", to: "scratchpad/.git")
+        #expect(FileSupport.looksLikeProject(scratch.path))
     }
 
     @Test("Identifiers are stable for a path and distinct for lookalikes")

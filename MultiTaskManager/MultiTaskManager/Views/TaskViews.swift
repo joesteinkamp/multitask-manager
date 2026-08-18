@@ -200,12 +200,30 @@ struct TaskRowView: View {
 /// rather than required because half-captured work still beats forgotten work.
 struct TaskComposer: View {
     @EnvironmentObject private var store: SessionStore
+    /// The project this task belongs to. `nil` means "not chosen yet", not
+    /// "no project" — see `chosenProject`.
     let projectId: String?
     var onFinish: () -> Void
 
     @State private var title = ""
     @State private var acceptance = ""
+    @State private var selectedProjectId: String?
     @FocusState private var titleFocused: Bool
+
+    /// Where the task will be filed.
+    ///
+    /// **A task always belongs to a project.** A loose task is one nobody will
+    /// ever see in context, and it breaks the thing this product is built on:
+    /// the project is the primary unit, and "what should I do next" ranks work
+    /// *within* projects. Filing without one produced a central list that
+    /// belonged nowhere.
+    ///
+    /// Composed from a project's row, that project is the answer. Composed from
+    /// the footer, the field below asks — defaulting to the project that most
+    /// recently did something, which is nearly always the one meant.
+    private var chosenProject: String? {
+        projectId ?? selectedProjectId ?? store.activeProjects.first?.id
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
@@ -220,13 +238,36 @@ struct TaskComposer: View {
                     .font(.caption)
             }
 
+            // Only when the caller did not already know: a task added from a
+            // project's own row does not ask which project it is for.
+            if projectId == nil {
+                Picker("Project", selection: Binding(
+                    get: { chosenProject ?? "" },
+                    set: { selectedProjectId = $0.isEmpty ? nil : $0 }
+                )) {
+                    ForEach(store.activeProjects) { project in
+                        Text(project.name).tag(project.id)
+                    }
+                }
+                .labelsHidden()
+                .font(.caption)
+                .disabled(store.activeProjects.isEmpty)
+            }
+
             HStack {
                 Spacer()
                 Button("Cancel") { onFinish() }
                     .buttonStyle(.link)
                     .font(.caption)
                 Button("Add", action: commit)
-                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(title.trimmingCharacters(in: .whitespaces).isEmpty
+                              || chosenProject == nil)
+            }
+
+            if store.activeProjects.isEmpty, projectId == nil {
+                Text("Track a project first — a task needs somewhere to belong.")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .onAppear { titleFocused = true }
@@ -235,9 +276,10 @@ struct TaskComposer: View {
     private func commit() {
         let trimmed = title.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return }
+        guard let project = chosenProject else { return }
         store.addTask(
             title: trimmed,
-            projectId: projectId,
+            projectId: project,
             acceptance: acceptance.isEmpty ? nil : acceptance
         )
         title = ""
