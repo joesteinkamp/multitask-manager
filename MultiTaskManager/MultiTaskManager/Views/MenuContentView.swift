@@ -379,10 +379,16 @@ enum SettingsPresentation {
     /// deterministic; activating after races the window's creation.
     static func prepare() {
         NSApp.setActivationPolicy(.regular)
-        // `activate()` rather than `activate(ignoringOtherApps:)`, which is
-        // deprecated from macOS 14 — and this is a direct response to a click,
-        // the case cooperative activation exists for.
-        NSApp.activate()
+        // `activate()` is macOS 14+, and this helper is reachable from the
+        // macOS 13 path too — the package deploys to 13. On 14+ it is the right
+        // call (the `ignoringOtherApps:` variant is deprecated there, and this
+        // is a direct response to a click, the case cooperative activation
+        // exists for); on 13 that variant is the only one there is.
+        if #available(macOS 14.0, *) {
+            NSApp.activate()
+        } else {
+            NSApp.activate(ignoringOtherApps: true)
+        }
         observeClose()
     }
 
@@ -391,16 +397,17 @@ enum SettingsPresentation {
         closeObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.willCloseNotification, object: nil, queue: .main
         ) { _ in
-            // On the next pass, so the closing window is out of `windows` by the
-            // time we count what is left.
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    // `canBecomeMain` is what separates a real window from the
-                    // menu bar popover, which is a panel and must never keep the
-                    // app in `.regular`.
-                    let stillOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
-                    if !stillOpen { NSApp.setActivationPolicy(.accessory) }
-                }
+            // Hopped rather than run inline, so the closing window has left
+            // `NSApp.windows` by the time we count what is left.
+            //
+            // `Task { @MainActor in }` rather than `MainActor.assumeIsolated`,
+            // which is macOS 14+ and this deploys to 13.
+            Task { @MainActor in
+                // `canBecomeMain` is what separates a real window from the menu
+                // bar popover, which is a panel and must never hold the app in
+                // `.regular`.
+                let stillOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+                if !stillOpen { NSApp.setActivationPolicy(.accessory) }
             }
         }
     }
