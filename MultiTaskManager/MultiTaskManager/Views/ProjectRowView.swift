@@ -226,6 +226,10 @@ struct ProjectRowView: View {
             Divider()
             Button("Park for a week") { store.park(project) }
             Button("Archive") { store.archive(project) }
+            // Archive keeps it; this removes it. Needed because detection will
+            // sometimes decide a directory is a project when it plainly is not,
+            // and the answer to that cannot be "wait for a better heuristic".
+            Button("Not a project — forget it", role: .destructive) { store.forget(project) }
         } label: {
             Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
         }
