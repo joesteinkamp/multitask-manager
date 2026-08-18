@@ -63,7 +63,7 @@ public final class OverridesStore {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             guard let data = try? encoder.encode(overrides) else { return }
-            try? data.write(to: fileURL, options: .atomic)
+            try? FileSupport.write(data, to: fileURL)
         }
     }
 }

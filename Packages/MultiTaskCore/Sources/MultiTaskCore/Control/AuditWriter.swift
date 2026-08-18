@@ -88,6 +88,6 @@ public struct AuditWriter: Sendable {
         let url = URL(fileURLWithPath: path)
         try? FileSupport.fileManager.createDirectory(at: url.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        try? FileSupport.write(data, to: url)
     }
 }
