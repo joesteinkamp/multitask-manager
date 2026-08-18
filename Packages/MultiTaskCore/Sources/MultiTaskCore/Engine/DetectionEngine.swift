@@ -427,15 +427,20 @@ public actor DetectionEngine {
 
         if let activity, let endedAt = activity.endedAt {
             let sinceEnd = now.timeIntervalSince(endedAt)
-            // A run that finished days ago isn't asking for anything; age it out the
-            // same way a quiet session ages out.
-            let status: SessionStatus = sinceEnd >= config.idleThreshold ? .idle : .needsAttention
+            // **Finished is not the same as needing you.** This used to report a
+            // completed run as `needsAttention`, so a Codex run that ended
+            // cleanly lit the badge claiming it wanted a response. It wanted
+            // nothing. A run that ended is `complete` until it ages out.
+            let status: SessionStatus = sinceEnd >= config.idleThreshold ? .idle : .complete
             return Verdict(status: status, evidence: .sessionEnd,
-                           waiting: status == .needsAttention ? .done : nil,
-                           reason: activity.endReason)
+                           waiting: nil, reason: activity.endReason)
         }
 
         if let activity {
+            // Silence is not a request. Without a hook the most this can honestly
+            // say is "working" or "idle" — a quiet transcript looks identical
+            // whether the agent is thinking, waiting on the network, or waiting
+            // on you, and only one of those should interrupt.
             return Verdict(status: status(forGap: now.timeIntervalSince(activity.lastEventAt), config: config),
                            evidence: .auditActivity, waiting: nil, reason: nil)
         }
@@ -447,10 +452,21 @@ public actor DetectionEngine {
                        evidence: .fileActivity, waiting: nil, reason: nil)
     }
 
+    /// What a *gap in activity* can honestly be read as.
+    ///
+    /// **Never `needsAttention`.** A quiet transcript looks exactly the same
+    /// whether the agent is thinking, waiting on a slow network call, or waiting
+    /// on a person — and this used to call all three "needs attention", which
+    /// produced alerts for sessions that wanted nothing and taught the badge to
+    /// be ignored.
+    ///
+    /// `needsAttention` now comes only from something that *says so*: a hook
+    /// reporting `permission_prompt` or `agent_needs_input`, or a task explicitly
+    /// waiting on a human. Install the hooks (`mtm hooks install`) and attention
+    /// becomes a fact; without them the app reports activity honestly and
+    /// interrupts for nothing.
     private static func status(forGap gap: TimeInterval, config: Configuration) -> SessionStatus {
-        if gap >= config.idleThreshold { return .idle }
-        if gap >= config.attentionThreshold { return .needsAttention }
-        return .working
+        gap >= config.attentionThreshold ? .idle : .working
     }
 
     public static func sortSessions(_ sessions: [Session]) -> [Session] {

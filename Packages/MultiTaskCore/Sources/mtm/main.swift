@@ -14,7 +14,7 @@ struct MTM: AsyncParsableCommand {
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
         subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
-                      Run.self, Runs.self, Provision.self, Asks.self,
+                      Run.self, Runs.self, Provision.self, Asks.self, Hooks.self,
                       Log.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
@@ -1245,3 +1245,103 @@ struct AsksDeny: AsyncParsableCommand {
         }
     }
 }
+
+// MARK: - hooks
+
+/// Wires the status hooks into Claude Code.
+///
+/// Without them the app infers status from how long a transcript has gone
+/// unmodified, which cannot tell a session waiting for you from one thinking
+/// hard — and calls both "needs attention". The harness will say which outright;
+/// this is what asks it to.
+struct Hooks: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Let the harness report session status instead of guessing at it.",
+        subcommands: [HooksInstall.self, HooksUninstall.self]
+    )
+
+    func run() async throws {
+        let installer = HookInstaller()
+        let plan = installer.plan()
+
+        print("Settings: \(plan.settingsPath)")
+        print("Script:   \(plan.scriptPath)")
+        print("")
+        if plan.isComplete {
+            print("All \(plan.alreadyInstalled.count) hooks installed.")
+            print("Status comes from the harness, not from timeouts.")
+        } else {
+            print("\(plan.adding.count) hook(s) missing: \(plan.adding.joined(separator: ", "))")
+            print("")
+            print("Until these are installed, \"needs attention\" is inferred from a quiet")
+            print("transcript — which reports a session that is thinking and a session that")
+            print("is waiting for you identically.")
+            print("")
+            print("Install with `mtm hooks install`.")
+        }
+        if plan.foreignHooks > 0 {
+            print("\n\(plan.foreignHooks) other hook(s) present. They are left alone.")
+        }
+    }
+}
+
+struct HooksInstall: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "install",
+        abstract: "Add the status hooks, preserving any already there."
+    )
+
+    func run() async throws {
+        let installer = HookInstaller()
+
+        // The script has to live somewhere stable — a path inside a checkout
+        // breaks the day the checkout moves.
+        let destination = URL(fileURLWithPath: installer.scriptPath)
+        guard let source = Self.bundledScript() else {
+            print("Couldn't find mtm-status.sh. Expected it beside the binary or in the repo.")
+            throw ExitCode.failure
+        }
+        let script = try String(contentsOf: source, encoding: .utf8)
+        try FileSupport.write(script, to: destination)
+        try? FileSupport.fileManager.setAttributes([.posixPermissions: 0o755],
+                                                   ofItemAtPath: destination.path)
+
+        let added = try installer.install()
+        if added.isEmpty {
+            print("Already installed. Nothing changed.")
+        } else {
+            print("Installed \(added.count) hook(s): \(added.joined(separator: ", "))")
+            print("Script: \(destination.path)")
+            print("")
+            print("New sessions report their own status from now on. Sessions already")
+            print("running keep the inferred one until they next do something.")
+        }
+    }
+
+    /// Finds the script beside the binary, or in the repository during development.
+    static func bundledScript() -> URL? {
+        let candidates = [
+            URL(fileURLWithPath: CommandLine.arguments[0])
+                .deletingLastPathComponent().appendingPathComponent("mtm-status.sh"),
+            URL(fileURLWithPath: FileSupport.fileManager.currentDirectoryPath)
+                .appendingPathComponent("Scripts/hooks/mtm-status.sh"),
+            URL(fileURLWithPath: FileSupport.fileManager.currentDirectoryPath)
+                .appendingPathComponent("../../Scripts/hooks/mtm-status.sh")
+        ]
+        return candidates.first { FileSupport.fileManager.fileExists(atPath: $0.path) }
+    }
+}
+
+struct HooksUninstall: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "uninstall",
+        abstract: "Remove this app's hooks, leaving every other one in place."
+    )
+
+    func run() async throws {
+        let removed = try HookInstaller().uninstall()
+        print(removed.isEmpty ? "Nothing to remove."
+                              : "Removed \(removed.count) hook(s): \(removed.joined(separator: ", "))")
+    }
+}
+

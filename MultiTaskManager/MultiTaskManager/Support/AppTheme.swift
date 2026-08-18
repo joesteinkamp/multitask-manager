@@ -120,6 +120,10 @@ extension SessionStatus {
         switch self {
         case .working: return AppTheme.workingColor
         case .needsAttention: return AppTheme.attentionColor
+        // Complete reads as settled, not as a success to celebrate — and
+        // deliberately not as attention, which is the distinction that stops the
+        // badge crying wolf.
+        case .complete: return AppTheme.readyColor
         case .idle: return AppTheme.dormantColor
         case .unknown: return AppTheme.unknownColor
         }
@@ -168,6 +172,7 @@ enum RelativeTime {
         let elapsed = compact(seconds)
         switch status {
         case .needsAttention: return "waiting \(elapsed)"
+        case .complete: return "finished \(elapsed) ago"
         case .working: return seconds < 5 ? "now" : "\(elapsed) ago"
         default: return "\(elapsed) ago"
         }
