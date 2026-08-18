@@ -31,25 +31,25 @@ cwd="$(field cwd)"
 [ -n "$cwd" ] || cwd="$PWD"
 
 case "$event" in
-  SessionStart)            status=idle;           waiting=""; reason="Session started" ;;
-  UserPromptSubmit)        status=working;        waiting=""; reason="Working" ;;
+  SessionStart)            status="idle";           waiting=""; reason="Session started" ;;
+  UserPromptSubmit)        status="working";        waiting=""; reason="Working" ;;
   PreToolUse|PostToolUse|PostToolBatch)
-                           status=working;        waiting=""; reason="${matcher:-Running a tool}" ;;
+                           status="working";        waiting=""; reason="${matcher:-Running a tool}" ;;
   # The event this whole file exists for. `agent_needs_input` and
   # `permission_prompt` are the harness stating outright that it is blocked on a
   # person — no timeout, no inference.
   Notification)
     case "$matcher" in
-      permission_prompt)   status=needs_attention; waiting=approval; reason="Waiting for permission" ;;
-      agent_needs_input)   status=needs_attention; waiting=question; reason="Asked you something" ;;
-      idle_prompt)         status=needs_attention; waiting=question; reason="Waiting for your reply" ;;
-      agent_completed)     status=done;            waiting=done;     reason="Finished" ;;
-      *)                   status=needs_attention; waiting=question; reason="${matcher:-Notification}" ;;
+      permission_prompt)   status="needs_attention"; waiting="approval"; reason="Waiting for permission" ;;
+      agent_needs_input)   status="needs_attention"; waiting="question"; reason="Asked you something" ;;
+      idle_prompt)         status="needs_attention"; waiting="question"; reason="Waiting for your reply" ;;
+      agent_completed)     status="done";            waiting="done";     reason="Finished" ;;
+      *)                   status="needs_attention"; waiting="question"; reason="${matcher:-Notification}" ;;
     esac ;;
-  Stop)                    status=done;           waiting=done; reason="Finished responding" ;;
-  StopFailure)             status=needs_attention; waiting=error; reason="Turn ended with an error" ;;
-  SubagentStop)            status=working;        waiting=""; reason="Subagent finished" ;;
-  SessionEnd)              status=done;           waiting=done; reason="Session ended" ;;
+  Stop)                    status="done";           waiting="done"; reason="Finished responding" ;;
+  StopFailure)             status="needs_attention"; waiting="error"; reason="Turn ended with an error" ;;
+  SubagentStop)            status="working";        waiting=""; reason="Subagent finished" ;;
+  SessionEnd)              status="done";           waiting="done"; reason="Session ended" ;;
   *)                       exit 0 ;;
 esac
 
