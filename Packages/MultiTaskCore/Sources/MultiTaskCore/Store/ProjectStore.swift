@@ -99,7 +99,7 @@ public final class ProjectStore: @unchecked Sendable {
         }
         let text = Self.encode(record, body: body)
         do {
-            try text.write(to: url, atomically: true, encoding: .utf8)
+            try FileSupport.write(text, to: url)
             lastWriteError = nil
         } catch {
             // Previously `try?`. A store that silently fails to persist turns

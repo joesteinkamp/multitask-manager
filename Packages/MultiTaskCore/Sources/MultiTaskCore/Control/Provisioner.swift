@@ -128,12 +128,9 @@ public struct Provisioner: Sendable {
 
         // The marker goes down first: if anything below fails, the directory is
         // still identifiable as ours rather than becoming an orphan nobody owns.
-        try? "created by mtm\n".write(to: context.appendingPathComponent(Self.ownershipMarker),
-                                      atomically: true, encoding: .utf8)
-        try? brief.write(to: context.appendingPathComponent("TASK.md"),
-                         atomically: true, encoding: .utf8)
-        try? "".write(to: context.appendingPathComponent("STATE.md"),
-                      atomically: true, encoding: .utf8)
+        try? FileSupport.write("created by mtm\n", to: context.appendingPathComponent(Self.ownershipMarker))
+        try? FileSupport.write(brief, to: context.appendingPathComponent("TASK.md"))
+        try? FileSupport.write("", to: context.appendingPathComponent("STATE.md"))
 
         return Isolation(worktreePath: worktree, branch: branch, contextDirectory: context.path)
     }

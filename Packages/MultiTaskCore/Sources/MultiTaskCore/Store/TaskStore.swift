@@ -144,7 +144,7 @@ public final class TaskStore: @unchecked Sendable {
 
     private func write(_ task: TaskRecord) {
         let url = directory.appendingPathComponent("\(task.id).md")
-        try? Self.encode(task).write(to: url, atomically: true, encoding: .utf8)
+        try? FileSupport.write(Self.encode(task), to: url)
     }
 
     // MARK: Dependency validation
