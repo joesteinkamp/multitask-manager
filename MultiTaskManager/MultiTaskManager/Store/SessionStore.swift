@@ -324,6 +324,40 @@ final class SessionStore: ObservableObject {
         refresh()
     }
 
+    /// Tracks a directory as a project.
+    ///
+    /// The app could not do this at all: a project appeared only when a session
+    /// happened to run in it, or when `mtm projects add` was run in a terminal.
+    /// For an app whose primary unit is the project, "you cannot add one" is a
+    /// hole rather than a simplification.
+    ///
+    /// Mirrors the CLI: an already-tracked directory is reported, not duplicated
+    /// under a second id.
+    @discardableResult
+    func trackProject(at url: URL) -> String? {
+        let path = FileSupport.normalise(url.path)
+        if let existing = projects.first(where: {
+            $0.path.map { FileSupport.pathsEqual($0, path) } ?? false
+        }) {
+            return "Already tracking \(existing.name)."
+        }
+        let record = ProjectRecord(
+            id: ProjectRecord.identifier(forPath: url.path),
+            name: FileSupport.lastComponent(of: path),
+            path: url.path
+        )
+        projectStore.save(record)
+        refresh()
+        return nil
+    }
+
+    /// Archived and parked projects, so they can be brought back from the app.
+    /// `unarchive` existed but nothing could reach it, because the only rows
+    /// drawn are the active ones.
+    var restorableProjects: [Project] {
+        projects.filter { !$0.record.lifecycle.isActive }
+    }
+
     func unarchive(_ project: Project) {
         var record = project.record
         record.lifecycle = .active
