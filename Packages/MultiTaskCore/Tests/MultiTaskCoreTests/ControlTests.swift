@@ -449,6 +449,31 @@ struct LauncherSpawnTests {
                   workingDirectory: dir.url.path)
     }
 
+    /// Waits for a run to close out, reporting how long it took if it never does.
+    ///
+    /// The budget is deliberately generous. A `exit 3` finishes in microseconds,
+    /// but the termination handler is dispatched by Foundation's process reaper,
+    /// and on a CI container sharing a box with four other jobs that dispatch can
+    /// be delayed well past what looks reasonable — this failed at a 4 second
+    /// budget while passing 8 out of 8 locally. The test asserts an *eventual*
+    /// outcome, so the budget should be long enough that exhausting it means
+    /// something is genuinely wrong rather than merely slow.
+    static func awaitTerminal(_ id: String, in store: RunStore,
+                              budget: TimeInterval = 20,
+                              sourceLocation: SourceLocation = #_sourceLocation) -> RunRecord? {
+        let deadline = Date().addingTimeInterval(budget)
+        var last: RunRecord?
+        while Date() < deadline {
+            last = store.run(id: id)
+            if last?.state.isTerminal == true { return last }
+            Thread.sleep(forTimeInterval: 0.02)
+        }
+        Issue.record("""
+            Run \(id) never reached a terminal state within \(Int(budget))s —             last seen \(last?.state.rawValue ?? "missing").             If this recurs, the termination handler is not firing rather than             running late.
+            """, sourceLocation: sourceLocation)
+        return last
+    }
+
     /// A one-liner run through whatever shell the platform actually has.
     ///
     /// These tests are about the *plumbing* — redirection, pid capture,
@@ -564,12 +589,7 @@ struct LauncherSpawnTests {
         let launcher = Launcher(runStore: store)
 
         let started = try launcher.start(harmlessRun(dir, command: Self.shell("exit 3")))
-        var record = try #require(store.run(id: started.id))
-        for _ in 0..<80 {
-            Thread.sleep(forTimeInterval: 0.05)
-            record = try #require(store.run(id: started.id))
-            if record.state.isTerminal { break }
-        }
+        let record = try #require(Self.awaitTerminal(started.id, in: store))
         #expect(record.state == .failed)
         #expect(record.exitCode == 3)
         #expect(record.endedAt != nil)
@@ -582,11 +602,8 @@ struct LauncherSpawnTests {
         let launcher = Launcher(runStore: store)
 
         let started = try launcher.start(harmlessRun(dir, command: Self.shell("exit 0")))
-        for _ in 0..<80 {
-            Thread.sleep(forTimeInterval: 0.05)
-            if store.run(id: started.id)?.state.isTerminal == true { break }
-        }
-        #expect(store.run(id: started.id)?.state == .finished)
-        #expect(store.run(id: started.id)?.exitCode == 0)
+        let record = try #require(Self.awaitTerminal(started.id, in: store))
+        #expect(record.state == .finished)
+        #expect(record.exitCode == 0)
     }
 }
