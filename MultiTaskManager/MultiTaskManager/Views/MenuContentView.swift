@@ -251,7 +251,7 @@ struct SettingsButton: View {
                 ModernSettingsButton()
             } else {
                 Button {
-                    NSApp.activate(ignoringOtherApps: true)
+                    SettingsPresentation.prepare()
                     NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
                 } label: {
                     Image(systemName: "gearshape")
@@ -269,16 +269,55 @@ private struct ModernSettingsButton: View {
 
     var body: some View {
         Button {
-            // Order matters: bring the app forward first, then open. Opening
-            // first and activating afterwards races the window's creation.
-            //
-            // `activate()` rather than `activate(ignoringOtherApps:)` — the
-            // latter is deprecated from macOS 14, and this is a direct response
-            // to a click, which is the case cooperative activation is for.
-            NSApp.activate()
+            SettingsPresentation.prepare()
             openSettings()
         } label: {
             Image(systemName: "gearshape")
+        }
+    }
+}
+
+/// Makes the app briefly behave like a normal app while a real window is open.
+///
+/// `LSUIElement` is right for the popover — no Dock icon, no App Switcher entry,
+/// nothing in the way. It is wrong for Settings: a window you cannot Cmd-Tab back
+/// to is a window you lose behind your editor, which is exactly what happened.
+///
+/// So the activation policy is raised to `.regular` while a window is open and
+/// dropped back to `.accessory` once the last one closes. The Dock icon that
+/// appears alongside is the honest cost — an app that is Cmd-Tabbable and has no
+/// Dock icon is a worse inconsistency than a Dock icon that comes and goes.
+@MainActor
+enum SettingsPresentation {
+    private static var closeObserver: NSObjectProtocol?
+
+    /// Call immediately *before* opening a window. Activating first is
+    /// deterministic; activating after races the window's creation.
+    static func prepare() {
+        NSApp.setActivationPolicy(.regular)
+        // `activate()` rather than `activate(ignoringOtherApps:)`, which is
+        // deprecated from macOS 14 — and this is a direct response to a click,
+        // the case cooperative activation exists for.
+        NSApp.activate()
+        observeClose()
+    }
+
+    private static func observeClose() {
+        guard closeObserver == nil else { return }
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { _ in
+            // On the next pass, so the closing window is out of `windows` by the
+            // time we count what is left.
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    // `canBecomeMain` is what separates a real window from the
+                    // menu bar popover, which is a panel and must never keep the
+                    // app in `.regular`.
+                    let stillOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+                    if !stillOpen { NSApp.setActivationPolicy(.accessory) }
+                }
+            }
         }
     }
 }
