@@ -200,7 +200,7 @@ final class TempDir {
         let target = url.appendingPathComponent(relativePath)
         try? FileManager.default.createDirectory(
             at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? contents.write(to: target, atomically: true, encoding: .utf8)
+        try? FileSupport.write(contents, to: target)
         return target
     }
 

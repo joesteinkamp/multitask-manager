@@ -104,7 +104,7 @@ public final class DecisionLog: @unchecked Sendable {
             _ = try? handle.seekToEnd()
             try? handle.write(contentsOf: data)
         } else {
-            try? data.write(to: fileURL, options: .atomic)
+            try? FileSupport.write(data, to: fileURL)
         }
     }
 
@@ -147,7 +147,7 @@ public final class DecisionLog: @unchecked Sendable {
             kept.append(contentsOf: line)
             kept.append(UInt8(ascii: "\n"))
         }
-        try? kept.write(to: fileURL, options: .atomic)
+        try? FileSupport.write(kept, to: fileURL)
     }
 
     static let encoder: JSONEncoder = {
