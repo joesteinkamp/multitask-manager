@@ -92,15 +92,21 @@ struct MergeTests {
         var overrides = UserOverrides.empty
         overrides.pinned = ["pinned-idle"]
 
+        // A session that genuinely needs a person — which now requires a hook to
+        // say so, since a gap in activity no longer implies it.
+        var asking = Session.stub(id: "asking", lastActivity: now.addingTimeInterval(-60))
+        asking.hookStatus = .needsAttention
+
         let raw = [
             Session.stub(id: "working", lastActivity: now),
-            Session.stub(id: "attention", lastActivity: now.addingTimeInterval(-60)),
+            asking,
             Session.stub(id: "pinned-idle", lastActivity: now.addingTimeInterval(-4000)),
-            Session.stub(id: "older-attention", lastActivity: now.addingTimeInterval(-120))
+            Session.stub(id: "quiet", lastActivity: now.addingTimeInterval(-120))
         ]
 
         let merged = merge(raw, overrides: overrides)
-        #expect(merged.map(\.id) == ["pinned-idle", "attention", "older-attention", "working"])
+        // Pinned, then the one actually asking, then working, then quiet.
+        #expect(merged.map(\.id) == ["pinned-idle", "asking", "working", "quiet"])
     }
 
     @Test("hideIdle removes idle sessions but never a pinned one")
@@ -150,7 +156,7 @@ struct ClassifyTests {
         #expect(verdict.evidence == .hook)
     }
 
-    @Test("SessionEnd makes a quiet session finished rather than merely stale")
+    @Test("A finished run is complete, and does not claim to need you")
     func sessionEndOutranksActivityAge() {
         // Recent file activity would say "working"; the log says it ended.
         let session = Session.stub(id: "a", lastActivity: now)
@@ -158,9 +164,11 @@ struct ClassifyTests {
                                      endReason: "prompt_input_exit")
 
         let verdict = DetectionEngine.classify(session, activity: activity, config: config, now: now)
-        #expect(verdict.status == .needsAttention)
+        // Was `.needsAttention`, which is how a Codex run that finished cleanly
+        // lit the badge asking for a response it did not want.
+        #expect(verdict.status == .complete)
         #expect(verdict.evidence == .sessionEnd)
-        #expect(verdict.waiting == .done)
+        #expect(verdict.waiting == nil)
         #expect(verdict.reason == "prompt_input_exit")
     }
 
@@ -190,7 +198,10 @@ struct ClassifyTests {
     func fileActivityFallback() {
         let quiet = Session.stub(id: "a", lastActivity: now.addingTimeInterval(-60))
         let verdict = DetectionEngine.classify(quiet, activity: nil, config: config, now: now)
-        #expect(verdict.status == .needsAttention)
+        // Quiet, and that is all this evidence can honestly support. It used to
+        // read silence as a request for attention, which is indistinguishable
+        // from an agent thinking or waiting on the network.
+        #expect(verdict.status == .idle)
         #expect(verdict.evidence == .fileActivity)
     }
 
@@ -202,7 +213,9 @@ struct ClassifyTests {
         }
         #expect(status(after: 0) == .working)
         #expect(status(after: config.attentionThreshold - 1) == .working)
-        #expect(status(after: config.attentionThreshold) == .needsAttention)
+        // Past the threshold it is quiet, not demanding. Nothing inferred from a
+        // gap may claim to need a person — only a hook or a waiting task can.
+        #expect(status(after: config.attentionThreshold) == .idle)
         #expect(status(after: config.idleThreshold) == .idle)
     }
 
@@ -256,5 +269,53 @@ struct EngineTests {
         #expect(snapshot.degraded.count == 1)
         #expect(snapshot.degraded[0].detectorId == "claudeCode")
         #expect(snapshot.degraded[0].message.contains("/nonexistent/claude"))
+    }
+}
+
+/// The rule the false alarms came from: only something that *says so* may claim
+/// a person is needed.
+@Suite("Attention is reported, never inferred")
+struct AttentionSourceTests {
+    let now = Fixtures.auditNow
+    var config: Configuration { .fixtureOnly }
+
+    @Test("No gap in activity, however long, produces needs-attention")
+    func silenceNeverDemands() {
+        for gap in [0.0, 60, 600, 3600, 86_400] {
+            let session = Session.stub(id: "a", lastActivity: now.addingTimeInterval(-gap))
+            let verdict = DetectionEngine.classify(session, activity: nil, config: config, now: now)
+            #expect(verdict.status != .needsAttention,
+                    "a \(Int(gap))s gap claimed to need a person")
+        }
+    }
+
+    @Test("A hook saying so is what produces needs-attention")
+    func hooksDemand() {
+        var session = Session.stub(id: "a", lastActivity: now.addingTimeInterval(-86_400))
+        session.hookStatus = .needsAttention
+        session.waiting = .approval
+        session.reason = "Bash(rm -rf build/)"
+
+        let verdict = DetectionEngine.classify(session, activity: nil, config: config, now: now)
+        // Quiet for a day, and still correct — because the harness said so
+        // rather than the clock.
+        #expect(verdict.status == .needsAttention)
+        #expect(verdict.evidence == .hook)
+        #expect(verdict.waiting == .approval)
+        #expect(verdict.reason == "Bash(rm -rf build/)")
+    }
+
+    @Test("A finished run is complete, then ages out to idle")
+    func completeThenIdle() {
+        let session = Session.stub(id: "a", lastActivity: now)
+        let justEnded = AuditActivity(lastEventAt: now, endedAt: now.addingTimeInterval(-5),
+                                      endReason: "done")
+        #expect(DetectionEngine.classify(session, activity: justEnded,
+                                         config: config, now: now).status == .complete)
+
+        let longEnded = AuditActivity(lastEventAt: now, endedAt: now.addingTimeInterval(-99_999),
+                                      endReason: "done")
+        #expect(DetectionEngine.classify(session, activity: longEnded,
+                                         config: config, now: now).status == .idle)
     }
 }

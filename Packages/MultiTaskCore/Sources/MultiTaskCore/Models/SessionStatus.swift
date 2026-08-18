@@ -7,9 +7,17 @@ import Foundation
 public enum SessionStatus: String, Codable, CaseIterable, Sendable {
     /// Recent activity — the agent appears to be actively working.
     case working
-    /// No recent activity while the session is still alive — likely finished and
-    /// waiting for the user's input/action.
+    /// Blocked on a person: a permission prompt, a question, an explicit
+    /// `agent_needs_input`. **Only ever set when something said so** — a hook,
+    /// or a task waiting on a human. It is not inferred from silence.
     case needsAttention
+    /// The run finished. Worth seeing, not waiting on you.
+    ///
+    /// Separated from `needsAttention` because conflating them is what made the
+    /// app cry wolf: a Codex run that completed cleanly lit the badge claiming
+    /// it needed a response. "Done" and "do something" are different, and only
+    /// one of them should interrupt.
+    case complete
     /// Stale / long-idle / underlying process gone.
     case idle
     /// Not enough information to classify.
@@ -19,9 +27,10 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
     public var sortRank: Int {
         switch self {
         case .needsAttention: return 0
-        case .working: return 1
-        case .idle: return 2
-        case .unknown: return 3
+        case .complete: return 1
+        case .working: return 2
+        case .idle: return 3
+        case .unknown: return 4
         }
     }
 
@@ -31,6 +40,7 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
         switch self {
         case .working: return "circle.fill"
         case .needsAttention: return "exclamationmark.circle.fill"
+        case .complete: return "checkmark.circle.fill"
         case .idle: return "moon.zzz.fill"
         case .unknown: return "questionmark.circle"
         }
@@ -39,7 +49,8 @@ public enum SessionStatus: String, Codable, CaseIterable, Sendable {
     public var label: String {
         switch self {
         case .working: return "Working"
-        case .needsAttention: return "Needs attention"
+        case .needsAttention: return "Needs you"
+        case .complete: return "Complete"
         case .idle: return "Idle"
         case .unknown: return "Unknown"
         }
