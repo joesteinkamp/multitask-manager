@@ -374,19 +374,66 @@ final class SessionStore: ObservableObject {
 
     // MARK: Opening things
 
-    /// Brings the underlying work to the foreground: activates the app for
-    /// desktop sessions, or reveals the project folder in Finder otherwise.
-    func activate(_ session: Session) {
+    /// Brings the underlying work to the foreground.
+    ///
+    /// In order of how much good it does:
+    ///
+    /// 1. **The session's own app**, when it is a desktop app we have a pid for.
+    /// 2. **The terminal running the session**, found by walking up from a
+    ///    process working in the project directory. This is the case that
+    ///    matters: a CLI session carries no pid, so this used to fall straight
+    ///    through to Finder — which answers "where does this project live"
+    ///    when the question was "where is the thing that needs me".
+    /// 3. **The project folder in Finder**, when nothing is running any more.
+    ///    Still the right answer then, just not the first one.
+    @discardableResult
+    func activate(_ session: Session) -> Bool {
         if let pid = session.pid, let app = NSRunningApplication(processIdentifier: pid) {
             app.activate(options: [.activateAllWindows])
-            return
+            return true
         }
         if let bundleId = session.bundleId,
            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
             NSWorkspace.shared.open(url)
-            return
+            return true
+        }
+        if let path = session.projectPath, focusTerminal(forProjectPath: path) {
+            return true
         }
         if let path = session.projectPath { reveal(path) }
+        return false
+    }
+
+    /// Brings forward the terminal running whatever is working in `path`.
+    ///
+    /// - Returns: whether a terminal was found *and* activated. `false` means
+    ///   nothing recognisable is running there, and the caller should fall back.
+    @discardableResult
+    func focusTerminal(forProjectPath path: String) -> Bool {
+        let processes = ProcessSnapshot.current()
+        guard let (terminal, process) = TerminalResolver.terminal(forProjectPath: path,
+                                                                  among: processes) else {
+            return false
+        }
+
+        // Activate the process we actually walked to, not a fresh launch of the
+        // bundle: with two Warp windows open for two projects, launching the app
+        // would raise whichever was last used, which is the wrong one half the
+        // time.
+        if let running = NSRunningApplication(processIdentifier: process.pid) {
+            running.activate(options: [.activateAllWindows])
+            return true
+        }
+
+        // The process we found is a helper rather than the app itself — common
+        // for Electron-based editors. Fall back to the bundle.
+        for bundleId in terminal.bundleIds {
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+                NSWorkspace.shared.open(url)
+                return true
+            }
+        }
+        return false
     }
 
     func activate(_ project: Project) {

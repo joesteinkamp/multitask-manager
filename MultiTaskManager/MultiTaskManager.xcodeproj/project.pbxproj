@@ -17,6 +17,7 @@
 		BF0000000000000000000010 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000010 /* SettingsView.swift */; };
 		BF0000000000000000000013 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000013 /* AppTheme.swift */; };
 		BF0000000000000000000014 /* NotificationPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000014 /* NotificationPresenter.swift */; };
+		BF0000000000000000000019 /* ProcessSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000019 /* ProcessSnapshot.swift */; };
 		BF0000000000000000000015 /* ProjectRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000015 /* ProjectRowView.swift */; };
 		BF0000000000000000000017 /* TaskViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000017 /* TaskViews.swift */; };
 		BF0000000000000000000018 /* ApprovalViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE0000000000000000000018 /* ApprovalViews.swift */; };
@@ -37,6 +38,7 @@
 		FE0000000000000000000010 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		FE0000000000000000000013 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		FE0000000000000000000014 /* NotificationPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPresenter.swift; sourceTree = "<group>"; };
+		FE0000000000000000000019 /* ProcessSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessSnapshot.swift; sourceTree = "<group>"; };
 		FE0000000000000000000017 /* TaskViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskViews.swift; sourceTree = "<group>"; };
 		FE0000000000000000000018 /* ApprovalViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApprovalViews.swift; sourceTree = "<group>"; };
 		FE0000000000000000000015 /* ProjectRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectRowView.swift; sourceTree = "<group>"; };
@@ -107,6 +109,7 @@
 				FE000000000000000000000D /* LaunchAtLogin.swift */,
 				FE0000000000000000000013 /* AppTheme.swift */,
 				FE0000000000000000000014 /* NotificationPresenter.swift */,
+				FE0000000000000000000019 /* ProcessSnapshot.swift */,
 			);
 			path = Support;
 			sourceTree = "<group>";
@@ -205,6 +208,7 @@
 				BF000000000000000000000D /* LaunchAtLogin.swift in Sources */,
 				BF0000000000000000000013 /* AppTheme.swift in Sources */,
 				BF0000000000000000000014 /* NotificationPresenter.swift in Sources */,
+				BF0000000000000000000019 /* ProcessSnapshot.swift in Sources */,
 				BF000000000000000000000E /* MenuContentView.swift in Sources */,
 				BF0000000000000000000015 /* ProjectRowView.swift in Sources */,
 				BF0000000000000000000017 /* TaskViews.swift in Sources */,
