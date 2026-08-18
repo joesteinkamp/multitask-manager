@@ -9,6 +9,264 @@ did.
 
 ---
 
+## Make Windows CI mean something, and get one diagnosis badly wrong
+
+*(2026-08-17, Claude)*
+
+### What changed
+
+Windows CI ran the full suite for the first time and failed ten tests, then kept
+finding more. All are resolved: five were real cross-platform bugs, one was a
+test that cannot run on Windows, and the rest were one intermittent bug wearing
+several disguises — an atomic write that Windows loses. It took three wrong
+diagnoses to get there, recorded below.
+
+The real fixes: the search path is found whatever the platform calls it
+(Windows spells it `Path`, and Swift's environment dictionary is case-sensitive,
+so *every* executable lookup silently failed there — delegates and git alike);
+`WaveReader.pathTokens` recognises drive letters and UNC shares, without which a
+brief written on Windows named no paths at all; the launcher records that it
+cancelled a run instead of re-deriving it from `terminationReason`; and
+`ProjectStore.save` reports write failures instead of discarding them with
+`try?`.
+
+### The ask
+
+*"fix the windows bugs"*, after CI first surfaced them.
+
+### Why this approach
+
+**Adapt tests to the platform; skip only what genuinely cannot run.** The
+launcher's spawn tests are about plumbing — redirection, pid capture,
+termination handling — none of which is POSIX-specific, so they pick a shell per
+platform and keep their coverage on both. The reconcile test asserts the
+*documented* Windows behaviour, that it deliberately does nothing rather than
+guess a run has ended, so it will fail loudly the day someone implements
+liveness there. Only the staleness test is skipped, gated on a probed
+capability, because it needs to backdate a directory's mtime and Windows will
+not.
+
+The line held throughout: skipping a test for a capability the product has not
+decided yet is honest; skipping one for a capability we have decided and broken
+is not.
+
+**Cancellation became something the launcher knows rather than infers.** The
+termination handler read `terminationReason` to decide whether a run had been
+cancelled, and that does not mean the same thing on every platform — on Windows
+a plain `exit 3` came back as `.uncaughtSignal`, so a failed run was filed as
+cancelled. `cancel` is what sends the signal, so it records the fact before
+signalling. Deriving something you already know is how platform differences turn
+into wrong data.
+
+### What was considered and rejected
+
+**Implementing Windows process liveness now.** `reconcile` cannot test liveness
+by pid there, so runs sit in `running` forever after a crash. That is the
+Windows-client milestone, not a CI fix; filed in `ROADMAP.md` with the test that
+will fail when it lands.
+
+**Making the Windows job non-blocking until someone builds the Windows client.**
+A red check everyone ignores is worse than no check.
+
+**"Paths do not survive the round trip on Windows."** Adopted, acted on, and
+wrong — see below.
+
+### The mistake worth recording
+
+Two Windows tests failed with missing files, and the theory was that `URL.path`
+returns forward slashes on Windows and those strings break when fed back to path
+APIs. A `nativePath` helper went in, every filesystem call was rewritten around
+it, and the PR description explained it confidently.
+
+CI disagreed twice over. Detection went from finding one session on Windows to
+finding none, in a test that had passed before — the change *caused* a
+regression. And both failures it claimed to fix passed on that same run, while
+`ProjectStore.save` had never touched `nativePath` at all, so the change could
+not have been what fixed them. They were flaky, not path bugs. The whole thing
+was reverted.
+
+A second theory replaced it and was also wrong: that `TempDir` deleting its
+directory in `deinit` let ARC remove the tree mid-test. That change was kept —
+a fixture that deletes itself while a test is using it is a genuine hazard — but
+it did not explain the failures either, and `main` went red on Windows again
+after it merged.
+
+**The actual cause was the write mode.** Every "file doesn't exist" failure on
+Windows in this project has been an *atomic* write — `ProjectStore.save`,
+`TempDir.write`, `AuditWriter.append`. An atomic write is a temp file plus a
+rename, and on Windows that rename loses to a transient sharing violation
+whenever something holds the new file for a moment; a virus scanner on a CI
+runner is the usual cause. It fails intermittently and surfaces far from the
+write, which is exactly why it read as three unrelated bugs across three
+debugging attempts. Every write now goes through `FileSupport.write(_:to:)`,
+which tries atomic, retries briefly, then falls back to a direct write — giving
+up crash-atomicity, which is the right trade, because every reader here
+tolerates a truncated record and none tolerates a file that never appeared.
+
+A third diagnosis was wrong the same way: the staleness gate probed whether a
+*file* could be backdated, which Windows does, when what the test needs is a
+*directory*, which it does not. The evidence had been in the CI output all along
+— the delegate files were correctly backdated to July and only the directory
+read as now.
+
+The pattern in all three: asserting a cause from a plausible story instead of
+reading what the log actually said. What finally broke it open was a *fourth*
+failure landing on a different test, which made "what do these have in common"
+a better question than "what is wrong with this one". Every real step forward
+came from the logs, not from the theories.
+
+**One failure resolved without explanation.** "An approval consumed by an attempt
+that failed stays pending" failed on Windows and then passed with no targeted
+fix. It is most likely the same intermittent write, but that cannot be claimed.
+If it returns, `noWorkingDirectory` now names whether the project is missing,
+pathless, or simply absent from the snapshot.
+
+---
+
+## Make it do things — and split "agents can write" from "agents can spend"
+
+*(2026-08-17, Claude)*
+
+### What changed
+
+The app stopped being read-only. Three gated actions land — run a task with a
+delegate, cancel a run, provision an isolated worktree — with the launcher, run
+store, shell-environment snapshot and audit writer behind them. Runs attach to
+tasks, so the audit trail describes something somebody asked for rather than a
+command that happened.
+
+On top of that, an **approval queue**: agents file requests over MCP
+(`request_run`, `request_isolation`) and only a person decides. The menu bar app
+grew the surfaces for all of it — asks above everything, Approve and Decline on
+the row, a run confirmation sheet, a runs section — and a new ask now notifies.
+
+Also: `DESIGN.json` plus a generated Swift token file with CI enforcement,
+`DESIGN.md`, and `CODE.md`. 152 tests to 334.
+
+### The ask
+
+*"Build the actual product!!! How many times do I have to tell you"*, then *"do
+the task UI next and everything else!"*, then *"do phase 3 too"*. The plan had
+been read, reconciled and re-planned enough; the instruction was to stop
+reporting and start building.
+
+### Why this approach
+
+**The approval queue was not planned, and it is the entry's real subject.** The
+MCP server needed write tools — *"MCP definitely needs write tools"* — and
+writing them exposed a hole in the gate. The confirmation-token gate works
+because the party that reads the description and the party that replays the
+token is a person. Over MCP that assumption is simply false: an agent handed a
+token calls again with it, and the gate becomes two round-trips of theatre.
+Telling agents "show this to your human first" is a policy, and a policy is not
+a mechanism.
+
+So agents get a different verb. They **request**; only a person **decides**.
+Approving is what mints the token, and it happens inside the engine, so the
+token never reaches a caller. There is no MCP tool that decides, and a test
+fails if one is ever added — including one that merely accepts a `confirm`
+argument.
+
+This is the foundation the North Star needs rather than a detour from it. Agents
+answering their own prompts and moving to the next task requires them to be able
+to *propose* their next step; it does not require them to be able to spend
+without asking. Phase 5's standing authority now has something to be built on
+top of instead of instead of.
+
+**Design tokens got a generator, not a document.** The UI written earlier in the
+session had invented its own spacing — gaps at 1, 2, 3, 4, 6, 8, 10, 12 and 22,
+and `Color.orange` written out in four files — because the `DESIGN.md` the
+project's own rules point at did not exist. Two hand-maintained constant files
+do not drift dramatically; they drift by two points of padding and one shade of
+orange, which nobody notices until the macOS and Windows apps sit side by side
+and both have shipped. `DESIGN.json` is the source, the Swift file is generated,
+and CI fails on divergence.
+
+**Semantic system fonts and system colours, not a custom palette.** Both look
+like shortcuts and are not. The semantic fonts follow the user's accessibility
+text size, which a menu bar utility pinned to 11pt does not; system colours
+already satisfy contrast in both appearances and already respond to Increase
+Contrast and the colour-blind accommodations, none of which a hand-picked hex
+re-earns for free.
+
+### What was considered and rejected
+
+**Returning the confirmation token to the agent with instructions to ask its
+human first.** The obvious cheap answer, and it relies entirely on the agent's
+goodwill. Rejected: the gate would be enforced by a sentence in a tool
+description.
+
+**A pre-approved allowlist of safe commands instead of an ask.** That is Phase
+5's standing authority arriving early, and it should sit on top of a working ask
+rather than replace one — otherwise the first version of the feature is the
+version with no audit trail.
+
+**A separate approvals daemon.** Nothing needs a second process yet, and the
+daemon is already sequenced for when the Windows client makes it unavoidable.
+
+**Forcing a reason on every decline.** Rejected for the same reason acceptance
+criteria are prompted rather than required: a queue that demands a sentence
+before it will clear is a queue that stops getting cleared.
+
+**Giving Approve the Return key.** Written, then removed one commit later after
+arguing in the run sheet that a stray Return must never spend. A popover appears
+under whatever you were already typing into.
+
+**Opening the popover from a notification.** `MenuBarExtra` exposes no supported
+way to present its own window, and the unsupported routes trade a working menu
+bar for one click. A first draft set a `wantsPopover` flag nothing observed,
+which is worse than the limitation because it looks like it works.
+
+**Squashing the branch on merge.** The repository merges PRs with merge commits,
+and these commit messages carry the reasoning this log exists to preserve.
+
+### Bugs worth recording
+
+Each was found by building rather than by reading, and each is a design lesson:
+
+- **The gate could never be passed.** The token was a freshly minted run id, so
+  it differed between the describe pass and the do pass. Every confirmed run was
+  silently refused and the CLI exited 0 saying nothing — while the whole suite
+  stayed green, because the tests only covered refusal, which is what a broken
+  gate does perfectly. Tokens now derive from the request, which makes them
+  stable *and* bound: approving one run cannot authorise another.
+- **`confirm == "yes"` was a literal that always passed**, in both gated paths.
+- **`Process.isRunning` and `waitUntilExit()` are unreliable on Linux.** After
+  `terminate()` the handler fires at once with status 15, yet `isRunning` still
+  answers `true` seconds later and `waitUntilExit` blocks for the child's full
+  original lifetime — a `sleep 30` killed at 200ms held the caller 30 seconds.
+  Everything waits on the handler now; the suite went from 31s to 4.4s.
+- **A discarded `Process` left a zombie** the OS reported as alive forever, so
+  runs never closed out.
+- **Tests wrote to the real `~/.multitaskmanager`.** 378 fixture decisions ("Do
+  a thing", "Vague work") had accumulated in a live home and would have appeared
+  in the app's own feed. Stores now resolve to a per-process temp root under a
+  test bundle — a mechanism, rather than a convention every test must remember.
+- **`mtm projects add <directory>` discarded the path**, saved a project named
+  after it with no checkout, and explained that it was "an idea, not a checkout".
+
+### Two things that came in from elsewhere
+
+**Another session's work landed on `main` mid-flight.** PR #3 built the same
+Phase 1 features — notifications, audit-log activity — inside the *app target*,
+while this branch had moved that logic into `MultiTaskCore` and deleted the app
+copies. Eleven files conflicted. Resolved toward the core, per `AGENTS.md`'s
+"Foundation only … not negotiable": the app-target implementation cannot build
+on Linux or Windows, so keeping it would have forfeited CI and the Windows
+client both. Only one thing was genuinely missing from this side and was ported
+— a list of muted projects in Settings, since muting happens on a project's row
+and a muted project is by definition one you have stopped looking at.
+
+**CI had never actually run.** The workflow arrived on this branch, and its
+first run earned its keep immediately: a test target that could not compile on
+the Swift version the package declares, a design-token check that could not run
+inside its own container, a macOS job that had been reporting "skipped" rather
+than passing, and — once Windows got far enough to execute anything — the
+cross-platform bugs above. `swift build` had stayed green throughout, because
+build never compiles the test target.
+
+---
+
 ## Restate what the project is for: parallel projects, two kinds of actor
 
 *(2026-08-16, Claude)*
