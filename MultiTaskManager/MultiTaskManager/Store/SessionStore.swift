@@ -361,6 +361,17 @@ final class SessionStore: ObservableObject {
         projects.filter { !$0.record.lifecycle.isActive }
     }
 
+    /// Removes a project from the board entirely.
+    ///
+    /// Distinct from archiving, which keeps it. This is for a row that should
+    /// never have existed — a directory that was never a project, a worktree,
+    /// something detection got wrong. Every rule for guessing what a project is
+    /// will be wrong sometimes, and there has to be a way to say so.
+    func forget(_ project: Project) {
+        projectStore.forget(id: project.id)
+        refresh()
+    }
+
     func unarchive(_ project: Project) {
         var record = project.record
         record.lifecycle = .active

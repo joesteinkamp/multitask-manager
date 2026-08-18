@@ -757,3 +757,43 @@ struct VanishedProjectTests {
         #expect(store.load().count == 1)
     }
 }
+
+@Suite("Migrating rows that should never have existed")
+struct ProjectMigrationTests {
+
+    @Test("A worktree already recorded as its own project is folded into the repository")
+    func migratesStoredWorktrees() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        let repo = dir.makeDirectory("app")
+        dir.write("ref: refs/heads/main\n", to: "app/.git/HEAD")
+        let worktree = dir.makeDirectory("app-agent")
+        dir.write("gitdir: \(repo.path)/.git/worktrees/app-agent\n", to: "app-agent/.git")
+
+        // Recorded before the rule existed — which is the case that matters,
+        // since `ensure` returns an existing record before any check runs and
+        // would never re-examine it.
+        store.save(ProjectRecord(id: "wt", name: "app-agent", path: worktree.path))
+
+        let removed = store.forgetVanished()
+        #expect(removed.map(\.id) == ["wt"])
+
+        let remaining = store.load()
+        #expect(remaining.count == 1)
+        #expect(FileSupport.pathsEqual(remaining[0].path ?? "", repo.path))
+    }
+
+    @Test("Forgetting removes a project whatever created it")
+    func forgetRemovesAnything() {
+        let dir = TempDir()
+        let store = ProjectStore(directory: dir.url.appendingPathComponent("store"))
+        // Manual, and its directory exists — so no automatic rule would touch it.
+        // Saying "this is not a project" has to work regardless.
+        let real = dir.makeDirectory("kept")
+        store.save(ProjectRecord(id: "mine", name: "kept", path: real.path, origin: "manual"))
+
+        store.forget(id: "mine")
+        #expect(store.load().isEmpty)
+    }
+}
+
