@@ -84,7 +84,7 @@ struct ProjectRowView: View {
 
     private var hasDetail: Bool {
         !project.sessions.isEmpty || !project.nextSteps.isEmpty || !project.openTasks.isEmpty
-            || !project.waves.isEmpty || project.oneLiner != nil
+            || !project.waves.isEmpty
     }
 
     // MARK: Status
@@ -130,12 +130,11 @@ struct ProjectRowView: View {
 
     private var detail: some View {
         VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
-            if let one = project.oneLiner {
-                Text(one)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            // The project's own description is deliberately *not* here. You know
+            // what your project is; repeating three lines of README above the
+            // thing you opened this to see is noise, and it pushed the sessions
+            // — the actual answer — below the fold. It still has a place: the
+            // collapsed row's subtitle, and `mtm show`.
 
             // Tasks before sessions: the work is the point, the sessions are
             // how it's being done.
@@ -245,14 +244,19 @@ struct WaveRowView: View {
             HStack(spacing: AppTheme.tightSpacing) {
                 Image(systemName: "square.stack.3d.down.right")
                     .font(AppTheme.glyphFont)
+                Text("Wave")
+                    .font(AppTheme.rowMeta.weight(.semibold))
                 Text(wave.title ?? wave.id)
-                    .font(.caption2.weight(.semibold))
+                    .font(AppTheme.rowMeta)
                     .lineLimit(1)
                 Spacer()
-                Text("\(wave.doneCount)/\(wave.delegates.count)")
-                    .font(AppTheme.glyphFont)
+                // "4/4" alone is a riddle. It is delegates finished out of
+                // delegates dispatched, and the row has to say so.
+                Text("\(wave.doneCount) of \(wave.delegates.count) agents done")
+                    .font(AppTheme.rowMeta)
                     .monospacedDigit()
                     .foregroundStyle(.tertiary)
+                    .fixedSize()
             }
             .foregroundStyle(.secondary)
 

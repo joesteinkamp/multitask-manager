@@ -110,6 +110,28 @@ public final class ProjectStore: @unchecked Sendable {
         }
     }
 
+    /// Drops discovered projects whose directory no longer exists.
+    ///
+    /// The marker rule stops new phantoms; it cannot remove the ones already
+    /// recorded, and a row for a directory that is gone is worse than one that
+    /// is merely uninteresting — it cannot be opened, fixed, or explained.
+    ///
+    /// **Only discovered projects, and only missing directories.** A project the
+    /// user added by hand stays until they remove it, and a project on an
+    /// unmounted volume is not gone — which is why this needs the path to be
+    /// absent rather than merely unreadable.
+    @discardableResult
+    public func forgetVanished() -> [ProjectRecord] {
+        var removed: [ProjectRecord] = []
+        for record in load() {
+            guard let path = record.path, record.origin != "manual" else { continue }
+            guard !FileSupport.fileManager.fileExists(atPath: path) else { continue }
+            delete(id: record.id)
+            removed.append(record)
+        }
+        return removed
+    }
+
     public func delete(id: String) {
         lock.lock()
         defer { lock.unlock() }
@@ -133,6 +155,15 @@ public final class ProjectStore: @unchecked Sendable {
         // projects out of a `/tmp` scratch folder and a skills sub-directory
         // inside `~/.hermes` — rows nobody manages, for directories that in one
         // case stopped existing when the session ended.
+        // A worktree belongs to the repository it is a checkout of. The
+        // parallel-agent workflow puts every agent in `../<repo>-<agent>`, so
+        // without this each one becomes a project of its own under a name nobody
+        // chose. Resolved before the marker check, because the worktree itself
+        // may carry no markers at all.
+        if discovered, let repository = FileSupport.mainRepository(ofWorktree: projectPath) {
+            return ensure(path: repository, name: name, discovered: true, now: now)
+        }
+
         if discovered, !FileSupport.looksLikeProject(projectPath) { return nil }
         let record = ProjectRecord(
             id: id,
