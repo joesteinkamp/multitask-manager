@@ -114,6 +114,11 @@ struct MenuContentView: View {
     private var projectList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
+                // First, not last. Appended to the bottom of a scrolling list it
+                // can land below the fold, which looks exactly like a button that
+                // did nothing.
+                if isAdding { addField }
+
                 ForEach(liveProjects) { project in
                     ProjectRowView(project: project)
                 }
@@ -134,7 +139,6 @@ struct MenuContentView: View {
                     }
                 }
 
-                if isAdding { addField }
             }
             .padding(.vertical, AppTheme.rowPadding)
         }
@@ -261,30 +265,37 @@ struct MenuContentView: View {
 
     private var footer: some View {
         HStack(spacing: AppTheme.sectionSpacing) {
-            // A menu, not a button: "Add" used to mean "add a task" only, which
-            // left no way to add a project from the app at all.
-            Menu {
-                Button("Task…") { isAdding = true }
-                Button("Project…") { trackProject() }
-                if !store.restorableProjects.isEmpty {
-                    Divider()
-                    Menu("Bring back") {
-                        ForEach(store.restorableProjects) { project in
-                            Button(project.name) { store.unarchive(project) }
-                        }
-                    }
-                }
-            } label: {
-                Label("Add", systemImage: "plus.circle")
+            // Two plain buttons rather than one "Add" menu. `Menu` inside a
+            // MenuBarExtra window is unreliable across macOS versions, and this
+            // footer already had a control reported as doing nothing — a popover
+            // is the wrong place to depend on a nested menu opening.
+            Button { isAdding.toggle() } label: {
+                Label("Task", systemImage: "plus.circle")
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
+            .buttonStyle(.plain)
+            .help("Capture a task")
+
+            Button { trackProject() } label: {
+                Label("Project", systemImage: "folder.badge.plus")
+            }
+            .buttonStyle(.plain)
+            .help("Track a folder as a project")
 
             Button { store.refresh() } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
             }
             .buttonStyle(.plain)
+
+            if !store.restorableProjects.isEmpty {
+                Menu("Bring back \(store.restorableProjects.count)") {
+                    ForEach(store.restorableProjects) { project in
+                        Button(project.name) { store.unarchive(project) }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Un-archive a project")
+            }
 
             if store.hiddenCount > 0 {
                 Button { store.clearHidden() } label: {
