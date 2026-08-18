@@ -13,6 +13,9 @@ struct MenuContentView: View {
 
     @State private var isAdding = false
     @State private var showingPast = false
+    /// Set when tracking a folder had nothing to do — shown rather than silently
+    /// doing nothing, which reads as a broken button.
+    @State private var addProblem: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -60,6 +63,12 @@ struct MenuContentView: View {
             footer
         }
         .frame(width: AppTheme.popoverWidth)
+        .alert("Nothing to add", isPresented: Binding(get: { addProblem != nil },
+                                                      set: { if !$0 { addProblem = nil } })) {
+            Button("OK") { addProblem = nil }
+        } message: {
+            Text(addProblem ?? "")
+        }
     }
 
     // MARK: Header
@@ -110,7 +119,19 @@ struct MenuContentView: View {
                 }
 
                 if !dormantProjects.isEmpty {
-                    dormantDisclosure
+                    if liveProjects.isEmpty {
+                        // Nothing is running, so these are the only projects
+                        // there are — show them. Collapsing every project behind
+                        // a disclosure while the header counts them produces a
+                        // list that looks empty and a count that looks wrong,
+                        // which is exactly how this read in use.
+                        quietHeading
+                        ForEach(dormantProjects) { project in
+                            ProjectRowView(project: project)
+                        }
+                    } else {
+                        dormantDisclosure
+                    }
                 }
 
                 if isAdding { addField }
@@ -130,6 +151,18 @@ struct MenuContentView: View {
         store.activeProjects.filter { $0.status == .dormant }
     }
 
+    /// Shown when the quiet projects are the *only* projects.
+    ///
+    /// A label rather than a toggle: there is nothing to collapse them in favour
+    /// of, and a control whose only outcome is an empty list is not a control.
+    private var quietHeading: some View {
+        Text("Nothing running right now")
+            .font(AppTheme.rowMeta)
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, AppTheme.sectionSpacing)
+            .padding(.bottom, AppTheme.hairSpacing)
+    }
+
     private var dormantDisclosure: some View {
         VStack(alignment: .leading, spacing: AppTheme.tightSpacing) {
             Button {
@@ -139,7 +172,7 @@ struct MenuContentView: View {
                     Image(systemName: "chevron.right")
                         .font(AppTheme.glyphFont.weight(.semibold))
                         .rotationEffect(.degrees(showingPast ? 90 : 0))
-                    Text("\(dormantProjects.count) gone quiet")
+                    Text("\(dormantProjects.count) quiet project\(dormantProjects.count == 1 ? "" : "s")")
                         .font(.caption)
                 }
                 .foregroundStyle(.secondary)
@@ -178,6 +211,31 @@ struct MenuContentView: View {
         .padding(.horizontal, AppTheme.sectionSpacing)
     }
 
+    /// Picks a directory to track.
+    ///
+    /// A folder picker rather than a text field: a project *is* a directory here,
+    /// and typing a path is both slower and wrong more often.
+    private func trackProject() {
+        // Bring the app forward first: a modal opened by a background agent
+        // appears behind whatever is in front, which is the same trap the
+        // Settings window fell into.
+        NSApp.activate(ignoringOtherApps: true)
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Track"
+        panel.message = "Choose the project's folder."
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("projects")
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        if let already = store.trackProject(at: url) {
+            addProblem = already
+        }
+    }
+
     private var addField: some View {
         TaskComposer(projectId: nil) { isAdding = false }
             .padding(.horizontal, AppTheme.sectionSpacing)
@@ -203,10 +261,25 @@ struct MenuContentView: View {
 
     private var footer: some View {
         HStack(spacing: AppTheme.sectionSpacing) {
-            Button { isAdding.toggle() } label: {
+            // A menu, not a button: "Add" used to mean "add a task" only, which
+            // left no way to add a project from the app at all.
+            Menu {
+                Button("Task…") { isAdding = true }
+                Button("Project…") { trackProject() }
+                if !store.restorableProjects.isEmpty {
+                    Divider()
+                    Menu("Bring back") {
+                        ForEach(store.restorableProjects) { project in
+                            Button(project.name) { store.unarchive(project) }
+                        }
+                    }
+                }
+            } label: {
                 Label("Add", systemImage: "plus.circle")
             }
-            .buttonStyle(.plain)
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
 
             Button { store.refresh() } label: {
                 Label("Refresh", systemImage: "arrow.clockwise")
