@@ -236,23 +236,49 @@ struct MenuContentView: View {
 }
 
 /// Opens the Settings scene, working on both macOS 13 and 14+.
+///
+/// **Activate before opening, on every path.** This is an `LSUIElement` agent,
+/// so it is not the frontmost app while its popover is showing — and a window
+/// created by a background app opens *behind* whatever is in front. `SettingsLink`
+/// is the blessed control on macOS 14+ but offers no hook to activate first,
+/// which is exactly how Settings ended up opening behind other windows. The
+/// `openSettings` environment action is equally supported and can be preceded by
+/// the activation the situation needs.
 struct SettingsButton: View {
     var body: some View {
-        if #available(macOS 14.0, *) {
-            SettingsLink {
-                Image(systemName: "gearshape")
+        Group {
+            if #available(macOS 14.0, *) {
+                ModernSettingsButton()
+            } else {
+                Button {
+                    NSApp.activate(ignoringOtherApps: true)
+                    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                } label: {
+                    Image(systemName: "gearshape")
+                }
             }
-            .buttonStyle(.plain)
-            .help("Settings")
-        } else {
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.plain)
-            .help("Settings")
+        }
+        .buttonStyle(.plain)
+        .help("Settings")
+    }
+}
+
+@available(macOS 14.0, *)
+private struct ModernSettingsButton: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button {
+            // Order matters: bring the app forward first, then open. Opening
+            // first and activating afterwards races the window's creation.
+            //
+            // `activate()` rather than `activate(ignoringOtherApps:)` — the
+            // latter is deprecated from macOS 14, and this is a direct response
+            // to a click, which is the case cooperative activation is for.
+            NSApp.activate()
+            openSettings()
+        } label: {
+            Image(systemName: "gearshape")
         }
     }
 }
