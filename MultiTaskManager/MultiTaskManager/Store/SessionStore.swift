@@ -102,7 +102,10 @@ final class SessionStore: ObservableObject {
                 guard let self else { return }
                 switch event {
                 case .snapshot(let snapshot):
-                    await self.apply(snapshot)
+                    // No `await`: this Task inherits SessionStore's MainActor
+                    // context, and `apply` is a synchronous MainActor method, so
+                    // there is no hop to suspend on. `deliver` genuinely is async.
+                    self.apply(snapshot)
                 case .notify(let notification):
                     await self.deliver(notification)
                 }
