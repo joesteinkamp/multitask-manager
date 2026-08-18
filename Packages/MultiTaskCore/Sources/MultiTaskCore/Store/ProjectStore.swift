@@ -125,12 +125,36 @@ public final class ProjectStore: @unchecked Sendable {
         var removed: [ProjectRecord] = []
         for record in load() {
             guard let path = record.path, record.origin != "manual" else { continue }
-            guard !FileSupport.fileManager.fileExists(atPath: path) else { continue }
-            delete(id: record.id)
-            removed.append(record)
+
+            // Gone from disk: a row that cannot be opened, fixed, or explained.
+            if !FileSupport.fileManager.fileExists(atPath: path) {
+                delete(id: record.id)
+                removed.append(record)
+                continue
+            }
+
+            // Already recorded as its own project, but it is a worktree.
+            //
+            // Filtering at discovery is not enough on its own: `ensure` returns
+            // an existing record before any check runs, so rows stored before
+            // the rule existed are never re-examined. They have to be migrated
+            // here or they stay forever, which is exactly what happened.
+            if let repository = FileSupport.mainRepository(ofWorktree: path) {
+                ensure(path: repository, discovered: true)
+                delete(id: record.id)
+                removed.append(record)
+            }
         }
         return removed
     }
+
+    /// Removes a project outright, whoever created it.
+    ///
+    /// Archiving hides a project you still have; this is for one that should
+    /// never have been a row. Every heuristic here will be wrong sometimes, so
+    /// there has to be a way to say so that does not depend on the heuristic
+    /// agreeing.
+    public func forget(id: String) { delete(id: id) }
 
     public func delete(id: String) {
         lock.lock()
