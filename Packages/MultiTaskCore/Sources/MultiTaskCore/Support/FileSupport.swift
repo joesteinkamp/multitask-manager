@@ -309,3 +309,9 @@ public enum FileSupport {
         return String(decoding: data, as: UTF8.self)
     }
 }
+
+extension String {
+    /// The string, unless it is empty — so a blank field falls through to the
+    /// next option in a `??` chain rather than showing as nothing at all.
+    var nonEmpty: String? { isEmpty ? nil : self }
+}

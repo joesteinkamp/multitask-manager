@@ -175,9 +175,18 @@ public struct ProjectAssembler: Sendable {
         let waiting = sessions.filter { $0.status == .needsAttention }
         if !waiting.isEmpty {
             let ranked = AttentionTriage.rank(waiting, now: now)
-            let why = ranked.first?.waiting?.label ?? "Quiet and waiting"
+            // The session's own words first. It used to reach only for the
+            // waiting *kind* and fall back to "Quiet and waiting" — so a project
+            // row read "Quiet and waiting" directly above a session row saying
+            // "Remove uncommitted work. I'm going to fix it on remote". The two
+            // disagreed, and the useless one was on top.
+            let why = ranked.first?.reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+                .nonEmpty
+                ?? ranked.first?.waiting?.label
+                ?? "Waiting on you"
             let more = waiting.count > 1 ? " (+\(waiting.count - 1) more)" : ""
-            return StatusVerdict(status: .needsYou, reason: "\(why)\(more)")
+            return StatusVerdict(status: .needsYou,
+                                 reason: "\(ProjectContextReader.truncate(why, to: 70))\(more)")
         }
 
         // 2 — something is running.
@@ -264,10 +273,27 @@ public struct ProjectAssembler: Sendable {
     }
 
     /// Pinned first, then by urgency, then by recency.
+    /// Pinned first, then by what the project needs, then by recency.
+    ///
+    /// **Recency is compared coarsely, on purpose.** Comparing raw timestamps
+    /// let the list reorder between refreshes: several idle projects sharing a
+    /// status were separated by fractions of a second, and any re-read that
+    /// nudged one timestamp swapped two rows. A list that rearranges itself
+    /// under the cursor is unusable for glancing at, which is the only way this
+    /// one is used.
+    ///
+    /// A minute is the granularity at which "more recent" means something here.
+    /// Below that it is noise, and ties break on name — deterministic, so equal
+    /// projects hold their places across refreshes.
     static func ordering(_ a: Project, _ b: Project) -> Bool {
         if a.record.isPinned != b.record.isPinned { return a.record.isPinned }
         if a.status.sortRank != b.status.sortRank { return a.status.sortRank < b.status.sortRank }
-        return a.lastActivity > b.lastActivity
+
+        let aMinute = (a.lastActivity.timeIntervalSince1970 / 60).rounded(.down)
+        let bMinute = (b.lastActivity.timeIntervalSince1970 / 60).rounded(.down)
+        if aMinute != bMinute { return aMinute > bMinute }
+
+        return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
     }
 }
 

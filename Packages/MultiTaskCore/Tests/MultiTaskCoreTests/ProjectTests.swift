@@ -542,3 +542,121 @@ struct FrontMatterTests {
         #expect(fields["name"] == "App")
     }
 }
+
+/// The list must hold still between refreshes, and say why a project needs you.
+@Suite("Project list stability and reasons")
+struct ProjectListStabilityTests {
+    let now = Date(timeIntervalSince1970: 1_755_252_000)
+
+    private func project(_ name: String, status: ProjectStatus,
+                         activity: TimeInterval, pinned: Bool = false) -> Project {
+        var record = ProjectRecord(id: name, name: name, path: "/p/\(name)")
+        record.isPinned = pinned
+        return Project(record: record, status: status, statusReason: "",
+                       lastActivity: now.addingTimeInterval(activity))
+    }
+
+    @Test("Sub-minute differences do not reorder the list")
+    func noiseDoesNotReorder() {
+        // Three idle projects, timestamps a fraction of a second apart — which is
+        // what re-reading the same files produces. Ordering on raw timestamps let
+        // any of these swap places between refreshes.
+        let a = project("alpha", status: .unbriefed, activity: -0.2)
+        let b = project("bravo", status: .unbriefed, activity: -0.5)
+        let c = project("charlie", status: .unbriefed, activity: -0.1)
+
+        let order = [c, a, b].sorted(by: ProjectAssembler.ordering).map(\.name)
+        // Same minute, so the tiebreak decides — and it is deterministic.
+        #expect(order == ["alpha", "bravo", "charlie"])
+
+        // Whatever order they arrive in, they come out the same.
+        #expect([b, c, a].sorted(by: ProjectAssembler.ordering).map(\.name) == order)
+        #expect([a, b, c].sorted(by: ProjectAssembler.ordering).map(\.name) == order)
+    }
+
+    @Test("A genuinely more recent project still sorts first")
+    func realRecencyStillWins() {
+        let old = project("alpha", status: .unbriefed, activity: -3600)
+        let fresh = project("zulu", status: .unbriefed, activity: -10)
+        // An hour apart is signal, not noise — despite `zulu` losing on name.
+        #expect([old, fresh].sorted(by: ProjectAssembler.ordering).map(\.name) == ["zulu", "alpha"])
+    }
+
+    @Test("Pinning and status still outrank recency")
+    func prioritiesHold() {
+        let pinned = project("zulu", status: .dormant, activity: -3600, pinned: true)
+        let urgent = project("alpha", status: .needsYou, activity: -10)
+        let idle = project("bravo", status: .dormant, activity: -5)
+
+        let order = [idle, urgent, pinned].sorted(by: ProjectAssembler.ordering).map(\.name)
+        #expect(order == ["zulu", "alpha", "bravo"])
+    }
+}
+
+@Suite("Why a project needs you")
+struct ProjectReasonTests {
+    let now = Date(timeIntervalSince1970: 1_755_252_000)
+
+    /// A briefed project, so the verdict reaches the waiting rung rather than
+    /// stopping at "No PRODUCT.md".
+    static var briefed: BriefSet {
+        var set = BriefSet()
+        set.product = true
+        return set
+    }
+
+    private func waitingSession(reason: String?, waiting: WaitingReason?) -> Session {
+        var session = Session(id: "s1", title: "instructions", projectName: "instructions",
+                              projectPath: "/p/instructions", source: .claudeCode,
+                              lastActivity: now.addingTimeInterval(-1020))
+        session.status = .needsAttention
+        session.hookStatus = .needsAttention
+        session.reason = reason
+        session.waiting = waiting
+        return session
+    }
+
+    @Test("The project reports what the session actually said")
+    func usesTheSessionsOwnWords() {
+        // The screenshot that prompted this showed a project row reading "Quiet
+        // and waiting" directly above a session row reading the sentence below.
+        let verdict = ProjectAssembler.status(
+            record: ProjectRecord(id: "p", name: "instructions", path: "/p/instructions"),
+            sessions: [waitingSession(reason: "Remove uncommitted work. I'm going to fix it on remote",
+                                      waiting: .approval)],
+            tasks: [], repository: nil, briefs: Self.briefed,
+            nextStepCount: 0, lastActivity: now.addingTimeInterval(-1020), now: now)
+
+        #expect(verdict.status == .needsYou)
+        #expect(verdict.reason.contains("Remove uncommitted work"))
+        #expect(!verdict.reason.contains("Quiet and waiting"))
+    }
+
+    @Test("With no explanation it falls back to the kind of wait, then to plain English")
+    func fallsBackInOrder() {
+        let record = ProjectRecord(id: "p", name: "x", path: "/p/x")
+
+        let kind = ProjectAssembler.status(
+            record: record, sessions: [waitingSession(reason: nil, waiting: .approval)],
+            tasks: [], repository: nil, briefs: Self.briefed,
+            nextStepCount: 0, lastActivity: now.addingTimeInterval(-1020), now: now)
+        #expect(kind.reason == WaitingReason.approval.label)
+
+        let neither = ProjectAssembler.status(
+            record: record, sessions: [waitingSession(reason: nil, waiting: nil)],
+            tasks: [], repository: nil, briefs: Self.briefed,
+            nextStepCount: 0, lastActivity: now.addingTimeInterval(-1020), now: now)
+        #expect(neither.reason == "Waiting on you")
+    }
+
+    @Test("A blank explanation is treated as none, not shown as nothing")
+    func blankReasonFallsThrough() {
+        let verdict = ProjectAssembler.status(
+            record: ProjectRecord(id: "p", name: "x", path: "/p/x"),
+            sessions: [waitingSession(reason: "   ", waiting: .question)],
+            tasks: [], repository: nil, briefs: Self.briefed,
+            nextStepCount: 0, lastActivity: now.addingTimeInterval(-1020), now: now)
+        #expect(verdict.reason == WaitingReason.question.label)
+    }
+}
+
