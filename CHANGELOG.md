@@ -15,10 +15,11 @@ did.
 
 ### What changed
 
-Windows CI ran the full suite for the first time and failed ten tests. All ten
-are resolved: four were real cross-platform bugs, one was a test that cannot run
-on Windows, and the rest were flakiness. `main` is now green on Linux, Windows,
-macOS, design tokens and shellcheck together.
+Windows CI ran the full suite for the first time and failed ten tests, then kept
+finding more. All are resolved: five were real cross-platform bugs, one was a
+test that cannot run on Windows, and the rest were one intermittent bug wearing
+several disguises — an atomic write that Windows loses. It took three wrong
+diagnoses to get there, recorded below.
 
 The real fixes: the search path is found whatever the platform calls it
 (Windows spells it `Path`, and Swift's environment dictionary is case-sensitive,
@@ -84,28 +85,41 @@ regression. And both failures it claimed to fix passed on that same run, while
 not have been what fixed them. They were flaky, not path bugs. The whole thing
 was reverted.
 
-The likely real cause was mundane: `TempDir` deleted its directory in `deinit`,
-and ARC may release the object after its last *textual* use — so a test that
-hands `dir.url` to a store and then reads a file back can have the tree removed
-mid-test, on whichever platform's optimiser releases earliest. Fixtures now live
-under one per-process root that is swept on first use.
+A second theory replaced it and was also wrong: that `TempDir` deleting its
+directory in `deinit` let ARC remove the tree mid-test. That change was kept —
+a fixture that deletes itself while a test is using it is a genuine hazard — but
+it did not explain the failures either, and `main` went red on Windows again
+after it merged.
 
-A second diagnosis was wrong the same way: the staleness gate probed whether a
+**The actual cause was the write mode.** Every "file doesn't exist" failure on
+Windows in this project has been an *atomic* write — `ProjectStore.save`,
+`TempDir.write`, `AuditWriter.append`. An atomic write is a temp file plus a
+rename, and on Windows that rename loses to a transient sharing violation
+whenever something holds the new file for a moment; a virus scanner on a CI
+runner is the usual cause. It fails intermittently and surfaces far from the
+write, which is exactly why it read as three unrelated bugs across three
+debugging attempts. Every write now goes through `FileSupport.write(_:to:)`,
+which tries atomic, retries briefly, then falls back to a direct write — giving
+up crash-atomicity, which is the right trade, because every reader here
+tolerates a truncated record and none tolerates a file that never appeared.
+
+A third diagnosis was wrong the same way: the staleness gate probed whether a
 *file* could be backdated, which Windows does, when what the test needs is a
 *directory*, which it does not. The evidence had been in the CI output all along
 — the delegate files were correctly backdated to July and only the directory
 read as now.
 
-The pattern in both: asserting a cause from a plausible story instead of reading
-what the log actually said. Every real step forward on this branch came from the
-log, not from the theory.
+The pattern in all three: asserting a cause from a plausible story instead of
+reading what the log actually said. What finally broke it open was a *fourth*
+failure landing on a different test, which made "what do these have in common"
+a better question than "what is wrong with this one". Every real step forward
+came from the logs, not from the theories.
 
-**One failure remains unexplained.** "An approval consumed by an attempt that
-failed stays pending" failed on Windows and then passed with no targeted fix.
-The `TempDir` change is the plausible cause but was already in place for the run
-where it failed, so it cannot be claimed. If it returns, `noWorkingDirectory`
-now names whether the project is missing, pathless, or simply absent from the
-snapshot.
+**One failure resolved without explanation.** "An approval consumed by an attempt
+that failed stays pending" failed on Windows and then passed with no targeted
+fix. It is most likely the same intermittent write, but that cannot be claimed.
+If it returns, `noWorkingDirectory` now names whether the project is missing,
+pathless, or simply absent from the snapshot.
 
 ---
 
