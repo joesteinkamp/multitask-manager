@@ -71,6 +71,47 @@ public enum FileSupport {
         return result
     }
 
+    /// Writes `data` to `url`, preferring an atomic replace but never losing the
+    /// write to one.
+    ///
+    /// **Why this exists.** An atomic write is a temp file plus a rename, and on
+    /// Windows that rename loses to a transient sharing violation whenever
+    /// something else has the new file open for a moment — a virus scanner on a
+    /// CI runner, an indexer on a desktop. The failure is intermittent and
+    /// surfaces far from the write, as a file that simply is not there. Three
+    /// separate Windows CI failures traced back to exactly this, each looking
+    /// like a different bug.
+    ///
+    /// So: try atomic, retry briefly, then write directly. The fallback gives up
+    /// crash-atomicity, which is the right trade here — every reader in this
+    /// package already tolerates a truncated or interleaved record, and none of
+    /// them tolerates a file that never appeared.
+    public static func write(_ data: Data, to url: URL) throws {
+        try? fileManager.createDirectory(at: url.deletingLastPathComponent(),
+                                         withIntermediateDirectories: true)
+        var lastError: Error?
+        for attempt in 0..<3 {
+            do {
+                try data.write(to: url, options: .atomic)
+                return
+            } catch {
+                lastError = error
+                // Short, and not on the last pass: whatever holds the file is
+                // holding it for milliseconds, not seconds.
+                if attempt < 2 { Thread.sleep(forTimeInterval: 0.05) }
+            }
+        }
+        do {
+            try data.write(to: url)
+        } catch {
+            throw lastError ?? error
+        }
+    }
+
+    public static func write(_ text: String, to url: URL) throws {
+        try write(Data(text.utf8), to: url)
+    }
+
     /// Root for everything this app owns: projects, tasks, runs, the socket.
     ///
     /// `$MTM_HOME` overrides it, which is what lets tests and demos run against a

@@ -127,7 +127,7 @@ public final class RunStore: @unchecked Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(run) else { return }
-        try? data.write(to: dir.appendingPathComponent("run.json"), options: .atomic)
+        try? FileSupport.write(data, to: dir.appendingPathComponent("run.json"))
     }
 
     public func load() -> [RunRecord] {

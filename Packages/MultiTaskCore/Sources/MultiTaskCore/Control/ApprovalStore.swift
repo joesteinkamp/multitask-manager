@@ -126,7 +126,7 @@ public final class ApprovalStore: @unchecked Sendable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         guard let data = try? encoder.encode(request) else { return }
-        try? data.write(to: directory.appendingPathComponent("\(request.id).json"), options: .atomic)
+        try? FileSupport.write(data, to: directory.appendingPathComponent("\(request.id).json"))
     }
 
     public func load() -> [ApprovalRequest] {

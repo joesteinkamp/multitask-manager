@@ -130,3 +130,51 @@ struct DesignTokensTests {
         #expect(process.terminationStatus == 0, "\(text)")
     }
 }
+
+/// Writing files in a way that survives a failed atomic rename.
+@Suite("Resilient writes")
+struct ResilientWriteTests {
+
+    @Test("Writes the content, creating any missing directories")
+    func writesAndCreatesDirectories() throws {
+        let dir = TempDir()
+        let target = dir.url.appendingPathComponent("a/b/c/notes.md")
+
+        try FileSupport.write("hello", to: target)
+
+        #expect(FileManager.default.fileExists(atPath: target.path))
+        #expect(try String(contentsOf: target, encoding: .utf8) == "hello")
+    }
+
+    @Test("Replaces existing content rather than appending to it")
+    func replaces() throws {
+        let dir = TempDir()
+        let target = dir.url.appendingPathComponent("notes.md")
+
+        try FileSupport.write("first", to: target)
+        try FileSupport.write("second", to: target)
+
+        #expect(try String(contentsOf: target, encoding: .utf8) == "second")
+    }
+
+    @Test("Round-trips bytes that aren't valid UTF-8 text")
+    func binarySafe() throws {
+        let dir = TempDir()
+        let target = dir.url.appendingPathComponent("blob.bin")
+        let data = Data([0xFF, 0x00, 0xFE, 0x41])
+
+        try FileSupport.write(data, to: target)
+        #expect(try Data(contentsOf: target) == data)
+    }
+
+    @Test("A path that cannot be written reports the failure rather than losing it")
+    func reportsRealFailures() {
+        // A directory where a file is expected: the fallback cannot rescue this,
+        // and it must surface rather than silently do nothing.
+        let dir = TempDir()
+        let target = dir.makeDirectory("occupied")
+        #expect(throws: (any Error).self) {
+            try FileSupport.write("x", to: target)
+        }
+    }
+}
