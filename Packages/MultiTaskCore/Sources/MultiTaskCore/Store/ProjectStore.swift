@@ -185,10 +185,18 @@ public final class ProjectStore: @unchecked Sendable {
         // chose. Resolved before the marker check, because the worktree itself
         // may carry no markers at all.
         if discovered, let repository = FileSupport.mainRepository(ofWorktree: projectPath) {
+            Diagnostics.shared.record(.projects,
+                "worktree \(projectPath) → repository \(repository)")
             return ensure(path: repository, name: name, discovered: true, now: now)
         }
 
-        if discovered, !FileSupport.looksLikeProject(projectPath) { return nil }
+        if discovered, !FileSupport.looksLikeProject(projectPath) {
+            Diagnostics.shared.record(.projects,
+                "refused \(projectPath) — no project marker (\(FileSupport.projectMarkers.sorted().prefix(4).joined(separator: ", ")), …)")
+            return nil
+        }
+        Diagnostics.shared.record(.projects,
+            "accepted \(projectPath)\(discovered ? "" : " (added by hand)")")
         let record = ProjectRecord(
             id: id,
             name: name ?? FileSupport.lastComponent(of: projectPath),
