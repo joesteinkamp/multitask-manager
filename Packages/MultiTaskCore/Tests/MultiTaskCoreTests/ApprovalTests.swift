@@ -165,9 +165,14 @@ struct ApprovalTests {
         let (engine, taskStore, approvals, _) = engine(dir)
         _ = try taskStore.save(TaskRecord(id: "t1", title: "Homeless", state: .ready))
 
-        await #expect(throws: LaunchError.noWorkingDirectory) {
+        // The case now carries context, so match on the shape rather than a value.
+        let error = await expectError(LaunchError.self) {
             _ = try await engine.act(.requestApproval(kind: "run", taskId: "t1", delegate: "claude",
                                                        requestedBy: "codex", rationale: nil))
+        }
+        guard case .noWorkingDirectory = error else {
+            Issue.record("expected noWorkingDirectory, got \(String(describing: error))")
+            return
         }
         #expect(approvals.pending().isEmpty)
     }

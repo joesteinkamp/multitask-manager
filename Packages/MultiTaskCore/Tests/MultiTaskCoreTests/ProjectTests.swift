@@ -399,8 +399,14 @@ struct ProjectStoreTests {
         let store = ProjectStore(directory: dir.url)
         store.save(ProjectRecord(id: "a", name: "a", createdAt: now))
 
-        // Someone — a person or an agent — adds notes under the front matter.
+        // Saving is the precondition, so check it here rather than let a missing
+        // file surface as an unexplained read error three lines later.
+        #expect(store.lastWriteError == nil, "\(store.lastWriteError ?? "")")
         let file = dir.url.appendingPathComponent("a.md")
+        try #require(FileManager.default.fileExists(atPath: file.path),
+                     "ProjectStore.save reported success but wrote nothing to \(file.path)")
+
+        // Someone — a person or an agent — adds notes under the front matter.
         let existing = try String(contentsOf: file, encoding: .utf8)
         try (existing + "\nSome notes I wrote by hand.\n").write(to: file, atomically: true, encoding: .utf8)
 
