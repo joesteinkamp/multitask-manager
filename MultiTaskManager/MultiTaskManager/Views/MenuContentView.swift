@@ -236,23 +236,88 @@ struct MenuContentView: View {
 }
 
 /// Opens the Settings scene, working on both macOS 13 and 14+.
+///
+/// **Activate before opening, on every path.** This is an `LSUIElement` agent,
+/// so it is not the frontmost app while its popover is showing — and a window
+/// created by a background app opens *behind* whatever is in front. `SettingsLink`
+/// is the blessed control on macOS 14+ but offers no hook to activate first,
+/// which is exactly how Settings ended up opening behind other windows. The
+/// `openSettings` environment action is equally supported and can be preceded by
+/// the activation the situation needs.
 struct SettingsButton: View {
     var body: some View {
-        if #available(macOS 14.0, *) {
-            SettingsLink {
-                Image(systemName: "gearshape")
+        Group {
+            if #available(macOS 14.0, *) {
+                ModernSettingsButton()
+            } else {
+                Button {
+                    SettingsPresentation.prepare()
+                    NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+                } label: {
+                    Image(systemName: "gearshape")
+                }
             }
-            .buttonStyle(.plain)
-            .help("Settings")
-        } else {
-            Button {
-                NSApp.activate(ignoringOtherApps: true)
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
-            } label: {
-                Image(systemName: "gearshape")
+        }
+        .buttonStyle(.plain)
+        .help("Settings")
+    }
+}
+
+@available(macOS 14.0, *)
+private struct ModernSettingsButton: View {
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Button {
+            SettingsPresentation.prepare()
+            openSettings()
+        } label: {
+            Image(systemName: "gearshape")
+        }
+    }
+}
+
+/// Makes the app briefly behave like a normal app while a real window is open.
+///
+/// `LSUIElement` is right for the popover — no Dock icon, no App Switcher entry,
+/// nothing in the way. It is wrong for Settings: a window you cannot Cmd-Tab back
+/// to is a window you lose behind your editor, which is exactly what happened.
+///
+/// So the activation policy is raised to `.regular` while a window is open and
+/// dropped back to `.accessory` once the last one closes. The Dock icon that
+/// appears alongside is the honest cost — an app that is Cmd-Tabbable and has no
+/// Dock icon is a worse inconsistency than a Dock icon that comes and goes.
+@MainActor
+enum SettingsPresentation {
+    private static var closeObserver: NSObjectProtocol?
+
+    /// Call immediately *before* opening a window. Activating first is
+    /// deterministic; activating after races the window's creation.
+    static func prepare() {
+        NSApp.setActivationPolicy(.regular)
+        // `activate()` rather than `activate(ignoringOtherApps:)`, which is
+        // deprecated from macOS 14 — and this is a direct response to a click,
+        // the case cooperative activation exists for.
+        NSApp.activate()
+        observeClose()
+    }
+
+    private static func observeClose() {
+        guard closeObserver == nil else { return }
+        closeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification, object: nil, queue: .main
+        ) { _ in
+            // On the next pass, so the closing window is out of `windows` by the
+            // time we count what is left.
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    // `canBecomeMain` is what separates a real window from the
+                    // menu bar popover, which is a panel and must never keep the
+                    // app in `.regular`.
+                    let stillOpen = NSApp.windows.contains { $0.isVisible && $0.canBecomeMain }
+                    if !stillOpen { NSApp.setActivationPolicy(.accessory) }
+                }
             }
-            .buttonStyle(.plain)
-            .help("Settings")
         }
     }
 }
