@@ -21,3 +21,8 @@ xcuserdata/
 
 # SwiftPM build products
 Packages/*/.build/
+
+# Screenshots dropped here to show the agent what the UI actually looks like.
+# Deliberately untracked: they are a conversation aid, not project history, and
+# a screenshot is the fastest way to settle a UI bug that reasoning cannot.
+temp-screenshot-share/

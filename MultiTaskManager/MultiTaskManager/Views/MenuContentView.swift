@@ -16,6 +16,8 @@ struct MenuContentView: View {
     /// Set when tracking a folder had nothing to do — shown rather than silently
     /// doing nothing, which reads as a broken button.
     @State private var addProblem: String?
+    /// Measured height of the project list's content — see `projectList`.
+    @State private var listHeight: CGFloat = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -40,6 +42,13 @@ struct MenuContentView: View {
             }
 
             Divider()
+
+            // Outside the scroll region on purpose: a transient input that can
+            // be scrolled away — or clipped by a container with no height — is
+            // one that looks like it never opened.
+            if isAdding, !store.activeProjects.isEmpty {
+                addField.padding(.top, AppTheme.rowPadding)
+            }
 
             if store.activeProjects.isEmpty {
                 emptyState
@@ -91,7 +100,8 @@ struct MenuContentView: View {
                         .foregroundStyle(AppTheme.attentionColor)
                         .font(.caption)
                 } else if projectsNeeding > 0 {
-                    Label("\(projectsNeeding) project\(projectsNeeding == 1 ? "" : "s") need you",
+                    Label(projectsNeeding == 1 ? "1 project needs you"
+                                            : "\(projectsNeeding) projects need you",
                           systemImage: "exclamationmark.circle.fill")
                         .foregroundStyle(AppTheme.attentionColor)
                         .font(.caption)
@@ -114,11 +124,6 @@ struct MenuContentView: View {
     private var projectList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppTheme.rowSpacing) {
-                // First, not last. Appended to the bottom of a scrolling list it
-                // can land below the fold, which looks exactly like a button that
-                // did nothing.
-                if isAdding { addField }
-
                 ForEach(liveProjects) { project in
                     ProjectRowView(project: project)
                 }
@@ -141,8 +146,23 @@ struct MenuContentView: View {
 
             }
             .padding(.vertical, AppTheme.rowPadding)
+            .background(
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                }
+            )
         }
-        .frame(maxHeight: 460)
+        .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
+        // **`maxHeight` alone collapsed this to nothing.** A ScrollView has no
+        // intrinsic height, and a MenuBarExtra window sizes to its content's
+        // *ideal* height — which for a ScrollView is effectively zero. So the
+        // whole project list rendered at zero points: the header counted four
+        // projects above a gap where the list should have been.
+        //
+        // Measuring the content and asking for that height, capped, gives the
+        // behaviour the ceiling was meant to express: grow with the list, scroll
+        // past 460.
+        .frame(height: min(max(listHeight, 1), 460))
     }
 
     /// Everything except the quiet ones, which collapse so they don't crowd out
@@ -410,5 +430,13 @@ enum SettingsPresentation {
                 if !stillOpen { NSApp.setActivationPolicy(.accessory) }
             }
         }
+    }
+}
+
+/// Carries the project list's measured content height up to its container.
+private struct ListHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
