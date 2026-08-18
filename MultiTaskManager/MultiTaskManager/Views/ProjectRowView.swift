@@ -212,7 +212,14 @@ struct ProjectRowView: View {
     private var actionsMenu: some View {
         Menu {
             Button("Add a task") { isExpanded = true; isCapturing = true }
-            Button("Reveal in Finder") { store.activate(project) }
+            // Two entries, because they are two different places now. Clicking
+            // the row goes to the terminal; this one has to keep meaning Finder,
+            // or the label lies.
+            Button("Go to the terminal") { store.activate(project) }
+            Button("Reveal in Finder") {
+                if let path = project.path { store.reveal(path) }
+            }
+            .disabled(project.path == nil)
             Button(project.record.isPinned ? "Unpin" : "Pin") { store.togglePin(project) }
             Button(store.isMuted(project) ? "Unmute notifications" : "Mute notifications") {
                 store.toggleMute(project)

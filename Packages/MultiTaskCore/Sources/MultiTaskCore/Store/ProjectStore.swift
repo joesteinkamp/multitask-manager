@@ -117,11 +117,23 @@ public final class ProjectStore: @unchecked Sendable {
     }
 
     /// Records the project a session was found in, if it isn't recorded already.
-    /// Returns the record either way.
+    /// Returns the record either way, or `nil` when a discovered directory does
+    /// not look like a project.
+    ///
+    /// - Parameter discovered: `true` when this came from watching the machine
+    ///   rather than from the user. Discovered directories must look like
+    ///   projects; a directory the user named is a project because they said so.
     @discardableResult
-    public func ensure(path projectPath: String, name: String? = nil, now: Date = Date()) -> ProjectRecord {
+    public func ensure(path projectPath: String, name: String? = nil,
+                       discovered: Bool = true, now: Date = Date()) -> ProjectRecord? {
         let id = ProjectRecord.identifier(forPath: projectPath)
         if let existing = load().first(where: { $0.id == id }) { return existing }
+
+        // Discovery used to accept any working directory, which manufactured
+        // projects out of a `/tmp` scratch folder and a skills sub-directory
+        // inside `~/.hermes` — rows nobody manages, for directories that in one
+        // case stopped existing when the session ended.
+        if discovered, !FileSupport.looksLikeProject(projectPath) { return nil }
         let record = ProjectRecord(
             id: id,
             name: name ?? FileSupport.lastComponent(of: projectPath),

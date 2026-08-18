@@ -154,6 +154,54 @@ public enum FileSupport {
         return url
     }()
 
+    /// Files that mark a directory as somebody's project rather than somewhere a
+    /// command happened to run.
+    ///
+    /// Deliberately broad — a false negative hides a real project, which is worse
+    /// than an extra row — but every entry is something a person puts in a
+    /// repository on purpose.
+    public static let projectMarkers: Set<String> = [
+        ".git", ".hg", ".svn",
+        "package.json", "Package.swift", "pyproject.toml", "setup.py", "requirements.txt",
+        "Cargo.toml", "go.mod", "Gemfile", "pom.xml", "build.gradle", "build.gradle.kts",
+        "composer.json", "mix.exs", "Makefile", "CMakeLists.txt",
+        "AGENTS.md", "CLAUDE.md", "PRODUCT.md", "README.md"
+    ]
+
+    /// Whether a directory *looks like* a project, as opposed to merely being one
+    /// a session ran in.
+    ///
+    /// Auto-discovery used to accept any working directory, which produced rows
+    /// for a scratch folder under `/tmp` and for a skills sub-directory six
+    /// levels inside `~/.hermes` — neither of which anyone manages, and one of
+    /// which stopped existing the moment the session ended.
+    ///
+    /// Applies to *discovery only*. A project the user added by hand is a project
+    /// because they said so, and is never subject to this.
+    public static func looksLikeProject(_ path: String) -> Bool {
+        guard isPlausibleProjectPath(path) else { return false }
+        let normalised = normalise(path)
+
+        // No special case for temp directories. It was tempting — a scratchpad
+        // under /tmp was one of the rows that prompted this — but the marker
+        // rule below already rejects a scratchpad, and a repository cloned to
+        // /tmp is a real project. An arbitrary location ban would have banned
+        // that too, and made this rule untestable besides.
+
+        // Inside a dot-directory: tool state — `.hermes`, `.cache`, `.local` —
+        // rather than work. The project's *own* dot-directories are not the
+        // question here; this asks whether the path passes *through* one.
+        let home = normalise(homeDirectory.path)
+        let relative = self.path(normalised, isInside: home)
+            ? String(normalised.dropFirst(home.count))
+            : normalised
+        if relative.split(separator: "/").contains(where: { $0.hasPrefix(".") }) { return false }
+
+        return projectMarkers.contains { marker in
+            fileManager.fileExists(atPath: normalised + "/" + marker)
+        }
+    }
+
     /// Whether a directory is specific enough to be somebody's *project*.
     ///
     /// The home directory becomes a candidate the moment a session runs there,
