@@ -73,6 +73,7 @@ public enum DesignTokens {
         case working
         case complete
         case ready
+        case idle
         case blocked
         case dormant
         case unknown
@@ -85,6 +86,7 @@ public enum DesignTokens {
             case .working: return "Progressing on its own. No action wanted. Shares the accent with `ready` on purpose: neither asks anything of you, and the glyph separates them."
             case .complete: return "Finished. Worth seeing, not waiting on you. Green belongs here — it reads as *done* everywhere else in software, which is why using it for work in progress was a mistake."
             case .ready: return "Available to pick up."
+            case .idle: return "Stopped with nothing queued. Noticed, never interrupting — orange stays the only role permitted to interrupt, so this reads as waste rather than as a question. Distinct from `dormant`, which is the same absence after a week and is genuinely not urgent."
             case .blocked: return "Waiting on something impersonal — a dependency, another task."
             case .dormant: return "Quiet with nothing ready. Reported, never highlighted."
             case .unknown: return "The app cannot tell. Distinct from 'nothing is happening'."
@@ -98,6 +100,7 @@ public enum DesignTokens {
             case .working: return "controlAccentColor"
             case .complete: return "systemGreen"
             case .ready: return "controlAccentColor"
+            case .idle: return "systemYellow"
             case .blocked: return "systemPurple"
             case .dormant: return "secondaryLabelColor"
             case .unknown: return "tertiaryLabelColor"
@@ -111,6 +114,7 @@ public enum DesignTokens {
             case .working: return "#0A6ED1"
             case .complete: return "#1E8E3E"
             case .ready: return "#0A6ED1"
+            case .idle: return "#B8860B"
             case .blocked: return "#7A3DB8"
             case .dormant: return "#6B6B70"
             case .unknown: return "#8E8E93"

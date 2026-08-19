@@ -106,6 +106,20 @@ struct DesignTokensTests {
         #expect(orange == [.attention])
     }
 
+    /// `idle` and `dormant` are the same absence at two timescales — stopped
+    /// now, and stopped since last week. If they shared a colour the urgent one
+    /// would inherit the quiet one's "reported, never highlighted" reading,
+    /// which is the exact mistake that let idle projects pass as healthy.
+    @Test("Stopped-now and stopped-for-a-week are told apart")
+    func idleIsNotDormant() {
+        #expect(DesignTokens.ColorRole.idle.macOSSystemColorName
+                != DesignTokens.ColorRole.dormant.macOSSystemColorName)
+        #expect(DesignTokens.ColorRole.idle.fallbackHex
+                != DesignTokens.ColorRole.dormant.fallbackHex)
+        // And it is not the interrupt either — idle is waste, not a question.
+        #expect(DesignTokens.ColorRole.idle.macOSSystemColorName != "systemOrange")
+    }
+
     @Test("Every fallback colour is a six-digit hex")
     func fallbacksAreUsable() {
         for role in DesignTokens.ColorRole.allCases {

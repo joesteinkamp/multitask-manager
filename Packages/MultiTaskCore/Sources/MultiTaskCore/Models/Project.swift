@@ -42,6 +42,23 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
     /// a stuck project makes noise, a forgotten one doesn't, and silence reads
     /// exactly like fine.
     case dormant
+    /// Nothing is running and nothing is queued. The project has stopped, and
+    /// no one has decided what comes next.
+    ///
+    /// **This is the state the app exists to surface.** A stuck project makes
+    /// noise; a stopped one makes none, and silence reads exactly like fine.
+    /// Until this existed the ladder's terminal branch was `.ready` with the
+    /// reason "Nothing blocked" — technically true, and precisely the wrong
+    /// emphasis: it reported an idle project as healthy when idle is the most
+    /// expensive thing a project can be in a week where several are meant to be
+    /// progressing at once. `dormant` did not cover it either, firing only
+    /// after seven days.
+    ///
+    /// It ranks second, below only work blocked on the person. Everything below
+    /// it either knows its next move (`ready`), is waiting on something legible
+    /// (`blocked`), or is moving (`working`). This one needs a decision before
+    /// anything can happen at all.
+    case idle
 
     // There was a seventh status here — `unbriefed`, for a project with no
     // `PRODUCT.md`, shown as a grey question mark. It is gone, and it should
@@ -56,10 +73,11 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
     public var sortRank: Int {
         switch self {
         case .needsYou: return 0
-        case .working: return 1
-        case .ready: return 2
-        case .blocked: return 3
-        case .dormant: return 4
+        case .idle: return 1
+        case .working: return 2
+        case .ready: return 3
+        case .blocked: return 4
+        case .dormant: return 5
         }
     }
 
@@ -70,6 +88,7 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
         case .ready: return "Ready"
         case .blocked: return "Blocked"
         case .dormant: return "Dormant"
+        case .idle: return "Idle"
         }
     }
 }
