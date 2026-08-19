@@ -9,6 +9,503 @@ did.
 
 ---
 
+## Idle is a failure state, and "suggestions" stop being a promise
+
+*(2026-08-19, Claude)*
+
+### What changed
+
+Three things the project layer was getting wrong, all of them the same mistake
+in different clothes: reporting the absence of a problem instead of the presence
+of one.
+
+**`PRODUCT.md` no longer gates anything.** It was a hard requirement —
+`meetsMinimum` was literally `product` — and failing it produced a status,
+`unbriefed`, reading *"No PRODUCT.md — add one to get suggestions"*. Three of
+four real projects reported that as their state, so the app's answer to "what is
+happening here?" was a demand for paperwork. `AGENTS.md`, `CLAUDE.md`,
+`CODE.md`, and a README now all count as knowing what a project is.
+
+**The suggestions that file was gating did not exist.** Ten occurrences of the
+word in the entire repository: two in the string telling the user they could not
+have any, eight in `DecisionLog.suggestionAccepted` / `.suggestionRejected` —
+accept and reject verbs for an object no code ever constructed. The gate was
+guarding an empty room.
+
+So `NextStepHarvester` was built to make the word mean something: it reads the
+newest assistant message from a transcript, in either the Claude Code or Codex
+shape, finds a next-steps cue, and offers the list under it for a yes or a no.
+`SuggestionStore` persists the answer. **Then it was measured against 165 real
+transcripts and produced nothing** — recorded below, because the measurement is
+the more useful artefact than the code.
+
+**`idle` exists, and ranks second.** The ladder's terminal verdict was `.ready`
+with the reason *"Nothing blocked"* — reached when nothing is running, nothing
+is queued, and nothing is suggested. An idle project got the same blue arrow as
+one with work waiting to start. It now reads **"Idle 4h — nothing queued"**, in
+`systemYellow`, behind only work blocked on the person. Ready reasons gained
+"— nothing running" for the same reason.
+
+`unbriefed` was deleted outright, along with the grey question mark that drew it.
+
+### The ask
+
+*"is the PRODUCT.md absolutely necessary for suggestions? I feel like we'd be
+able to extract enough context from the sessions and other context files, like
+AGENTS.md. Lastly, can this app consider encouraging recommended next steps from
+the agent sessions to feed back into the app."*
+
+Then, on seeing the result: *"If the file is even there, what does this app do as
+there is not AI baked into it. How is it providing suggestions."* — which is the
+question that exposed the empty room.
+
+Then: *"I believe part of this is showing a question mark icon next to the
+project. That makes it seem like something is wrong or unidentifiable."*
+
+And finally the correction that produced `idle`: *"'Nothing blocked' is not
+really the best state… we need to denote projects that are idle as idle is
+wasting time. Are you forgetting the context and goal of this app? The goal
+should be that we're moving through the projects faster and never have them stop
+working until their goal or task is achieved."*
+
+### Why this approach
+
+**Harvesting, not reasoning.** The app calls no models and will not — that
+constraint is in `AGENTS.md` and is what lets the engine build on Linux and
+Windows. But it does not need to reason about next steps, because the reasoning
+already happened: an agent that finishes a turn writes down what it thinks comes
+next, and that text sits in a transcript the person has since closed the terminal
+on. Reading it is reading, not inference, and it was the only honest sense in
+which this app could offer a suggestion.
+
+**No cue, no suggestion.** Extraction requires an explicit next-steps heading.
+Guessing which of an agent's closing sentences was a recommendation is how a
+queue fills with noise, and a queue full of noise stops being read — which
+costs more than having no queue.
+
+**Dismissal is permanent, keyed to project plus normalised text.** Steps are
+re-derived from disk on every refresh, so without a ledger every rejection
+undoes itself within the minute. Session id and timestamp are deliberately
+excluded from identity: the same step proposed again by a later session is the
+same step.
+
+**Idle ranks second because it is the state only a person can clear.**
+Everything below it either knows its next move (`ready`), waits on something
+legible (`blocked`), or is moving (`working`). And the elapsed time carries the
+weight — "Idle" alone invites a shrug, while "Idle 4h" separates a project that
+just finished a turn from one that stopped after breakfast.
+
+`PRODUCT.md` already named this as the failure to drive to zero: *"a stuck
+project makes noise; a forgotten one goes silent, and silence reads exactly like
+fine."* The engine was not honouring its own brief. `dormant` covered the same
+absence but waited seven days, by which point the week is gone.
+
+**Yellow, not orange or grey.** Orange remains the only role permitted to
+interrupt — idle is waste, not a question. Grey belongs to `dormant` and means
+"reported, never highlighted", which is exactly the reading that let idle pass
+as healthy. A test now pins the two apart. The glyph is an hourglass rather than
+a pause, because nothing is holding the project up; time is simply passing.
+
+### Considered and rejected
+
+**Loosening the cue to match prose.** The measurement forced this decision:
+probed against 63 real Claude Code sessions, twelve used a next-steps phrase
+somewhere in prose and **zero** used one as a heading above a list. The cause is
+upstream of the parser — the operating instructions in this repository tell
+agents to reach for a long-running primitive *"instead of ending with a list of
+next steps"*, so closing summaries are deliberately prose. Matching prose would
+mean deciding which sentence was a recommendation, which is inference this
+module cannot do and must not fake. The harvester was kept with its measured
+yield written next to it in the source: cheap and correct where the pattern
+occurs, wrong to rely on. The reliable path — dispatch a delegate and read its
+file output — is the architecture's own answer and remains unbuilt.
+
+**Removing only the question mark icon.** That would have left a status still
+meaning "we cannot identify this", drawn some other way. The problem was never
+the glyph; it was that whether the app has read a description of a project says
+nothing about whether that project needs anything, so it could not be a status
+at all.
+
+**Keeping a softened "no README" note in the expanded row.** Dropped for the
+same reason — `doc.badge.plus` carries the same implication that the user owes
+the app a file.
+
+**Leaving `ready` alone.** A queue nobody is working is stopped too, just with a
+known next move. "3 tasks ready" read as healthy when it is not.
+
+---
+
+## Say it in the menu bar, and give green one job
+
+*(2026-08-19, Claude)*
+
+### What changed
+
+The menu bar icon answers **"is anything waiting on me?"** without being opened,
+and answers nothing else. Calm is an outlined stack with no colour; working is a
+filled stack with a count; complete is a check; needs-you is an orange bell with
+a count.
+
+Underneath it, the colour system was rebalanced in `DESIGN.json` so both clients
+inherit it. Green had been doing three jobs — a working agent, an empty queue,
+and a healthy detector — so a glance at green said nothing about which. It was
+also on the wrong state entirely: green reads as *finished* everywhere else in
+software, and this app used it for work in progress.
+
+| Role | Was | Now |
+|---|---|---|
+| `working` | systemGreen | controlAccentColor |
+| `complete` | *(borrowed the accent)* | **systemGreen** |
+| all clear | systemGreen | **no colour** |
+
+### The ask
+
+*"The menu bar should highlight when things are active so I can tell what's
+going on without having to opening the menu popover. Let's ideate on how to
+signal activity in the icon space"* — and then, on the first proposal: *"You use
+green for in progress and nothing waiting for me, which that should be fixed."*
+
+### Why this approach
+
+**Colour appears only when you must act.** That is what makes a menu bar with no
+colour in it a fact you can read without focusing — the most valuable thing the
+surface offers. It only works if exactly one state is ever coloured, so a test
+asserts it. Calm is the absence of a signal, not a signal of its own.
+
+**The glyph changes with the state as well as the colour**, so the signal
+survives greyscale, a colour-blind reader, and a screenshot. Colour is the
+accelerator, never the message.
+
+**Counts appear only where a number implies something to do.** "3 finished"
+invites an action that is not there, so `complete` and `calm` carry none.
+
+**The precedence rule lives in `MultiTaskCore`, not the macOS app** — blocked on
+you, then work in flight, then work finished, then silence. It is pure logic and
+therefore testable, and the planned Windows taskbar has to answer the same
+question; a second implementation would answer it differently within a month.
+The badge count reads from the same rule, so the number and the glyph cannot
+tell different stories.
+
+Drawn as an `NSImage` because macOS renders a menu bar label as a template and
+discards a SwiftUI tint. Non-template rendering is the supported way to keep a
+colour, used for exactly one state.
+
+### Considered and rejected
+
+**A dot per project** — a dashboard in a space with room for one fact.
+**A pulse while working** — motion in the periphery is unignorable by design,
+which is the opposite of what a calm state needs.
+**A progress ring** — a run has no known duration, so the ring would be a
+decoration shaped like information.
+
+Options were mocked in situ before choosing rather than argued in prose.
+
+---
+
+## Debug from evidence: write down what the app decided, and why
+
+*(2026-08-19, Claude)*
+
+### What changed
+
+The app records its own verdicts — to a ring buffer, and to
+`~/.multitaskmanager/diagnostics.log` — reachable from `mtm diagnostics` and
+from Settings → Reporting a problem. The unit is a verdict and its reason, not
+an event:
+
+```
+projects   refused ~/dev/scratch — no project marker (.git, AGENTS.md, …)
+status     other: idle — 240s since its last tool call (inferred; no hook)
+terminal   found claude in ~/dev/app but no known terminal above it —
+           chain: claude ← zsh ← SomeTerminal
+```
+
+It immediately paid for itself. Two bugs were found by reading a log from the
+Mac rather than by reasoning — the first time this project was debugged from
+evidence:
+
+**Every Codex session was named after its own filename.** Sixteen of twenty-two
+sessions showed as `rollout-2026-08-18T11-28-12-…`, attached to no project.
+Codex writes its session metadata as one JSON object on line one, measuring
+17–18.6 KB on this machine; the reader used a 16 KB window, truncated the line
+mid-object, and never found `cwd`. That was what *"I have multiple agent
+sessions open and nothing is shown"* actually was — they were there,
+unrecognisable.
+
+**The log was burying its own signal.** Every refresh re-derived a verdict for
+every session and recorded all of them: 22 sessions on a five-second cadence
+wrote 264 lines a minute, filling a 500-entry buffer in under two minutes.
+
+### The ask
+
+*"I don't care about this machine's sessions. We're testing it on the mac. Get
+it through your thick skull. You are running on not a Mac but you need to be
+able to troubleshoot so why don't you add some sort of logging within the app
+that I can send you so you can have the information you need to diagnose
+issues."*
+
+The frustration was earned. Every hard bug in this project has been a wrong
+*conclusion* drawn from correct data, and reporting one meant describing a
+symptom in prose and having me guess at the cause — which I did wrongly three
+times in one afternoon, once shipping a regression on the strength of a guess.
+
+### Why this approach
+
+**A verdict and its reason, not an event stream.** An event log answers "what
+happened"; these bugs all needed "what did you conclude, and from what". The
+terminal line above answers *"why didn't it switch to Warp"* without another
+round trip — it names the executable to add to the catalog.
+
+**Written to a file, not just held in memory.** A problem is noticed, the app
+runs on for an hour, and by the time anyone looks the evidence has rolled out of
+the buffer or the app has restarted. Which is exactly when someone goes looking.
+It rotates at 2 MB keeping one previous file, so a rotation mid-investigation
+does not destroy the thing being investigated.
+
+**Transitions, not states.** `recordChange` keys a decision by session and files
+it only when it differs. Elapsed seconds came out of the message for the same
+reason — they tick every pass, which made every line look new.
+
+**A 512 KB metadata window, and drop the trailing partial line.** A byte window
+rarely lands on a newline, and half a JSON object parses as nothing — which is
+the same failure one size larger.
+
+### Considered and rejected
+
+**Including prompt or tool content.** The log carries no prompt text, tool
+input, tool result, or file content. Home is redacted *on disk*, not only in the
+export, because the file is what gets sent. Paths and project names are included
+— they are usually the bug.
+
+**Letting write failures surface.** They are swallowed deliberately: a
+diagnostics log that can break the app it is diagnosing is worse than no log.
+
+**Leaving it on under tests.** Disabled under a test bundle, or a suite fills
+the buffer with reports about its own fixtures.
+
+---
+
+## Report status from the harness instead of inferring it from silence
+
+*(2026-08-18, Claude)*
+
+### What changed
+
+The app decided a session needed you by **how long its transcript had gone
+unmodified**. That cannot distinguish an agent thinking, an agent waiting on the
+network, and an agent waiting on a person — so it called all three "needs
+attention".
+
+Claude Code will simply say. `Notification` carries the matchers
+`permission_prompt`, `agent_needs_input`, `idle_prompt` and `agent_completed`;
+`Stop` fires when a turn ends; `SessionStart` and `SessionEnd` bound the
+session. The app already read a v2 status file — what was missing was anything
+*writing* one. `Scripts/hooks/mtm-status.sh` maps every event to the contract,
+and `mtm hooks install` wires it up.
+
+Two rules changed, and they are the point:
+
+- **A gap in activity can never be `needsAttention`.** It resolves to working or
+  idle, full stop. Attention now requires something that *says so* — a hook, or
+  a task explicitly waiting on a human.
+- **Finished is not needing you.** A completed run was reported as
+  `needsAttention` for the entire idle window after it ended. There is now a
+  `complete` state, reading as settled rather than as an interruption.
+
+### The ask
+
+*"I ran an agent in Codex and the app didn't change the menu bar until it was
+done"*, and *"There are hook events that codex and claude have that tell you if
+things need things. AgentWatch does this super well for Claude… It color codes
+status by 'Ready' 'Running' 'Complete'."*
+
+### Why this approach
+
+**An alert that is wrong often enough teaches you to ignore the one that is
+not.** Without hooks the app now interrupts for nothing and reports activity
+honestly; with them, attention is a fact rather than an inference. That is the
+right way round.
+
+**`hooks install` merges rather than overwrites.** `settings.json` belongs to
+the user and already has hooks in it — it found nine on this machine and left
+them alone. `uninstall` removes only what this app wrote.
+
+**One script for all events, never blocking a tool call, always exiting 0.** A
+status reporter that can fail a tool call is a status reporter that gets
+uninstalled.
+
+### Considered and rejected
+
+**Keeping silence as a weak attention signal**, on the theory that a long enough
+gap probably means a prompt. Rejected outright, and a test now asserts that *no
+gap of any length* may produce needs-attention. "Probably" is what produced the
+badge that lit for a Codex run that had finished cleanly.
+
+---
+
+## Take you to the terminal running the session, not to its folder
+
+*(2026-08-18, Claude)*
+
+### What changed
+
+Clicking a notification revealed the project folder in Finder. For a CLI session
+that is the wrong answer to the wrong question — it says where the project
+*lives*, when you wanted the window that needs you.
+
+The app now finds a process whose working directory is the project, walks up its
+parent chain, stops at the first process a catalog recognises as a terminal, and
+activates **that process**. Shipping with Warp, Terminal, iTerm2, Ghostty, kitty,
+WezTerm, Alacritty, Hyper, Tabby, plus VS Code and Cursor.
+
+### The ask
+
+*"the notification should take you to the terminal of the session, not to the
+projects parent folder. We need to support many terminals, I use Warp primarily
+but we should support Terminal, Ghosty, iTerm2, etc… Make it easy to support
+more."*
+
+### Why this approach
+
+**A CLI session carries no pid.** It is detected from a transcript file, and the
+harness audit log records a working directory and a session id but no process.
+So the terminal cannot be remembered when the session is found — it has to be
+*located* when you ask to go there, from the processes running at that moment.
+That constraint shaped everything else.
+
+**Activate the process, not the bundle.** With two Warp windows open on two
+projects, launching the app raises whichever was last used — wrong half the time.
+
+**Adding a terminal is one entry.** `TerminalCatalog.all` carries bundle ids
+(several per terminal: they ship stable and preview builds under different ids)
+and executable names separately, because a bundled app's executable is rarely
+named after its bundle id. A test checks every entry's shape, so a malformed
+addition fails loudly rather than silently never matching.
+
+**Split for testability.** `TerminalCatalog` and `TerminalResolver` are
+Foundation-only and run on Linux in CI — including the case that would otherwise
+hang a click handler: a cycle in reported parentage, which a snapshot taken
+while processes exit can produce. Only gathering the process table is Darwin.
+
+### Considered and rejected
+
+**Falling back to whatever process sits above an unrecognised parent.** It
+resolves to *nothing* instead. Activating an arbitrary application because it
+happened to be in the chain is worse than doing nothing, and the diagnostics
+line names the executable to add to the catalog instead.
+
+**Raising the specific tab.** Not done. The catalog records the distinction —
+`precision: .tab` marks Terminal and iTerm2, which expose a tab's tty to
+AppleScript — but everything else can only be brought forward as an application.
+With several Warp tabs you land in Warp, not necessarily the right tab.
+
+---
+
+## Run the app for the first time, and fix everything that fell out
+
+*(2026-08-18, Claude)*
+
+### What changed
+
+The app had been built, migrated onto the shared package, and never once run.
+The first real session on a Mac produced a cascade of failures, fixed across
+seven pull requests:
+
+- **The project list rendered at zero height.** `ScrollView { … }.frame(maxHeight:)`
+  sets a *ceiling, not a floor*; a `ScrollView` has no intrinsic height and a
+  `MenuBarExtra` sizes to its content's ideal height. One cause, three reported
+  symptoms — no visible projects, a dead "+ Task" button, and a working
+  "+ Project" (a panel, outside the popover).
+- **Every dormant project was collapsed behind a row reading "4 gone quiet"**,
+  so the common case showed a count with no list, labelled like an archive.
+- **The app could not add a project.** `+` added a *task*; a project appeared
+  only when a session happened to run in its directory.
+- **Projects were being invented** from any working directory a session ran in —
+  a `~/.hermes` skills path, a `/tmp` scratchpad. One stopped existing when its
+  session ended, which is how a stale row ends up opening `~/Applications`.
+- **A git worktree showed as its own project** — and the parallel-agent workflow
+  this project is built around puts every agent in one, so it would keep
+  happening.
+- **The list reordered between refreshes**, because projects sharing a status
+  sorted on raw `lastActivity` and several sat fractions of a second apart.
+- **Tasks could belong to no project**, landing in a central list belonging
+  nowhere — which breaks what the product is built on.
+- **macOS 14 APIs were reachable from the macOS 13 path**, breaking `main`.
+
+### The ask
+
+Reported directly, over several rounds: *"The menu bar says there are 4 projects
+but I cannot see them anywhere?"*, *"Add button doesn't do anything"*, *"I have
+a random 'instructions' project that when clicked open `~/Applications`"*,
+*"'practical-chaplygin-eb0c7d' worktree keeps showing up as separate"*, and
+*"Add task adds it to a central list and not to a project. It should always be
+with a project."*
+
+### Why this approach
+
+**A discovered directory must look like a project** — a VCS directory, a
+manifest, a Makefile, or one of the brief files. Discovery only: a project added
+by hand is a project because you said so.
+
+**A worktree is folded into the repository it is a checkout of.** Its `.git` is
+a *file* pointing at `<repo>/.git/worktrees/<name>`, which is now read. A
+submodule uses the same mechanism with a different target and is deliberately
+left alone rather than folded into a parent it has nothing to do with.
+
+**Recency is compared by the minute**, with a deterministic tiebreak on name
+below that. An hour's difference still sorts first; a fraction of a second no
+longer does. A list that rearranges itself under the cursor is unusable for
+glancing at, which is the only way this one is used.
+
+**"Not a project — forget it" removes any row outright**, whatever created it
+and whatever the rules think. Archiving keeps a project you still have; this is
+for a row that should never have existed. That is the important half: every rule
+for guessing what a project is will be wrong sometimes, and the answer cannot be
+waiting for a better heuristic.
+
+**The composer asks which project**, defaulting to the most recently active, and
+cannot be submitted without one. From a project's own row it does not ask,
+because the answer is known.
+
+### Considered and rejected
+
+**Banning temp locations from discovery.** Tempting, since a `/tmp` scratchpad
+was one of the offending rows — but the marker rule already rejects a
+scratchpad, a repo cloned to `/tmp` is a real project, and a location ban would
+have banned that too while being untestable. A path *through* a dot-directory is
+still excluded marker-or-not: that is tool state, and it is the shape that
+produced the `~/.hermes` row.
+
+**Showing the project's README in an expanded row.** It pushed the sessions —
+the thing the row was expanded to see — below the fold. You already know what
+your project is.
+
+**Repurposing "Reveal in Finder" for the terminal.** The context menu grew a
+second entry instead. A label that stops meaning what it says is worse than a
+longer menu.
+
+### Mistakes worth recording
+
+**Work was reported as shipped that never reached `main`.** The worktree
+migration and "forget it" were written locally, were not part of the pull
+request that was merged, and were reported to the user as landed. Two rows the
+user reported as stuck stayed stuck, across six repetitions of the same
+complaint, because the fix existed only on this machine. Recovered as a separate
+change. This was the second such claim in the project.
+
+**Evidence was in hand and not acted on.** Two bugs in this batch — the
+reordering list and an unhelpful status line — were visible in screenshots
+already provided. The response was to ask for more information instead of
+reading what was there. The user's summary: *"I gave you all the information of
+the issues. You didn't make any changes."*
+
+**A warning was raised without reading the code it was about.** The user was
+told the new marker rule might make existing projects vanish. It cannot: `ensure`
+returns an existing record *before* the marker check runs, so discovery
+filtering applies only to directories seen for the first time.
+
+---
+
 ## Make Windows CI mean something, and get one diagnosis badly wrong
 
 *(2026-08-17, Claude)*
