@@ -81,3 +81,40 @@ struct DiagnosticsTests {
         #expect(log.recent.isEmpty)
     }
 }
+
+/// The log has to survive a restart, because that is when it gets read.
+@Suite("Diagnostics on disk")
+struct DiagnosticsFileTests {
+
+    @Test("Entries are written to the file as they happen")
+    func writesThrough() throws {
+        let log = Diagnostics()
+        log.setEnabled(true)
+        log.record(.projects, "accepted /somewhere/app")
+
+        let text = try String(contentsOf: Diagnostics.defaultFile, encoding: .utf8)
+        #expect(text.contains("accepted /somewhere/app"))
+        #expect(text.contains("projects"))
+    }
+
+    @Test("The home directory is redacted on disk too, not only in the export")
+    func redactsOnDisk() throws {
+        let log = Diagnostics()
+        log.setEnabled(true)
+        let home = FileSupport.homeDirectory.path
+        log.record(.terminal, "chain under \(home)/dev")
+
+        let text = try String(contentsOf: Diagnostics.defaultFile, encoding: .utf8)
+        // A file that is meant to be sent should not carry an account name on
+        // every line.
+        #expect(!text.contains(home))
+        #expect(text.contains("~/dev"))
+    }
+
+    @Test("The export points at the file, since the buffer is only the recent part")
+    func exportNamesTheFile() {
+        let log = Diagnostics()
+        log.setEnabled(true)
+        #expect(log.export().contains(Diagnostics.defaultFile.path))
+    }
+}

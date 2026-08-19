@@ -53,6 +53,23 @@ public final class Diagnostics: @unchecked Sendable {
     /// several hundred reports about its own fixtures, and the one real entry
     /// anyone wanted would have scrolled away.
     private var enabled = !FileSupport.isRunningTests
+    private var handle: FileHandle?
+    private var written: UInt64 = 0
+
+    /// Where the log is kept between launches.
+    ///
+    /// **In memory is not enough.** The buffer holds the last few hundred
+    /// decisions, which is the wrong window for the actual workflow: a bug is
+    /// noticed, the app runs on for an hour, and by the time anyone looks the
+    /// evidence has rolled out — or the app was restarted and it is gone
+    /// entirely. A file survives both, and can simply be sent.
+    public static var defaultFile: URL {
+        FileSupport.stateDirectory.appendingPathComponent("diagnostics.log")
+    }
+
+    /// Beyond this the file rotates. Small enough to attach to a message, large
+    /// enough to hold a day of ordinary use.
+    public static let maxFileBytes: UInt64 = 2 * 1024 * 1024
 
     public init() {}
 
@@ -65,10 +82,58 @@ public final class Diagnostics: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard enabled else { return }
-        entries.append(Entry(at: at, category: category, message: message()))
+        let entry = Entry(at: at, category: category, message: message())
+        entries.append(entry)
         if entries.count > Self.capacity {
             entries.removeFirst(entries.count - Self.capacity)
         }
+        appendToFile(entry)
+    }
+
+    /// Appends one line, so the log survives a quit and outlives the buffer.
+    ///
+    /// Failures are swallowed deliberately: a diagnostics log that can break the
+    /// app it is diagnosing is worse than no log.
+    private func appendToFile(_ entry: Entry) {
+        guard let file = fileHandle() else { return }
+        let line = "\(Self.stamp(entry.at))  \(entry.category.rawValue.padded(to: 9))  \(entry.message)\n"
+        guard let data = Self.redacting(line).data(using: .utf8) else { return }
+        try? file.write(contentsOf: data)
+        written += UInt64(data.count)
+        if written >= Self.maxFileBytes { rotate() }
+    }
+
+    private func fileHandle() -> FileHandle? {
+        if let handle { return handle }
+        let url = Self.defaultFile
+        try? FileSupport.fileManager.createDirectory(at: url.deletingLastPathComponent(),
+                                                     withIntermediateDirectories: true)
+        if !FileSupport.fileManager.fileExists(atPath: url.path) {
+            _ = FileSupport.fileManager.createFile(atPath: url.path, contents: nil)
+        }
+        guard let opened = try? FileHandle(forWritingTo: url) else { return nil }
+        written = (try? opened.seekToEnd()) ?? 0
+        handle = opened
+        return opened
+    }
+
+    /// Keeps one previous file, so a rotation mid-investigation does not destroy
+    /// the thing being investigated.
+    private func rotate() {
+        try? handle?.close()
+        handle = nil
+        written = 0
+        let current = Self.defaultFile
+        let previous = current.deletingLastPathComponent().appendingPathComponent("diagnostics.1.log")
+        try? FileSupport.fileManager.removeItem(at: previous)
+        try? FileSupport.fileManager.moveItem(at: current, to: previous)
+    }
+
+    static func stamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "MM-dd HH:mm:ss"
+        return formatter.string(from: date)
     }
 
     public var recent: [Entry] {
@@ -114,8 +179,10 @@ public final class Diagnostics: @unchecked Sendable {
             out.append("(nothing recorded yet — open the app and let it refresh once)")
         }
         for entry in all {
-            out.append("\(formatter.string(from: entry.at))  \(entry.category.rawValue.padded(to: 9))  \(entry.message)")
+            out.append("\(Self.stamp(entry.at))  \(entry.category.rawValue.padded(to: 9))  \(entry.message)")
         }
+        out.append("")
+        out.append("# Full history, including previous launches: \(Self.defaultFile.path)")
         return Self.redacting(out.joined(separator: "\n"))
     }
 
