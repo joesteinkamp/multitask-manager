@@ -477,7 +477,7 @@ struct ProjectStatusWithTasksTests {
         ]
         let result = verdict(tasks: tasks)
         #expect(result.status == .ready)
-        #expect(result.reason == "2 ready, 1 yours")
+        #expect(result.reason == "2 ready, 1 yours — nothing running")
     }
 
     @Test("All work blocked reads as blocked, not as ready")

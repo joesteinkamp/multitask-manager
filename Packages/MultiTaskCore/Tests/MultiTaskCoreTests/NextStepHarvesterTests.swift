@@ -268,7 +268,9 @@ struct SuggestedStepAssemblyTests {
             .assemble(records: [record], sessions: [], waves: [],
                       repositories: [], config: Configuration())
 
-        #expect(projects.first?.status == .ready)
+        // Idle, because nothing is running and nothing is queued — not because
+        // a file is missing.
+        #expect(projects.first?.status == .idle)
         #expect(projects.first?.statusReason.contains("PRODUCT.md") == false)
     }
 }

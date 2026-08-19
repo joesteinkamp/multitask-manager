@@ -80,6 +80,7 @@ enum AppTheme {
     static let readyColor = color(.ready)
     static let blockedColor = color(.blocked)
     static let dormantColor = color(.dormant)
+    static let idleColor = color(.idle)
     static let unknownColor = color(.unknown)
     /// Finished, and fine. Reads as settled rather than as a success to celebrate.
     static let calmColor = color(.dormant)
@@ -100,6 +101,7 @@ enum AppTheme {
         case .working: return Color(nsColor: .controlAccentColor)
         case .complete: return Color(nsColor: .systemGreen)
         case .ready: return Color(nsColor: .controlAccentColor)
+        case .idle: return Color(nsColor: .systemYellow)
         case .blocked: return Color(nsColor: .systemPurple)
         case .dormant: return Color(nsColor: .secondaryLabelColor)
         case .unknown: return Color(nsColor: .tertiaryLabelColor)
@@ -124,6 +126,9 @@ extension SessionStatus {
         case .working: return AppTheme.workingColor
         case .needsAttention: return AppTheme.attentionColor
         case .complete: return AppTheme.completeColor
+        // Grey, not the project role's yellow. One session going quiet while
+        // its siblings work is ordinary; a whole project going quiet is the
+        // waste this app watches for. Same word, different stakes.
         case .idle: return AppTheme.dormantColor
         case .unknown: return AppTheme.unknownColor
         }
@@ -136,6 +141,7 @@ extension ProjectStatus {
         case .needsYou: return AppTheme.attentionColor
         case .working: return AppTheme.workingColor
         case .ready: return AppTheme.readyColor
+        case .idle: return AppTheme.idleColor
         case .blocked: return AppTheme.blockedColor
         case .dormant: return AppTheme.dormantColor
         }
@@ -147,6 +153,9 @@ extension ProjectStatus {
         case .working: return "circle.fill"
         case .ready: return "arrow.right.circle.fill"
         case .blocked: return "pause.circle.fill"
+        // An hourglass, not a pause: nothing is holding this project up, time is
+        // simply passing while nothing happens to it.
+        case .idle: return "hourglass"
         case .dormant: return "moon.zzz.fill"
         }
     }

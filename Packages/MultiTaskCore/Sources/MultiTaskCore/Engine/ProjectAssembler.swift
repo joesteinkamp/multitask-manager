@@ -228,17 +228,21 @@ public struct ProjectAssembler: Sendable {
 
         // 3 — something you could pick up. Real tasks answer this once they
         //     exist; the roadmap's unchecked items are the stand-in until then.
+        //     Every reason here ends in "nothing running", and that is the
+        //     point: a queue nobody is working is stopped too, just with a known
+        //     next move. "3 tasks ready" reads as healthy; "3 tasks ready —
+        //     nothing running" reads as what it is.
         let readyTasks = TaskQueue.ready(for: nil, tasks: tasks, now: now)
         if !readyTasks.isEmpty {
             let mine = readyTasks.filter { $0.assignee == .me }.count
             let detail = mine > 0 && mine != readyTasks.count
                 ? "\(readyTasks.count) ready, \(mine) yours"
                 : "\(readyTasks.count) task\(readyTasks.count == 1 ? "" : "s") ready"
-            return StatusVerdict(status: .ready, reason: detail)
+            return StatusVerdict(status: .ready, reason: "\(detail) — nothing running")
         }
         if nextStepCount > 0 {
             return StatusVerdict(status: .ready,
-                                 reason: "\(nextStepCount) item\(nextStepCount == 1 ? "" : "s") ready to pick up")
+                                 reason: "\(nextStepCount) item\(nextStepCount == 1 ? "" : "s") to pick up — nothing running")
         }
         // Ranked below real tasks and the roadmap on purpose. A suggestion is
         // something an agent proposed and nobody has agreed to yet — reporting
@@ -248,7 +252,7 @@ public struct ProjectAssembler: Sendable {
             let who = Set(suggestedSteps.compactMap(\.agent))
             let by = who.count == 1 ? " from \(who.first!)" : ""
             return StatusVerdict(status: .ready,
-                                 reason: "\(suggestedSteps.count) suggested step\(suggestedSteps.count == 1 ? "" : "s")\(by)")
+                                 reason: "\(suggestedSteps.count) suggested step\(suggestedSteps.count == 1 ? "" : "s")\(by) — nothing running")
         }
 
         // 4 — work exists but is waiting on something else.
@@ -269,21 +273,42 @@ public struct ProjectAssembler: Sendable {
             return StatusVerdict(status: .dormant, reason: "No activity for \(days) days")
         }
 
-        // There is no rung 6. One used to sit here: `unbriefed`, fired whenever
-        // `PRODUCT.md` was absent, reading "add one to get suggestions". It was
-        // a demand for paperwork standing in for a status — and it promised a
-        // feature that did not exist. Suggestions are now harvested from what
-        // the agents themselves wrote, which needs no brief at all.
+        // 6 — nothing is running and nothing is queued.
         //
-        // Nothing replaced it, deliberately. Whether the app has read a
-        // description of a project says nothing about whether that project
-        // needs anything, so it cannot be a status; as one it put a grey
-        // question mark against perfectly healthy projects. A quiet project
-        // with nothing queued is quiet, and that is what this says.
-        return StatusVerdict(status: .ready, reason: "Nothing blocked")
+        // This branch used to return `.ready` with the reason "Nothing blocked",
+        // which was true and useless: it described the absence of a problem
+        // instead of the presence of one, and rendered an idle project as
+        // healthy. Idle is not healthy here. The premise of running several
+        // projects against agents at once is that none of them sits still while
+        // you are looking elsewhere, and a project with no session and no queue
+        // is burning exactly the parallelism this app exists to provide —
+        // silently, because nothing about a stopped project makes noise.
+        // `dormant` did not cover it either; it waits seven days.
+        //
+        // The elapsed time carries the weight. "Idle" alone invites a shrug;
+        // "Idle 4h — nothing queued" is a number a person acts on, and it
+        // separates a project that just finished a turn from one that stopped
+        // after breakfast.
+        //
+        // (A rung numbered 6 sat here before, `unbriefed`, firing whenever
+        // PRODUCT.md was absent. It was a demand for paperwork standing in for
+        // a status. Its removal is why this branch was reachable and bare.)
+        return StatusVerdict(status: .idle,
+                             reason: "Idle \(compactElapsed(since: lastActivity, now: now)) — nothing queued")
     }
 
     // MARK: Reading
+
+    /// Elapsed time in the shortest form that still reads unambiguously — "3m",
+    /// "4h", "2d". Deliberately coarse: nobody acts differently on 3h12m than on
+    /// 3h, and the extra characters cost the row width the reason needs.
+    static func compactElapsed(since date: Date, now: Date) -> String {
+        let seconds = max(0, now.timeIntervalSince(date))
+        if seconds < 90 { return "\(Int(seconds))s" }
+        if seconds < 3_600 { return "\(Int(seconds / 60))m" }
+        if seconds < 86_400 { return "\(Int(seconds / 3_600))h" }
+        return "\(Int(seconds / 86_400))d"
+    }
 
     /// Delegate name for a session's source, for attribution on a step.
     static func cliName(for source: SessionSource) -> String? {

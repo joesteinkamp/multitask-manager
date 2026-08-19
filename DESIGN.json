@@ -111,6 +111,11 @@
         "macOS": "controlAccentColor",
         "fallback": "#0A6ED1"
       },
+      "idle": {
+        "meaning": "Stopped with nothing queued. Noticed, never interrupting — orange stays the only role permitted to interrupt, so this reads as waste rather than as a question. Distinct from `dormant`, which is the same absence after a week and is genuinely not urgent.",
+        "macOS": "systemYellow",
+        "fallback": "#B8860B"
+      },
       "blocked": {
         "meaning": "Waiting on something impersonal — a dependency, another task.",
         "macOS": "systemPurple",

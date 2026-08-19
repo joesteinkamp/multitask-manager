@@ -36,6 +36,17 @@ struct ProjectRowView: View {
                             }
                         }
 
+                        // What the project is, above what it is doing. The
+                        // one-liner never changes, so the status line below it
+                        // keeps a stable vertical position across refreshes.
+                        if let oneLiner = project.oneLiner {
+                            Text(oneLiner)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(1)
+                                .help(oneLiner)
+                        }
+
                         Text(project.statusReason)
                             .font(.caption2)
                             .foregroundStyle(.secondary)

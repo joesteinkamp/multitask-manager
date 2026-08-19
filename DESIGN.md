@@ -90,12 +90,14 @@ neither is prose:
 
 | Role | Means | macOS |
 |---|---|---|
-| `attention` | Waiting on the person. The only role permitted to interrupt. | `systemOrange` |
-| `working` | Progressing on its own. No action wanted. | `systemGreen` |
+| `attention` | Something is waiting on the person. The only role permitted to interrupt. | `systemOrange` |
+| `working` | Progressing on its own. No action wanted. Shares the accent with `ready` on purpose: neither asks anything of you, and the glyph separates them. | `controlAccentColor` |
+| `complete` | Finished. Worth seeing, not waiting on you. Green belongs here — it reads as *done* everywhere else in software, which is why using it for work in progress was a mistake. | `systemGreen` |
 | `ready` | Available to pick up. | `controlAccentColor` |
-| `blocked` | Waiting on something impersonal — a dependency. | `systemPurple` |
+| `idle` | Stopped with nothing queued. Noticed, never interrupting — orange stays the only role permitted to interrupt, so this reads as waste rather than as a question. Distinct from `dormant`, which is the same absence after a week and is genuinely not urgent. | `systemYellow` |
+| `blocked` | Waiting on something impersonal — a dependency, another task. | `systemPurple` |
 | `dormant` | Quiet with nothing ready. Reported, never highlighted. | `secondaryLabelColor` |
-| `unknown` | The app can't tell. Distinct from "nothing is happening". | `tertiaryLabelColor` |
+| `unknown` | The app cannot tell. Distinct from 'nothing is happening'. | `tertiaryLabelColor` |
 
 **System colours, not a custom palette.** System colours already satisfy contrast in light and
 dark, already respond to Increase Contrast, and already look native beside every other menu bar

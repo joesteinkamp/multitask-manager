@@ -258,12 +258,39 @@ struct ProjectStatusTests {
     @Test("Having read no description of a project is not a status")
     func noDescriptionIsNotAStatus() {
         let result = verdict(briefs: BriefSet())
-        #expect(result.status == .ready)
-        #expect(result.reason == "Nothing blocked")
+        #expect(result.status == .idle)
         // The user is never told they owe the app a file.
         #expect(!result.reason.contains("PRODUCT.md"))
         #expect(!result.reason.lowercased().contains("add"))
     }
+
+    /// The point of the whole ladder. Nothing running and nothing queued is the
+    /// most expensive state a project can be in during a week where several are
+    /// meant to progress at once — and it used to report as `.ready`, "Nothing
+    /// blocked", which reads as healthy.
+    @Test("A project with nothing running and nothing queued is idle, not fine")
+    func stoppedIsNotFine() {
+        let result = verdict(lastActivity: now.addingTimeInterval(-4 * 3_600))
+        #expect(result.status == .idle)
+        #expect(result.reason == "Idle 4h — nothing queued")
+        #expect(!result.reason.lowercased().contains("nothing blocked"))
+    }
+
+    @Test("Idle outranks everything except work blocked on the person")
+    func idleRanksSecond() {
+        #expect(ProjectStatus.idle.sortRank > ProjectStatus.needsYou.sortRank)
+        for other in [ProjectStatus.working, .ready, .blocked, .dormant] {
+            #expect(ProjectStatus.idle.sortRank < other.sortRank)
+        }
+    }
+
+    @Test("Elapsed time is coarse but unambiguous",
+          arguments: [(30.0, "30s"), (600.0, "10m"), (4.0 * 3_600, "4h"), (3.0 * 86_400, "3d")])
+    func elapsedFormatting(_ seconds: Double, _ expected: String) {
+        let then = now.addingTimeInterval(-seconds)
+        #expect(ProjectAssembler.compactElapsed(since: then, now: now) == expected)
+    }
+
 
     /// Whichever context files exist, the verdict is the same — because the
     /// verdict never depended on them. Kept as a regression guard: a later rung
@@ -281,8 +308,8 @@ struct ProjectStatusTests {
         default: break
         }
         let result = verdict(briefs: briefs)
-        #expect(result.status == .ready)
-        #expect(result.reason == "Nothing blocked")
+        #expect(result.status == .idle)
+        #expect(result.reason.hasPrefix("Idle "))
     }
 
     @Test("Needing you still outranks everything")
