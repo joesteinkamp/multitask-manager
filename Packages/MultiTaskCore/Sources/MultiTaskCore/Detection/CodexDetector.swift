@@ -105,11 +105,31 @@ public struct CodexDetector: SessionDetector {
 
     /// Scans the head of a transcript for a working-directory field under any of a
     /// few known key names.
+    /// How much of a rollout to read looking for its working directory.
+    ///
+    /// **The old limit was 16 KB and every real rollout's first line is bigger.**
+    /// Codex writes its whole session metadata as one JSON object on line one —
+    /// measured at 17 to 18.6 KB across every rollout on this machine — so a
+    /// 16 KB window truncated it mid-object, the parse failed, and `cwd` was
+    /// never found. Every Codex session then fell back to naming itself after
+    /// its own filename: `rollout-2026-08-18T11-28-12-01a015b3-…`, attached to
+    /// no project.
+    ///
+    /// Generous rather than exact, because the right number is a property of
+    /// Codex's metadata and will change without warning.
+    static let metadataWindow = 512 * 1024
+
     public static func readWorkingDirectory(from transcript: URL) -> String? {
-        guard let text = FileSupport.readHead(of: transcript, limit: 16_384) else { return nil }
+        guard let text = FileSupport.readHead(of: transcript, limit: metadataWindow) else { return nil }
+
+        // Drop a trailing partial line. A byte window almost never lands on a
+        // newline, and half a JSON object parses as nothing — which is the
+        // failure this whole function just had, one size larger.
+        var lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        if !text.hasSuffix("\n"), lines.count > 1 { lines.removeLast() }
 
         let candidateKeys = ["cwd", "workdir", "cwd_path", "working_directory"]
-        for line in text.split(separator: "\n") {
+        for line in lines {
             guard let lineData = line.data(using: .utf8),
                   let obj = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any]
             else { continue }
