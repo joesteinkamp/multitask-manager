@@ -151,7 +151,11 @@ private struct HealthSettings: View {
     @State private var copiedAt: Date?
 
     private func copyDiagnostics() {
+        let bundle = Bundle.main
+        let version = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         let header = [
+            "app: \(version) (\(build))  macOS \(ProcessInfo.processInfo.operatingSystemVersionString)",
             "projects: \(store.activeProjects.count) active of \(store.projects.count)",
             "sessions: \(store.sessions.count)",
             "pending approvals: \(store.pendingApprovals.count)",
@@ -174,15 +178,30 @@ private struct HealthSettings: View {
                 // description. This puts the app's actual reasoning — which
                 // directories became projects, what evidence produced each
                 // status, what the terminal lookup found — on the clipboard.
-                Button("Copy diagnostics") { copyDiagnostics() }
+                HStack {
+                    Button("Copy diagnostics") { copyDiagnostics() }
+                    // The file, not just the buffer: a bug noticed an hour ago
+                    // has scrolled out of memory and does not survive a restart,
+                    // which is exactly when someone goes looking for it.
+                    Button("Reveal log file") {
+                        NSWorkspace.shared.activateFileViewerSelecting([Diagnostics.defaultFile])
+                    }
+                }
                 if copiedAt != nil {
                     Text("Copied. Paste it into the conversation.")
                         .font(AppTheme.rowMeta)
                         .foregroundStyle(.secondary)
                 }
-                Text("Decisions and paths, no prompt text or file contents. Safe to paste.")
+                Text("Decisions and paths — no prompt text, tool input, or file contents. "
+                     + "Safe to send without reading it first.")
                     .font(AppTheme.rowMeta)
                     .foregroundStyle(.secondary)
+                Text(Diagnostics.defaultFile.path)
+                    .font(AppTheme.rowMeta)
+                    .foregroundStyle(.tertiary)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .truncationMode(.head)
             }
 
             Section("Harness audit log") {

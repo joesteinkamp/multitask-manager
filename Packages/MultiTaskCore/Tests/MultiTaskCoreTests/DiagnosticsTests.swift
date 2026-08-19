@@ -81,3 +81,65 @@ struct DiagnosticsTests {
         #expect(log.recent.isEmpty)
     }
 }
+
+/// The log has to survive a restart, because that is when it gets read.
+@Suite("Diagnostics on disk")
+struct DiagnosticsFileTests {
+
+    /// Each test gets its own file. Sharing one meant three of these read each
+    /// other's entries and failed in whichever order the runner chose — which is
+    /// how this surfaced, on Windows, where the ordering differed.
+    private func subject(_ dir: TempDir) -> Diagnostics {
+        let log = Diagnostics(file: dir.url.appendingPathComponent("diagnostics.log"))
+        log.setEnabled(true)
+        return log
+    }
+
+    @Test("Entries are written to the file as they happen")
+    func writesThrough() throws {
+        let dir = TempDir()
+        let log = subject(dir)
+        log.record(.projects, "accepted /somewhere/app")
+
+        let text = try String(contentsOf: dir.url.appendingPathComponent("diagnostics.log"),
+                              encoding: .utf8)
+        #expect(text.contains("accepted /somewhere/app"))
+        #expect(text.contains("projects"))
+    }
+
+    @Test("The home directory is redacted on disk too, not only in the export")
+    func redactsOnDisk() throws {
+        let dir = TempDir()
+        let log = subject(dir)
+        let home = FileSupport.homeDirectory.path
+        log.record(.terminal, "chain under \(home)/dev")
+
+        let text = try String(contentsOf: dir.url.appendingPathComponent("diagnostics.log"),
+                              encoding: .utf8)
+        // A file meant to be sent should not carry an account name on every line.
+        #expect(!text.contains(home))
+        #expect(text.contains("~/dev"))
+    }
+
+    @Test("The export points at the file, since the buffer is only the recent part")
+    func exportNamesTheFile() {
+        let dir = TempDir()
+        let log = subject(dir)
+        // Redacted, like everything else — this line is for a person to read,
+        // and `~/.multitaskmanager/…` is more use to them than an absolute path
+        // with their account name in it.
+        #expect(log.export().contains(Diagnostics.redacting(dir.path("diagnostics.log"))))
+    }
+
+    @Test("A separate instance keeps its own file")
+    func instancesAreIndependent() throws {
+        let a = TempDir(), b = TempDir()
+        subject(a).record(.status, "only in a")
+        subject(b).record(.status, "only in b")
+
+        let textA = try String(contentsOf: a.url.appendingPathComponent("diagnostics.log"),
+                               encoding: .utf8)
+        #expect(textA.contains("only in a"))
+        #expect(!textA.contains("only in b"))
+    }
+}
