@@ -97,6 +97,22 @@ public enum NextStepHarvester {
     /// The last thing the agent said, as plain text. Mirrors
     /// `ProjectContextReader.latestUserPrompt` but for the other side of the
     /// conversation, and keeps newlines — the list structure is the whole point.
+    ///
+    /// **Measured yield on real transcripts is close to zero, and that is not a
+    /// bug in this parser.** Probed against 63 real Claude Code sessions: 12 used
+    /// a next-steps phrase somewhere in prose, and *none* used one as a heading
+    /// above a list. The reason is upstream — the operating instructions in this
+    /// repository tell agents to reach for a long-running primitive "instead of
+    /// ending with a list of next steps", so the closing summary is deliberately
+    /// prose. Loosening the cue to catch prose would mean picking which sentence
+    /// was a recommendation, which is inference this module cannot do and must
+    /// not fake.
+    ///
+    /// This is kept because it is cheap and correct where the pattern does occur
+    /// — a planning turn, a delegate briefed to emit a checklist, another tool's
+    /// output — but it is not the mechanism to rely on. The reliable path for
+    /// session-derived suggestions is to dispatch a delegate and read its file
+    /// output, which is what `Launcher` and `Provisioner` exist for.
     public static func latestAssistantMessage(fromTranscript path: String) -> String? {
         let url = URL(fileURLWithPath: path)
         guard let text = FileSupport.readTail(of: url, limit: transcriptTailBytes) else { return nil }

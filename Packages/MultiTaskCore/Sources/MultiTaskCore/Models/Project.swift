@@ -42,8 +42,15 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
     /// a stuck project makes noise, a forgotten one doesn't, and silence reads
     /// exactly like fine.
     case dormant
-    /// No `PRODUCT.md`. The app can watch this project but can't help with it.
-    case unbriefed
+
+    // There was a seventh status here — `unbriefed`, for a project with no
+    // `PRODUCT.md`, shown as a grey question mark. It is gone, and it should
+    // not come back. "The app hasn't read anything about this project" is a
+    // fact about the app's knowledge, not a state of the project, and it
+    // belongs nowhere near a row of states that describe whether work is
+    // moving. Rendered as a question mark it read as *something is wrong here*
+    // — on projects where nothing was wrong at all. A quiet project with no
+    // README is quiet, which the ladder already says.
 
     /// Sort weight, most urgent first.
     public var sortRank: Int {
@@ -53,7 +60,6 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
         case .ready: return 2
         case .blocked: return 3
         case .dormant: return 4
-        case .unbriefed: return 5
         }
     }
 
@@ -64,7 +70,6 @@ public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
         case .ready: return "Ready"
         case .blocked: return "Blocked"
         case .dormant: return "Dormant"
-        case .unbriefed: return "No brief"
         }
     }
 }

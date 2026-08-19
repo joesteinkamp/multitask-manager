@@ -233,12 +233,6 @@ struct ProjectRowView: View {
                 }
             }
 
-            if !project.briefs.meetsMinimum {
-                Label("No README or brief — the app can watch this, but can't describe it",
-                      systemImage: "doc.badge.plus")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
         }
         .padding(.leading, AppTheme.nestedIndent)
         .padding(.trailing, AppTheme.tightSpacing)

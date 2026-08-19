@@ -252,37 +252,41 @@ struct ProjectStatusTests {
         #expect(result.status != .dormant)
     }
 
-    @Test("With nothing else to say and nothing on disk describing it, it says so")
-    func unbriefed() {
+    /// A project the app knows nothing about is not a project with a problem.
+    /// This used to return `.unbriefed`, rendered as a grey question mark, which
+    /// read as *something is wrong here* on projects where nothing was.
+    @Test("Having read no description of a project is not a status")
+    func noDescriptionIsNotAStatus() {
         let result = verdict(briefs: BriefSet())
-        #expect(result.status == .unbriefed)
-        // The reason names what the app can't do, not a file the user owes it.
-        // "add a PRODUCT.md to get suggestions" was a demand for paperwork
-        // standing in for a status — and it promised a feature that did not
-        // exist at the time.
-        #expect(result.reason.contains("README") || result.reason.contains("brief"))
-        #expect(!result.reason.contains("add one"))
+        #expect(result.status == .ready)
+        #expect(result.reason == "Nothing blocked")
+        // The user is never told they owe the app a file.
+        #expect(!result.reason.contains("PRODUCT.md"))
+        #expect(!result.reason.lowercased().contains("add"))
     }
 
-    /// The gate this rung used to apply. Any of these files says what a project
-    /// is, so none of them should leave it reported as undescribed.
-    @Test("An AGENTS.md, CLAUDE.md or README is enough to not be unbriefed",
-          arguments: ["agents", "claude", "readme", "code"])
-    func contextBeyondProductBrief(_ which: String) {
+    /// Whichever context files exist, the verdict is the same — because the
+    /// verdict never depended on them. Kept as a regression guard: a later rung
+    /// keyed to `meetsMinimum` would reintroduce exactly the bug removed here.
+    @Test("The status is identical with and without a brief",
+          arguments: ["none", "agents", "claude", "readme", "code", "product"])
+    func statusIgnoresBriefs(_ which: String) {
         var briefs = BriefSet()
         switch which {
         case "agents": briefs.agents = true
         case "claude": briefs.claude = true
         case "readme": briefs.readme = true
-        default: briefs.code = true
+        case "code": briefs.code = true
+        case "product": briefs.product = true
+        default: break
         }
-        #expect(briefs.meetsMinimum)
-        #expect(briefs.hasProductBrief == false)
-        #expect(verdict(briefs: briefs).status != .unbriefed)
+        let result = verdict(briefs: briefs)
+        #expect(result.status == .ready)
+        #expect(result.reason == "Nothing blocked")
     }
 
-    @Test("Needing you outranks having no brief")
-    func urgencyBeatsUnbriefed() {
+    @Test("Needing you still outranks everything")
+    func urgencyWins() {
         let waiting = Session.stub(id: "s", lastActivity: now, status: .needsAttention)
         let result = verdict(sessions: [waiting], briefs: BriefSet())
         #expect(result.status == .needsYou)
@@ -607,9 +611,9 @@ struct ProjectListStabilityTests {
         // Three idle projects, timestamps a fraction of a second apart — which is
         // what re-reading the same files produces. Ordering on raw timestamps let
         // any of these swap places between refreshes.
-        let a = project("alpha", status: .unbriefed, activity: -0.2)
-        let b = project("bravo", status: .unbriefed, activity: -0.5)
-        let c = project("charlie", status: .unbriefed, activity: -0.1)
+        let a = project("alpha", status: .dormant, activity: -0.2)
+        let b = project("bravo", status: .dormant, activity: -0.5)
+        let c = project("charlie", status: .dormant, activity: -0.1)
 
         let order = [c, a, b].sorted(by: ProjectAssembler.ordering).map(\.name)
         // Same minute, so the tiebreak decides — and it is deterministic.
@@ -622,8 +626,8 @@ struct ProjectListStabilityTests {
 
     @Test("A genuinely more recent project still sorts first")
     func realRecencyStillWins() {
-        let old = project("alpha", status: .unbriefed, activity: -3600)
-        let fresh = project("zulu", status: .unbriefed, activity: -10)
+        let old = project("alpha", status: .dormant, activity: -3600)
+        let fresh = project("zulu", status: .dormant, activity: -10)
         // An hour apart is signal, not noise — despite `zulu` losing on name.
         #expect([old, fresh].sorted(by: ProjectAssembler.ordering).map(\.name) == ["zulu", "alpha"])
     }

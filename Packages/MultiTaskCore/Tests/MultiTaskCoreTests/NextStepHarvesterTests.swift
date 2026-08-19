@@ -256,7 +256,7 @@ struct SuggestedStepAssemblyTests {
         #expect(again.first?.suggestedSteps.first?.text == "Retire the unbriefed status")
     }
 
-    @Test("A README-only project is no longer reported as unbriefed")
+    @Test("A README-only project reports a real state, not a question mark")
     func readmeIsEnough() throws {
         let dir = TempDir()
         dir.makeDirectory("app")
@@ -268,7 +268,7 @@ struct SuggestedStepAssemblyTests {
             .assemble(records: [record], sessions: [], waves: [],
                       repositories: [], config: Configuration())
 
-        #expect(projects.first?.status != .unbriefed)
+        #expect(projects.first?.status == .ready)
         #expect(projects.first?.statusReason.contains("PRODUCT.md") == false)
     }
 }

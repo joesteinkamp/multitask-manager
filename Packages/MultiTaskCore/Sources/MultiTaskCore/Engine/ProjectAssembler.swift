@@ -269,19 +269,17 @@ public struct ProjectAssembler: Sendable {
             return StatusVerdict(status: .dormant, reason: "No activity for \(days) days")
         }
 
-        // 6 — nothing above applied, and nothing on disk says what this project
-        //     is. Note what this rung no longer does: it used to fire whenever
-        //     `PRODUCT.md` was absent, and read "add one to get suggestions" —
-        //     a demand for paperwork standing in for a status, and a promise of
-        //     a feature that did not exist. Suggestions are now harvested from
-        //     what the agents themselves wrote (`NextStepHarvester`), which
-        //     needs no brief at all. What remains here is the genuinely
-        //     uninformative case: a directory the app can watch but cannot
-        //     describe.
-        if !briefs.meetsMinimum {
-            return StatusVerdict(status: .unbriefed, reason: "Quiet — no README or brief to read")
-        }
-
+        // There is no rung 6. One used to sit here: `unbriefed`, fired whenever
+        // `PRODUCT.md` was absent, reading "add one to get suggestions". It was
+        // a demand for paperwork standing in for a status — and it promised a
+        // feature that did not exist. Suggestions are now harvested from what
+        // the agents themselves wrote, which needs no brief at all.
+        //
+        // Nothing replaced it, deliberately. Whether the app has read a
+        // description of a project says nothing about whether that project
+        // needs anything, so it cannot be a status; as one it put a grey
+        // question mark against perfectly healthy projects. A quiet project
+        // with nothing queued is quiet, and that is what this says.
         return StatusVerdict(status: .ready, reason: "Nothing blocked")
     }
 
@@ -319,7 +317,7 @@ public struct ProjectAssembler: Sendable {
     /// Whether a directory should become a project on its own.
     ///
     /// A session run straight from the home directory is a session, not a
-    /// project — and left unfiltered it becomes a permanent unbriefed row that
+    /// project — and left unfiltered it becomes a permanent dead row that
     /// can never be satisfied, because nobody is going to write a product brief
     /// for `~`. An explicitly-added record for such a path is still honoured;
     /// this only governs *automatic* discovery.
