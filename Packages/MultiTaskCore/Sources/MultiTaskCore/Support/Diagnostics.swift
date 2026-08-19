@@ -71,7 +71,17 @@ public final class Diagnostics: @unchecked Sendable {
     /// enough to hold a day of ordinary use.
     public static let maxFileBytes: UInt64 = 2 * 1024 * 1024
 
-    public init() {}
+    /// Where *this* instance writes.
+    ///
+    /// Injectable rather than always the shared path: three tests writing to one
+    /// global file read each other's entries and failed in whichever order the
+    /// runner happened to pick. A single hard-coded destination is also simply
+    /// untestable, which is a good sign it was the wrong shape.
+    private let file: URL
+
+    public init(file: URL? = nil) {
+        self.file = file ?? Self.defaultFile
+    }
 
     /// Records a decision and the reason for it.
     ///
@@ -105,7 +115,7 @@ public final class Diagnostics: @unchecked Sendable {
 
     private func fileHandle() -> FileHandle? {
         if let handle { return handle }
-        let url = Self.defaultFile
+        let url = file
         try? FileSupport.fileManager.createDirectory(at: url.deletingLastPathComponent(),
                                                      withIntermediateDirectories: true)
         if !FileSupport.fileManager.fileExists(atPath: url.path) {
@@ -123,8 +133,9 @@ public final class Diagnostics: @unchecked Sendable {
         try? handle?.close()
         handle = nil
         written = 0
-        let current = Self.defaultFile
-        let previous = current.deletingLastPathComponent().appendingPathComponent("diagnostics.1.log")
+        let current = file
+        let previous = current.deletingLastPathComponent()
+            .appendingPathComponent("diagnostics.1.log")
         try? FileSupport.fileManager.removeItem(at: previous)
         try? FileSupport.fileManager.moveItem(at: current, to: previous)
     }
@@ -182,7 +193,8 @@ public final class Diagnostics: @unchecked Sendable {
             out.append("\(Self.stamp(entry.at))  \(entry.category.rawValue.padded(to: 9))  \(entry.message)")
         }
         out.append("")
-        out.append("# Full history, including previous launches: \(Self.defaultFile.path)")
+        out.append("# Full history, including previous launches:")
+        out.append("# \(Self.redacting(file.path))")
         return Self.redacting(out.joined(separator: "\n"))
     }
 
