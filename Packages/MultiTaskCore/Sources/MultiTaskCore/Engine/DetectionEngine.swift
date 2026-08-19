@@ -380,7 +380,8 @@ public actor DetectionEngine {
             if let renamed = overrides.renames[s.id] { s.title = renamed }
             s.isPinned = overrides.pinned.contains(s.id)
 
-            let activity = audit.activity(sessionId: s.harnessSessionId, projectPath: s.projectPath)
+            let activity = audit.activity(sessionId: s.harnessSessionId, projectPath: s.projectPath,
+                                          tool: s.source.harnessToolName)
             if let activity {
                 s.lastActivity = max(s.lastActivity, activity.lastEventAt)
                 s.lastToolName = activity.lastToolName

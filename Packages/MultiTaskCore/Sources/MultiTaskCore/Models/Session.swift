@@ -46,6 +46,21 @@ public enum SessionSource: Codable, Hashable, Sendable {
 /// `id` is intentionally *stable* across refreshes (derived from the source plus a
 /// path or uuid) so that user overrides — hides, renames, pins — and the computed
 /// status survive re-detection.
+public extension SessionSource {
+    /// What the harness audit log calls this agent, when it is one that logs.
+    ///
+    /// Used to keep the audit log's directory-based fallback from attributing
+    /// one agent's work to another: Codex sessions in a project made a Claude
+    /// Code session in the same project look busy.
+    var harnessToolName: String? {
+        switch self {
+        case .claudeCode: return "claude"
+        case .codex: return "codex"
+        default: return nil
+        }
+    }
+}
+
 public struct Session: Identifiable, Codable, Hashable, Sendable {
     public var id: String
     public var title: String

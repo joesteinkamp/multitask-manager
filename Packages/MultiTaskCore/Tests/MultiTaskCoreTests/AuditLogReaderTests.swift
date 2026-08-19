@@ -260,3 +260,44 @@ struct AuditTailTests {
         #expect(index.byCWD.isEmpty)
     }
 }
+
+/// Attributing one agent's work to another is worse than attributing none.
+@Suite("The directory fallback does not cross agents")
+struct AuditAttributionTests {
+    let now = Fixtures.auditNow
+
+    private func index() -> AuditIndex {
+        var index = AuditIndex()
+        // Codex is working in this directory. Claude Code is not.
+        index.byCWD["/dev/app"] = AuditActivity(lastEventAt: now, tool: "codex")
+        index.bySession["codex-1"] = AuditActivity(lastEventAt: now, tool: "codex")
+        return index
+    }
+
+    @Test("A Claude Code session does not inherit Codex's activity")
+    func doesNotCrossAgents() {
+        // The bug this replaces: a project showed "Claude Code active" while
+        // three Codex sessions did the work and no Claude Code was running.
+        #expect(index().activity(sessionId: nil, projectPath: "/dev/app", tool: "claude") == nil)
+    }
+
+    @Test("The same agent still matches by directory")
+    func sameAgentStillMatches() {
+        #expect(index().activity(sessionId: nil, projectPath: "/dev/app", tool: "codex") != nil)
+    }
+
+    @Test("An exact session id wins regardless of tool")
+    func sessionIdIsAuthoritative() {
+        // The id is the precise join; the tool check exists only to discipline
+        // the coarse one.
+        #expect(index().activity(sessionId: "codex-1", projectPath: nil, tool: "claude") != nil)
+    }
+
+    @Test("With no tool recorded on either side, the old coarse behaviour stands")
+    func degradesGracefully() {
+        var index = AuditIndex()
+        index.byCWD["/dev/app"] = AuditActivity(lastEventAt: now)
+        // Better than nothing when the harness did not record which agent it was.
+        #expect(index.activity(sessionId: nil, projectPath: "/dev/app", tool: "claude") != nil)
+    }
+}
