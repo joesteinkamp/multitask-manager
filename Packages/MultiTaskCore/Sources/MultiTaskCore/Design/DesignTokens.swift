@@ -71,6 +71,7 @@ public enum DesignTokens {
     public enum ColorRole: String, CaseIterable, Sendable {
         case attention
         case working
+        case complete
         case ready
         case blocked
         case dormant
@@ -81,7 +82,8 @@ public enum DesignTokens {
         public var meaning: String {
             switch self {
             case .attention: return "Something is waiting on the person. The only role permitted to interrupt."
-            case .working: return "Progressing on its own. No action wanted."
+            case .working: return "Progressing on its own. No action wanted. Shares the accent with `ready` on purpose: neither asks anything of you, and the glyph separates them."
+            case .complete: return "Finished. Worth seeing, not waiting on you. Green belongs here — it reads as *done* everywhere else in software, which is why using it for work in progress was a mistake."
             case .ready: return "Available to pick up."
             case .blocked: return "Waiting on something impersonal — a dependency, another task."
             case .dormant: return "Quiet with nothing ready. Reported, never highlighted."
@@ -93,7 +95,8 @@ public enum DesignTokens {
         public var macOSSystemColorName: String {
             switch self {
             case .attention: return "systemOrange"
-            case .working: return "systemGreen"
+            case .working: return "controlAccentColor"
+            case .complete: return "systemGreen"
             case .ready: return "controlAccentColor"
             case .blocked: return "systemPurple"
             case .dormant: return "secondaryLabelColor"
@@ -105,7 +108,8 @@ public enum DesignTokens {
         public var fallbackHex: String {
             switch self {
             case .attention: return "#E8730A"
-            case .working: return "#1E8E3E"
+            case .working: return "#0A6ED1"
+            case .complete: return "#1E8E3E"
             case .ready: return "#0A6ED1"
             case .blocked: return "#7A3DB8"
             case .dormant: return "#6B6B70"

@@ -76,6 +76,11 @@
       "Semantic ROLES, mapped by each platform to its own system colour — not hex",
       "values baked into two apps.",
       "",
+      "Green means *finished*, never *in progress*, and never *all clear*. It carried",
+      "all three at once, which made it mean nothing: a working agent, a healthy",
+      "detector, and an empty queue were the same colour. Calm is now the absence of",
+      "colour — nothing coloured in view is itself the signal that nothing needs you.",
+      "",
       "This is a deliberate rejection of a custom status palette. System colours",
       "already satisfy contrast in light and dark, already respond to Increase",
       "Contrast and to the colour-blind accommodations in macOS, and already look",
@@ -92,7 +97,12 @@
         "fallback": "#E8730A"
       },
       "working": {
-        "meaning": "Progressing on its own. No action wanted.",
+        "meaning": "Progressing on its own. No action wanted. Shares the accent with `ready` on purpose: neither asks anything of you, and the glyph separates them.",
+        "macOS": "controlAccentColor",
+        "fallback": "#0A6ED1"
+      },
+      "complete": {
+        "meaning": "Finished. Worth seeing, not waiting on you. Green belongs here — it reads as *done* everywhere else in software, which is why using it for work in progress was a mistake.",
         "macOS": "systemGreen",
         "fallback": "#1E8E3E"
       },

@@ -106,8 +106,12 @@ struct MenuContentView: View {
                         .foregroundStyle(AppTheme.attentionColor)
                         .font(.caption)
                 } else {
-                    Label("Nothing waiting on you", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(AppTheme.workingColor)
+                    // Deliberately uncoloured. Calm is the *absence* of a signal —
+                    // if "all clear" is green and a working agent is green, the
+                    // colour has stopped meaning anything. Nothing coloured in
+                    // view is itself the message.
+                    Label("Nothing waiting on you", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
                         .font(.caption)
                 }
                 Spacer()
