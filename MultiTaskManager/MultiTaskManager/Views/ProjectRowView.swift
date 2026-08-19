@@ -189,12 +189,50 @@ struct ProjectRowView: View {
                 WaveRowView(wave: wave)
             }
 
-            if !project.briefs.meetsMinimum {
-                Label("No PRODUCT.md — add one to get suggestions",
-                      systemImage: "doc.badge.plus")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // What the agents proposed, waiting on a yes or a no. Deliberately
+            // below the sessions and waves: this is the least certain thing on
+            // the row, and it is never filed without a person saying so.
+            if !project.suggestedSteps.isEmpty {
+                Divider().opacity(0.4)
+                Text("Suggested by your agents")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                ForEach(project.suggestedSteps) { step in
+                    HStack(alignment: .firstTextBaseline, spacing: AppTheme.tightSpacing) {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(step.text)
+                                .font(.caption2)
+                                .foregroundStyle(.primary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(step.source)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        Spacer(minLength: AppTheme.tightSpacing)
+                        Button {
+                            store.accept(step, projectId: project.id)
+                        } label: {
+                            Image(systemName: "plus.circle")
+                        }
+                        .buttonStyle(.plain)
+                        .help("Add to this project's tasks")
+                        .accessibilityLabel("Add “\(step.text)” to tasks")
+
+                        Button {
+                            store.dismiss(step)
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.tertiary)
+                        .help("Dismiss — this won't come back")
+                        .accessibilityLabel("Dismiss “\(step.text)”")
+                    }
+                }
             }
+
         }
         .padding(.leading, AppTheme.nestedIndent)
         .padding(.trailing, AppTheme.tightSpacing)

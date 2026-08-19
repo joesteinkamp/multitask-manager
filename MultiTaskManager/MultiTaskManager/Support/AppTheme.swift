@@ -138,7 +138,6 @@ extension ProjectStatus {
         case .ready: return AppTheme.readyColor
         case .blocked: return AppTheme.blockedColor
         case .dormant: return AppTheme.dormantColor
-        case .unbriefed: return AppTheme.unknownColor
         }
     }
 
@@ -149,7 +148,6 @@ extension ProjectStatus {
         case .ready: return "arrow.right.circle.fill"
         case .blocked: return "pause.circle.fill"
         case .dormant: return "moon.zzz.fill"
-        case .unbriefed: return "questionmark.circle"
         }
     }
 }

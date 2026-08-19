@@ -116,7 +116,7 @@ struct BriefReaderTests {
         #expect(set.missing == ["DESIGN.md"])
     }
 
-    @Test("A project with no brief reports the minimum it's missing")
+    @Test("A project with nothing at all reports the minimum it's missing")
     func noBrief() {
         let dir = TempDir()
         dir.makeDirectory("app")
@@ -125,6 +125,30 @@ struct BriefReaderTests {
         #expect(brief == nil)
         #expect(set.meetsMinimum == false)
         #expect(set.missing.contains("PRODUCT.md"))
+    }
+
+    @Test("A bare README is read as context, without being a product brief")
+    func readmeCounts() {
+        let dir = TempDir()
+        dir.makeDirectory("app")
+        dir.write("# Demo\n\nA thing that does a thing.", to: "app/README.md")
+        let (_, set) = BriefReader().read(projectPath: dir.path("app"))
+
+        #expect(set.readme)
+        #expect(set.meetsMinimum)
+        // Still worth prompting for once — just never as a status.
+        #expect(set.hasProductBrief == false)
+        #expect(set.missing.contains("PRODUCT.md"))
+    }
+
+    @Test("CLAUDE.md alone counts — instructions for an agent describe the project too")
+    func claudeMdCounts() {
+        let dir = TempDir()
+        dir.makeDirectory("app")
+        dir.write("# Claude Code Instructions", to: "app/CLAUDE.md")
+        let (_, set) = BriefReader().read(projectPath: dir.path("app"))
+        #expect(set.claude)
+        #expect(set.meetsMinimum)
     }
 }
 
@@ -228,15 +252,41 @@ struct ProjectStatusTests {
         #expect(result.status != .dormant)
     }
 
-    @Test("With nothing else to say and no brief, it says so")
-    func unbriefed() {
+    /// A project the app knows nothing about is not a project with a problem.
+    /// This used to return `.unbriefed`, rendered as a grey question mark, which
+    /// read as *something is wrong here* on projects where nothing was.
+    @Test("Having read no description of a project is not a status")
+    func noDescriptionIsNotAStatus() {
         let result = verdict(briefs: BriefSet())
-        #expect(result.status == .unbriefed)
-        #expect(result.reason.contains("PRODUCT.md"))
+        #expect(result.status == .ready)
+        #expect(result.reason == "Nothing blocked")
+        // The user is never told they owe the app a file.
+        #expect(!result.reason.contains("PRODUCT.md"))
+        #expect(!result.reason.lowercased().contains("add"))
     }
 
-    @Test("Needing you outranks having no brief")
-    func urgencyBeatsUnbriefed() {
+    /// Whichever context files exist, the verdict is the same — because the
+    /// verdict never depended on them. Kept as a regression guard: a later rung
+    /// keyed to `meetsMinimum` would reintroduce exactly the bug removed here.
+    @Test("The status is identical with and without a brief",
+          arguments: ["none", "agents", "claude", "readme", "code", "product"])
+    func statusIgnoresBriefs(_ which: String) {
+        var briefs = BriefSet()
+        switch which {
+        case "agents": briefs.agents = true
+        case "claude": briefs.claude = true
+        case "readme": briefs.readme = true
+        case "code": briefs.code = true
+        case "product": briefs.product = true
+        default: break
+        }
+        let result = verdict(briefs: briefs)
+        #expect(result.status == .ready)
+        #expect(result.reason == "Nothing blocked")
+    }
+
+    @Test("Needing you still outranks everything")
+    func urgencyWins() {
         let waiting = Session.stub(id: "s", lastActivity: now, status: .needsAttention)
         let result = verdict(sessions: [waiting], briefs: BriefSet())
         #expect(result.status == .needsYou)
@@ -561,9 +611,9 @@ struct ProjectListStabilityTests {
         // Three idle projects, timestamps a fraction of a second apart — which is
         // what re-reading the same files produces. Ordering on raw timestamps let
         // any of these swap places between refreshes.
-        let a = project("alpha", status: .unbriefed, activity: -0.2)
-        let b = project("bravo", status: .unbriefed, activity: -0.5)
-        let c = project("charlie", status: .unbriefed, activity: -0.1)
+        let a = project("alpha", status: .dormant, activity: -0.2)
+        let b = project("bravo", status: .dormant, activity: -0.5)
+        let c = project("charlie", status: .dormant, activity: -0.1)
 
         let order = [c, a, b].sorted(by: ProjectAssembler.ordering).map(\.name)
         // Same minute, so the tiebreak decides — and it is deterministic.
@@ -576,8 +626,8 @@ struct ProjectListStabilityTests {
 
     @Test("A genuinely more recent project still sorts first")
     func realRecencyStillWins() {
-        let old = project("alpha", status: .unbriefed, activity: -3600)
-        let fresh = project("zulu", status: .unbriefed, activity: -10)
+        let old = project("alpha", status: .dormant, activity: -3600)
+        let fresh = project("zulu", status: .dormant, activity: -10)
         // An hour apart is signal, not noise — despite `zulu` losing on name.
         #expect([old, fresh].sorted(by: ProjectAssembler.ordering).map(\.name) == ["zulu", "alpha"])
     }

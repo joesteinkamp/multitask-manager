@@ -281,7 +281,7 @@ struct Show: AsyncParsableCommand {
             print("Progress   \(progress.summary) (\(Int(progress.fraction * 100))%) from \(progress.source)")
         }
         if let path = project.path { print("Path       \(path)") }
-        if !project.briefs.meetsMinimum {
+        if !project.briefs.missing.isEmpty {
             print("Briefs     missing \(project.briefs.missing.joined(separator: ", "))")
         }
 
