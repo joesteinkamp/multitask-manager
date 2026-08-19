@@ -48,12 +48,21 @@ final class SessionStore: ObservableObject {
 
     /// Drives the menu bar badge.
     var needsAttentionCount: Int {
-        projects.filter { $0.status == .needsYou && $0.record.lifecycle.isActive }.count
-            + pendingApprovals.count
+        // Read from the same rule that drives the icon, so the badge and the
+        // glyph can never tell different stories.
+        if case .needsYou(let count) = barState { return count }
+        return 0
     }
 
     /// Runs still going, for the "working" summary.
     var activeRuns: [RunRecord] { runs.filter { !$0.state.isTerminal } }
+
+    /// What the menu bar should say, without being opened.
+    ///
+    /// The rule lives in `MultiTaskCore` so it is testable and so the Windows
+    /// taskbar answers the same question the same way. This is only the cache of
+    /// the last snapshot's answer.
+    @Published private(set) var barState: BarState = .calm
 
     var activeProjects: [Project] {
         projects.filter { $0.record.lifecycle.isActive }
@@ -125,6 +134,7 @@ final class SessionStore: ObservableObject {
         awaitingMe = snapshot.tasksNeedingYou()
         pendingApprovals = snapshot.pendingApprovals
         runs = snapshot.runs
+        barState = snapshot.barState
         sessions = snapshot.sessions
         waves = snapshot.waves
         repositories = snapshot.repositories
