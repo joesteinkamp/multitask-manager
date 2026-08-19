@@ -484,7 +484,7 @@ public struct MCPServer: Sendable {
         if let progress = project.progress {
             lines.append("progress: \(progress.summary) from \(progress.source)")
         }
-        if !project.briefs.meetsMinimum {
+        if !project.briefs.hasProductBrief {
             lines.append("note: no PRODUCT.md — context for this project is scraped, not stated")
         }
         let open = project.openTasks

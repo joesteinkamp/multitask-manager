@@ -12,13 +12,20 @@ public struct ProjectAssembler: Sendable {
     /// pick up, is dormant.
     public static let dormancyWindow: TimeInterval = 7 * 24 * 60 * 60
 
+    /// Four is the point where a list still reads as a shortlist. Past it the
+    /// user is reviewing a backlog they never asked for.
+    public static let maxSuggestionsPerProject = 4
+
     private let briefReader: BriefReader
     private let contextReader: ProjectContextReader
+    private let suggestions: SuggestionStore
 
     public init(briefReader: BriefReader = BriefReader(),
-                contextReader: ProjectContextReader = ProjectContextReader()) {
+                contextReader: ProjectContextReader = ProjectContextReader(),
+                suggestions: SuggestionStore = .shared) {
         self.briefReader = briefReader
         self.contextReader = contextReader
+        self.suggestions = suggestions
     }
 
     /// - Parameters:
@@ -109,6 +116,24 @@ public struct ProjectAssembler: Sendable {
             }
         }
 
+        // Harvest what the agents proposed, minus anything already ruled on.
+        // Newest session first, so a fresh recommendation outranks a stale one
+        // when the per-project cap bites.
+        var suggested: [SuggestedStep] = []
+        if let path = record.path {
+            for session in sessions.sorted(by: { $0.lastActivity > $1.lastActivity }) {
+                guard let transcript = session.transcriptPath else { continue }
+                suggested += NextStepHarvester.steps(fromTranscript: transcript,
+                                                     projectPath: path,
+                                                     agent: Self.cliName(for: session.source),
+                                                     sessionId: session.id,
+                                                     capturedAt: session.lastActivity)
+            }
+            var seen = Set<String>()
+            suggested = suggestions.pending(suggested).filter { seen.insert($0.id).inserted }
+            suggested = Array(suggested.prefix(Self.maxSuggestionsPerProject))
+        }
+
         let lastActivity = ([record.createdAt]
                             + sessions.map(\.lastActivity)
                             + waves.map(\.updatedAt)).max() ?? record.createdAt
@@ -119,6 +144,7 @@ public struct ProjectAssembler: Sendable {
                                   repository: repository,
                                   briefs: briefs,
                                   nextStepCount: nextSteps.count,
+                                  suggestedSteps: suggested,
                                   lastActivity: lastActivity,
                                   now: now)
 
@@ -130,6 +156,7 @@ public struct ProjectAssembler: Sendable {
             briefs: briefs,
             progress: progress,
             nextSteps: nextSteps,
+            suggestedSteps: suggested,
             sessions: DetectionEngine.sortSessions(sessions),
             tasks: tasks.sorted { $0.updatedAt > $1.updatedAt },
             waves: waves.sorted { $0.updatedAt > $1.updatedAt },
@@ -154,6 +181,7 @@ public struct ProjectAssembler: Sendable {
                               repository: RepositoryState?,
                               briefs: BriefSet,
                               nextStepCount: Int,
+                              suggestedSteps: [SuggestedStep] = [],
                               lastActivity: Date,
                               now: Date) -> StatusVerdict {
 
@@ -212,6 +240,16 @@ public struct ProjectAssembler: Sendable {
             return StatusVerdict(status: .ready,
                                  reason: "\(nextStepCount) item\(nextStepCount == 1 ? "" : "s") ready to pick up")
         }
+        // Ranked below real tasks and the roadmap on purpose. A suggestion is
+        // something an agent proposed and nobody has agreed to yet — reporting
+        // it with the same weight as committed work would let an agent fill a
+        // person's queue by writing a list.
+        if !suggestedSteps.isEmpty {
+            let who = Set(suggestedSteps.compactMap(\.agent))
+            let by = who.count == 1 ? " from \(who.first!)" : ""
+            return StatusVerdict(status: .ready,
+                                 reason: "\(suggestedSteps.count) suggested step\(suggestedSteps.count == 1 ? "" : "s")\(by)")
+        }
 
         // 4 — work exists but is waiting on something else.
         let blockedTasks = TaskQueue.blocked(tasks: tasks, now: now)
@@ -231,15 +269,32 @@ public struct ProjectAssembler: Sendable {
             return StatusVerdict(status: .dormant, reason: "No activity for \(days) days")
         }
 
-        // 6 — nothing above applied, and there's no brief to work from.
+        // 6 — nothing above applied, and nothing on disk says what this project
+        //     is. Note what this rung no longer does: it used to fire whenever
+        //     `PRODUCT.md` was absent, and read "add one to get suggestions" —
+        //     a demand for paperwork standing in for a status, and a promise of
+        //     a feature that did not exist. Suggestions are now harvested from
+        //     what the agents themselves wrote (`NextStepHarvester`), which
+        //     needs no brief at all. What remains here is the genuinely
+        //     uninformative case: a directory the app can watch but cannot
+        //     describe.
         if !briefs.meetsMinimum {
-            return StatusVerdict(status: .unbriefed, reason: "No PRODUCT.md — add one to get suggestions")
+            return StatusVerdict(status: .unbriefed, reason: "Quiet — no README or brief to read")
         }
 
         return StatusVerdict(status: .ready, reason: "Nothing blocked")
     }
 
     // MARK: Reading
+
+    /// Delegate name for a session's source, for attribution on a step.
+    static func cliName(for source: SessionSource) -> String? {
+        switch source {
+        case .claudeCode: return "claude"
+        case .codex: return "codex"
+        default: return nil
+        }
+    }
 
     /// Progress and next steps from the project's roadmap, in one pass.
     static func readRoadmap(projectPath: String) -> (ProjectProgress?, [String]) {

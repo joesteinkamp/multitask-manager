@@ -191,6 +191,9 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     /// Unchecked roadmap items — what you could pick up, before a task store
     /// exists to hold real tasks.
     public var nextSteps: [String]
+    /// Steps the agents themselves proposed, harvested from their closing
+    /// messages and awaiting a yes or no. Not tasks yet — see `SuggestedStep`.
+    public var suggestedSteps: [SuggestedStep] = []
     public var sessions: [Session]
     /// Work belonging to this project — the unit the app actually manages.
     public var tasks: [TaskRecord]
@@ -210,6 +213,7 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
     public init(record: ProjectRecord, status: ProjectStatus, statusReason: String,
                 brief: ProductBrief? = nil, briefs: BriefSet = BriefSet(),
                 progress: ProjectProgress? = nil, nextSteps: [String] = [],
+                suggestedSteps: [SuggestedStep] = [],
                 sessions: [Session] = [], tasks: [TaskRecord] = [], waves: [Wave] = [],
                 repository: RepositoryState? = nil,
                 lastActivity: Date = .distantPast, oneLiner: String? = nil) {
@@ -220,6 +224,7 @@ public struct Project: Identifiable, Codable, Hashable, Sendable {
         self.briefs = briefs
         self.progress = progress
         self.nextSteps = nextSteps
+        self.suggestedSteps = suggestedSteps
         self.sessions = sessions
         self.tasks = tasks
         self.waves = waves

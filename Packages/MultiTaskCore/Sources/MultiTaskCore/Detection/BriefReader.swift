@@ -41,9 +41,20 @@ public struct ProductBrief: Codable, Hashable, Sendable {
     }
 }
 
-/// Which briefs a project has. Absence is reportable: a project the app can
-/// watch but can't help with should say which document is missing rather than
-/// quietly guessing from a README.
+/// Which context files a project has.
+///
+/// **`PRODUCT.md` used to be a hard gate**, on the reasoning that a project the
+/// app cannot help with should name the missing document rather than "quietly
+/// guess from a README". That reasoning was wrong twice over. Reading
+/// `AGENTS.md`, `CLAUDE.md` or a README is not guessing — those are deliberate
+/// statements of what a project is, and most repositories have one. And the
+/// effect was that a board of ordinary projects reported "No PRODUCT.md — add
+/// one to get suggestions" as their *status*: the app answering "what is
+/// happening here?" with a request for paperwork.
+///
+/// Any of them now counts as knowing what the project is. `PRODUCT.md` still
+/// says the most — it is the only one carrying positioning, personas and
+/// anti-references — so it is still worth having, just not a toll gate.
 public struct BriefSet: Codable, Hashable, Sendable {
     public var product: Bool = false
     public var design: Bool = false
@@ -51,11 +62,20 @@ public struct BriefSet: Codable, Hashable, Sendable {
     public var code: Bool = false
     public var writing: Bool = false
     public var agents: Bool = false
+    /// `CLAUDE.md` — instructions written for an agent, which describe the
+    /// project as a side effect.
+    public var claude: Bool = false
+    /// A README. The weakest of these and by far the most common.
+    public var readme: Bool = false
 
     public init() {}
 
-    /// `PRODUCT.md` is the bar. Everything else is a bonus.
-    public var meetsMinimum: Bool { product }
+    /// Whether anything here says what this project is.
+    public var meetsMinimum: Bool { product || agents || claude || code || readme }
+
+    /// Whether the *richest* source is present — worth prompting for once, never
+    /// worth reporting as a status.
+    public var hasProductBrief: Bool { product }
 
     public var missing: [String] {
         var names: [String] = []
@@ -99,6 +119,9 @@ public final class BriefReader: @unchecked Sendable {
         set.code = FileSupport.exists(base.appendingPathComponent("CODE.md"))
         set.writing = FileSupport.exists(base.appendingPathComponent("WRITING.md"))
         set.agents = FileSupport.exists(base.appendingPathComponent("AGENTS.md"))
+        set.claude = FileSupport.exists(base.appendingPathComponent("CLAUDE.md"))
+        set.readme = FileSupport.exists(base.appendingPathComponent("README.md"))
+            || FileSupport.exists(base.appendingPathComponent("readme.md"))
 
         guard set.product else { return (nil, set) }
 

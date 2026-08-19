@@ -116,7 +116,7 @@ struct BriefReaderTests {
         #expect(set.missing == ["DESIGN.md"])
     }
 
-    @Test("A project with no brief reports the minimum it's missing")
+    @Test("A project with nothing at all reports the minimum it's missing")
     func noBrief() {
         let dir = TempDir()
         dir.makeDirectory("app")
@@ -125,6 +125,30 @@ struct BriefReaderTests {
         #expect(brief == nil)
         #expect(set.meetsMinimum == false)
         #expect(set.missing.contains("PRODUCT.md"))
+    }
+
+    @Test("A bare README is read as context, without being a product brief")
+    func readmeCounts() {
+        let dir = TempDir()
+        dir.makeDirectory("app")
+        dir.write("# Demo\n\nA thing that does a thing.", to: "app/README.md")
+        let (_, set) = BriefReader().read(projectPath: dir.path("app"))
+
+        #expect(set.readme)
+        #expect(set.meetsMinimum)
+        // Still worth prompting for once — just never as a status.
+        #expect(set.hasProductBrief == false)
+        #expect(set.missing.contains("PRODUCT.md"))
+    }
+
+    @Test("CLAUDE.md alone counts — instructions for an agent describe the project too")
+    func claudeMdCounts() {
+        let dir = TempDir()
+        dir.makeDirectory("app")
+        dir.write("# Claude Code Instructions", to: "app/CLAUDE.md")
+        let (_, set) = BriefReader().read(projectPath: dir.path("app"))
+        #expect(set.claude)
+        #expect(set.meetsMinimum)
     }
 }
 
@@ -228,11 +252,33 @@ struct ProjectStatusTests {
         #expect(result.status != .dormant)
     }
 
-    @Test("With nothing else to say and no brief, it says so")
+    @Test("With nothing else to say and nothing on disk describing it, it says so")
     func unbriefed() {
         let result = verdict(briefs: BriefSet())
         #expect(result.status == .unbriefed)
-        #expect(result.reason.contains("PRODUCT.md"))
+        // The reason names what the app can't do, not a file the user owes it.
+        // "add a PRODUCT.md to get suggestions" was a demand for paperwork
+        // standing in for a status — and it promised a feature that did not
+        // exist at the time.
+        #expect(result.reason.contains("README") || result.reason.contains("brief"))
+        #expect(!result.reason.contains("add one"))
+    }
+
+    /// The gate this rung used to apply. Any of these files says what a project
+    /// is, so none of them should leave it reported as undescribed.
+    @Test("An AGENTS.md, CLAUDE.md or README is enough to not be unbriefed",
+          arguments: ["agents", "claude", "readme", "code"])
+    func contextBeyondProductBrief(_ which: String) {
+        var briefs = BriefSet()
+        switch which {
+        case "agents": briefs.agents = true
+        case "claude": briefs.claude = true
+        case "readme": briefs.readme = true
+        default: briefs.code = true
+        }
+        #expect(briefs.meetsMinimum)
+        #expect(briefs.hasProductBrief == false)
+        #expect(verdict(briefs: briefs).status != .unbriefed)
     }
 
     @Test("Needing you outranks having no brief")

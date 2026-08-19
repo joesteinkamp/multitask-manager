@@ -222,6 +222,34 @@ final class SessionStore: ObservableObject {
 
     func complete(_ task: TaskRecord) { perform(.completeTask(taskId: task.id, note: nil)) }
 
+    // MARK: Suggested steps
+
+    /// Turns an agent's proposal into a real task, and records that it was a
+    /// proposal. The origin matters: three months on, "who decided this?" has a
+    /// different answer for a task the user typed and one they waved through.
+    func accept(_ step: SuggestedStep, projectId: String?) {
+        SuggestionStore.shared.accept(step)
+        perform(.createTask(.init(
+            title: step.text,
+            projectId: projectId,
+            assignee: Assignee.unassigned.encoded,
+            acceptance: nil,
+            origin: step.agent.map { "suggested:\($0)" } ?? "suggested",
+            state: "ready"
+        )))
+        Diagnostics.shared.record(.control, "accepted suggestion from \(step.source): \(step.text)")
+        refresh()
+    }
+
+    /// Declines a proposal permanently. Without the ledger write this is a
+    /// no-op — the step is re-derived from the same transcript on the next
+    /// refresh and reappears within the minute.
+    func dismiss(_ step: SuggestedStep) {
+        SuggestionStore.shared.dismiss(step)
+        Diagnostics.shared.record(.control, "dismissed suggestion from \(step.source): \(step.text)")
+        refresh()
+    }
+
     func snooze(_ task: TaskRecord, days: Int = 7) {
         perform(.snoozeTask(taskId: task.id, days: days))
     }
