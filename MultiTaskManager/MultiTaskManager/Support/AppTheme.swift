@@ -72,8 +72,10 @@ enum AppTheme {
 
     /// Something is waiting on the person. The one role permitted to interrupt.
     static let attentionColor = color(.attention)
-    /// Progressing on its own.
+    /// Progressing on its own. Deliberately *not* green — see `completeColor`.
     static let workingColor = color(.working)
+    /// Finished. Green lives here and nowhere else.
+    static let completeColor = color(.complete)
     /// Available to pick up.
     static let readyColor = color(.ready)
     static let blockedColor = color(.blocked)
@@ -95,7 +97,8 @@ enum AppTheme {
     static func color(_ role: DesignTokens.ColorRole) -> Color {
         switch role {
         case .attention: return Color(nsColor: .systemOrange)
-        case .working: return Color(nsColor: .systemGreen)
+        case .working: return Color(nsColor: .controlAccentColor)
+        case .complete: return Color(nsColor: .systemGreen)
         case .ready: return Color(nsColor: .controlAccentColor)
         case .blocked: return Color(nsColor: .systemPurple)
         case .dormant: return Color(nsColor: .secondaryLabelColor)
@@ -120,10 +123,7 @@ extension SessionStatus {
         switch self {
         case .working: return AppTheme.workingColor
         case .needsAttention: return AppTheme.attentionColor
-        // Complete reads as settled, not as a success to celebrate — and
-        // deliberately not as attention, which is the distinction that stops the
-        // badge crying wolf.
-        case .complete: return AppTheme.readyColor
+        case .complete: return AppTheme.completeColor
         case .idle: return AppTheme.dormantColor
         case .unknown: return AppTheme.unknownColor
         }

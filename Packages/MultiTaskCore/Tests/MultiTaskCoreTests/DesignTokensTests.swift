@@ -78,6 +78,34 @@ struct DesignTokensTests {
         }
     }
 
+    /// The collision that prompted this: green meant "working", "all clear", and
+    /// "healthy" at once, so it meant nothing.
+    @Test("Green belongs to complete, and to nothing else")
+    func greenIsReservedForDone() {
+        let green = DesignTokens.ColorRole.complete
+        #expect(green.macOSSystemColorName == "systemGreen")
+
+        for role in DesignTokens.ColorRole.allCases where role != .complete {
+            #expect(role.macOSSystemColorName != "systemGreen",
+                    "\(role.rawValue) also claims green — the signal stops meaning anything")
+        }
+    }
+
+    @Test("Work in progress does not wear the colour of work finished")
+    func workingIsNotComplete() {
+        #expect(DesignTokens.ColorRole.working.macOSSystemColorName
+                != DesignTokens.ColorRole.complete.macOSSystemColorName)
+    }
+
+    @Test("Only one role is permitted to interrupt")
+    func oneAttentionColour() {
+        // Orange is the interrupt. If a second role took it, the badge would be
+        // lit by things that are not asking for anything.
+        let orange = DesignTokens.ColorRole.allCases
+            .filter { $0.macOSSystemColorName == "systemOrange" }
+        #expect(orange == [.attention])
+    }
+
     @Test("Every fallback colour is a six-digit hex")
     func fallbacksAreUsable() {
         for role in DesignTokens.ColorRole.allCases {

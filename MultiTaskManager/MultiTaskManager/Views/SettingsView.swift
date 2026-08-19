@@ -213,8 +213,9 @@ private struct HealthSettings: View {
             }
             Section("Sources") {
                 if store.degraded.isEmpty {
-                    Label("Everything readable", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(AppTheme.workingColor)
+                    // Same rule: a healthy system is quiet, not green.
+                    Label("Everything readable", systemImage: "checkmark.circle")
+                        .foregroundStyle(.secondary)
                         .font(.callout)
                 } else {
                     ForEach(store.degraded, id: \.self) { reason in
