@@ -148,11 +148,43 @@ private struct NotificationSettings: View {
 /// What the app can and can't currently see. "Nothing is running" and "I can't
 /// read anything" must never look the same.
 private struct HealthSettings: View {
+    @State private var copiedAt: Date?
+
+    private func copyDiagnostics() {
+        let header = [
+            "projects: \(store.activeProjects.count) active of \(store.projects.count)",
+            "sessions: \(store.sessions.count)",
+            "pending approvals: \(store.pendingApprovals.count)",
+            "degraded: \(store.degraded.isEmpty ? "none" : store.degraded.map(\.detectorId).joined(separator: ", "))"
+        ]
+        let text = Diagnostics.shared.export(header: header)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        copiedAt = Date()
+    }
+
     @ObservedObject private var prefs = Preferences.shared
     @EnvironmentObject private var store: SessionStore
 
     var body: some View {
         Form {
+            Section("Reporting a problem") {
+                // The loop this replaces: notice something wrong, describe it in
+                // prose, and have someone guess at the cause from the
+                // description. This puts the app's actual reasoning — which
+                // directories became projects, what evidence produced each
+                // status, what the terminal lookup found — on the clipboard.
+                Button("Copy diagnostics") { copyDiagnostics() }
+                if copiedAt != nil {
+                    Text("Copied. Paste it into the conversation.")
+                        .font(AppTheme.rowMeta)
+                        .foregroundStyle(.secondary)
+                }
+                Text("Decisions and paths, no prompt text or file contents. Safe to paste.")
+                    .font(AppTheme.rowMeta)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Harness audit log") {
                 TextField("Path (blank uses $AI_TOOL_LOG, then the default)",
                           text: $prefs.auditLogPath)

@@ -84,7 +84,41 @@ public enum TerminalResolver {
     /// Both steps: the terminal hosting whatever is working in `projectPath`.
     public static func terminal(forProjectPath projectPath: String,
                                 among processes: [RunningProcess]) -> (TerminalApp, RunningProcess)? {
-        guard let agent = agentProcess(forProjectPath: projectPath, among: processes) else { return nil }
-        return terminal(owning: agent.pid, among: processes)
+        guard let agent = agentProcess(forProjectPath: projectPath, among: processes) else {
+            // The common miss, and worth naming: nothing is running there, so
+            // there is no terminal to go to and Finder is the honest fallback.
+            Diagnostics.shared.record(.terminal,
+                "no process working in \(projectPath) — \(processes.count) processes examined")
+            return nil
+        }
+        guard let found = terminal(owning: agent.pid, among: processes) else {
+            // The other miss: something *is* running, but nothing on the way up
+            // to it is a terminal this app knows. This is the line that says
+            // which executable name to add to the catalog.
+            let chain = parents(of: agent.pid, among: processes)
+                .map { FileSupport.lastComponent(of: $0.executablePath) }
+            Diagnostics.shared.record(.terminal,
+                "found \(agent.executableName) in \(projectPath) but no known terminal above it — chain: \(chain.joined(separator: " ← "))")
+            return nil
+        }
+        Diagnostics.shared.record(.terminal,
+            "\(projectPath) → \(found.0.name) (pid \(found.1.pid))")
+        return found
+    }
+
+    /// The parent chain above a process, for reporting what was walked.
+    static func parents(of pid: Int32, among processes: [RunningProcess]) -> [RunningProcess] {
+        var byPid: [Int32: RunningProcess] = [:]
+        for process in processes { byPid[process.pid] = process }
+        var chain: [RunningProcess] = []
+        var current = byPid[pid]
+        var seen: Set<Int32> = []
+        while let process = current, !seen.contains(process.pid), chain.count < 12 {
+            seen.insert(process.pid)
+            chain.append(process)
+            guard process.parentPid > 1 else { break }
+            current = byPid[process.parentPid]
+        }
+        return chain
     }
 }

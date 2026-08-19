@@ -14,7 +14,7 @@ struct MTM: AsyncParsableCommand {
         commandName: "mtm",
         abstract: "See every AI coding session you have running.",
         subcommands: [Status.self, Next.self, Tasks.self, Projects.self, Show.self,
-                      Run.self, Runs.self, Provision.self, Asks.self, Hooks.self,
+                      Run.self, Runs.self, Provision.self, Asks.self, Hooks.self, Diagnose.self,
                       Log.self, List.self, Watch.self, Waves.self, Roster.self, Doctor.self],
         defaultSubcommand: Status.self
     )
@@ -1342,6 +1342,51 @@ struct HooksUninstall: AsyncParsableCommand {
         let removed = try HookInstaller().uninstall()
         print(removed.isEmpty ? "Nothing to remove."
                               : "Removed \(removed.count) hook(s): \(removed.joined(separator: ", "))")
+    }
+}
+
+// MARK: - diagnostics
+
+/// Prints why the app decided what it decided, ready to paste to someone.
+struct Diagnose: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "diagnostics",
+        abstract: "Why the app concluded what it did — paste this when reporting a problem."
+    )
+
+    @OptionGroup var options: EngineOptions
+
+    @Option(name: .long, help: "Only one area: projects, status, detection, hooks, terminal, control.")
+    var only: String?
+
+    func run() async throws {
+        // A pass first, so the log describes the machine as it is now rather
+        // than whatever happened to be left in the buffer.
+        let snapshot = try await options.client().list()
+
+        let plan = HookInstaller().plan()
+        var header = [
+            "projects: \(snapshot.projects.count) (\(snapshot.activeProjects.count) active)",
+            "sessions: \(snapshot.sessions.count)",
+            "hooks: \(plan.isComplete ? "installed" : "\(plan.adding.count) missing — status is inferred, not reported")",
+            "audit log: \(snapshot.audit.path.isEmpty ? "none" : snapshot.audit.path)",
+            "  \(snapshot.audit.recordsRead) records, \(snapshot.audit.malformedLines) malformed, \(snapshot.audit.preciseJoins) precise joins"
+        ]
+        if !snapshot.degraded.isEmpty {
+            header.append("degraded: \(snapshot.degraded.map(\.detectorId).joined(separator: ", "))")
+        }
+
+        var category: Diagnostics.Category?
+        if let only {
+            guard let parsed = Diagnostics.Category(rawValue: only) else {
+                print("No such area: \(only). Try: "
+                      + Diagnostics.Category.allCases.map(\.rawValue).joined(separator: ", "))
+                throw ExitCode.failure
+            }
+            category = parsed
+            header.append("filtered to: \(parsed.rawValue)")
+        }
+        print(Diagnostics.shared.export(header: header, only: category))
     }
 }
 

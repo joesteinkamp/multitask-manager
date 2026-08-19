@@ -211,6 +211,7 @@ public actor DetectionEngine {
         // the interface wrong — the header said four projects while one of them
         // pointed at nothing.
         projectStore.forgetVanished()
+        Diagnostics.shared.record(.detection, "refresh started")
 
         let config = configurationProvider.configuration
         var snapshot = EngineSnapshot()
@@ -421,6 +422,8 @@ public actor DetectionEngine {
                                 config: Configuration,
                                 now: Date) -> Verdict {
         if let hook = session.hookStatus {
+            Diagnostics.shared.record(.status,
+                "\(session.projectName): \(hook.rawValue) — the harness said so\(session.waiting.map { " (\($0.rawValue))" } ?? "")")
             return Verdict(status: hook, evidence: .hook,
                            waiting: session.waiting, reason: session.reason)
         }
@@ -432,6 +435,8 @@ public actor DetectionEngine {
             // cleanly lit the badge claiming it wanted a response. It wanted
             // nothing. A run that ended is `complete` until it ages out.
             let status: SessionStatus = sinceEnd >= config.idleThreshold ? .idle : .complete
+            Diagnostics.shared.record(.status,
+                "\(session.projectName): \(status.rawValue) — ended \(Int(sinceEnd))s ago (\(activity.endReason ?? "no reason given"))")
             return Verdict(status: status, evidence: .sessionEnd,
                            waiting: nil, reason: activity.endReason)
         }
@@ -441,15 +446,21 @@ public actor DetectionEngine {
             // say is "working" or "idle" — a quiet transcript looks identical
             // whether the agent is thinking, waiting on the network, or waiting
             // on you, and only one of those should interrupt.
-            return Verdict(status: status(forGap: now.timeIntervalSince(activity.lastEventAt), config: config),
-                           evidence: .auditActivity, waiting: nil, reason: nil)
+            let gap = now.timeIntervalSince(activity.lastEventAt)
+            let inferred = status(forGap: gap, config: config)
+            Diagnostics.shared.record(.status,
+                "\(session.projectName): \(inferred.rawValue) — \(Int(gap))s since its last tool call (inferred; no hook)")
+            return Verdict(status: inferred, evidence: .auditActivity, waiting: nil, reason: nil)
         }
 
         guard session.lastActivity > .distantPast else {
             return Verdict(status: .unknown, evidence: .none, waiting: nil, reason: nil)
         }
-        return Verdict(status: status(forGap: now.timeIntervalSince(session.lastActivity), config: config),
-                       evidence: .fileActivity, waiting: nil, reason: nil)
+        let gap = now.timeIntervalSince(session.lastActivity)
+        let inferred = status(forGap: gap, config: config)
+        Diagnostics.shared.record(.status,
+            "\(session.projectName): \(inferred.rawValue) — transcript untouched for \(Int(gap))s (weakest evidence; install hooks)")
+        return Verdict(status: inferred, evidence: .fileActivity, waiting: nil, reason: nil)
     }
 
     /// What a *gap in activity* can honestly be read as.
