@@ -40,6 +40,33 @@ struct CodexDetectorTests {
         #expect(session.harnessSessionId == "019f9acf-6091-7663-b483-4b0fec2f778b")
     }
 
+    @Test("A rollout whose metadata line is larger than the read window still resolves")
+    func largeMetadataLine() throws {
+        let dir = TempDir()
+        // Every real rollout measured on this machine has a first line between
+        // 17 and 18.6 KB — Codex writes the whole session metadata as one JSON
+        // object. The reader used a 16 KB window, so the line was truncated
+        // mid-object, the parse failed, and every Codex session fell back to
+        // naming itself after its own filename.
+        let padding = String(repeating: "x", count: 40_000)
+        let line = #"{"type":"session_meta","payload":{"cwd":"/Users/joe/dev/app","base_instructions":"\#(padding)","id":"abc"}}"#
+        #expect(line.utf8.count > 16_384, "the fixture must exceed the old window to test anything")
+
+        let file = dir.write(line + "\n", to: "rollout-2026-08-18T11-28-12-01a015b3-afc5-70d2-ba72-fb90562638d4.jsonl")
+        #expect(CodexDetector.readWorkingDirectory(from: file) == "/Users/joe/dev/app")
+    }
+
+    @Test("A window landing mid-line does not produce a false negative")
+    func partialTrailingLine() throws {
+        let dir = TempDir()
+        // The first line has no cwd and the second does; whatever the window
+        // cuts, a half-parsed line must never be mistaken for "no cwd here".
+        let first = #"{"type":"noise","payload":{"id":"1"}}"#
+        let second = #"{"type":"session_meta","payload":{"cwd":"/Users/joe/dev/other"}}"#
+        let file = dir.write(first + "\n" + second + "\n", to: "rollout-2026-08-18T11-28-12-01a015b3-0000-0000-0000-000000000000.jsonl")
+        #expect(CodexDetector.readWorkingDirectory(from: file) == "/Users/joe/dev/other")
+    }
+
     @Test("A missing Codex directory degrades with a reason instead of going quiet")
     func missingRootDegrades() async {
         let outcome = await CodexDetector(root: URL(fileURLWithPath: "/nonexistent/codex")).detect()

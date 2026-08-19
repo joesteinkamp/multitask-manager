@@ -143,3 +143,54 @@ struct DiagnosticsFileTests {
         #expect(!textA.contains("only in b"))
     }
 }
+
+/// A log that repeats itself buries the one line that mattered.
+@Suite("Only changes are recorded")
+struct DiagnosticsChangeTests {
+
+    private func subject(_ dir: TempDir) -> Diagnostics {
+        let log = Diagnostics(file: dir.url.appendingPathComponent("d.log"))
+        log.setEnabled(true)
+        return log
+    }
+
+    @Test("Repeating the same verdict for the same key records once")
+    func repeatsAreDropped() {
+        let dir = TempDir()
+        let log = subject(dir)
+        for _ in 0..<20 { log.recordChange(.status, key: "s1", "app: idle") }
+        #expect(log.recent.count == 1)
+    }
+
+    @Test("A transition is recorded, which is the whole point")
+    func transitionsAreKept() {
+        let dir = TempDir()
+        let log = subject(dir)
+        log.recordChange(.status, key: "s1", "app: idle")
+        log.recordChange(.status, key: "s1", "app: working")
+        log.recordChange(.status, key: "s1", "app: idle")
+
+        #expect(log.recent.map(\.message) == ["app: idle", "app: working", "app: idle"])
+    }
+
+    @Test("Different sessions do not suppress each other")
+    func keysAreIndependent() {
+        let dir = TempDir()
+        let log = subject(dir)
+        log.recordChange(.status, key: "s1", "a: idle")
+        log.recordChange(.status, key: "s2", "b: idle")
+        #expect(log.recent.count == 2)
+    }
+
+    @Test("A real machine's refresh cadence no longer fills the buffer")
+    func survivesARealCadence() {
+        let dir = TempDir()
+        let log = subject(dir)
+        // 22 sessions, unchanged, across 60 refreshes — the shape of the log
+        // that prompted this, which wrote 1,320 lines and held two minutes.
+        for _ in 0..<60 {
+            for session in 0..<22 { log.recordChange(.status, key: "s\(session)", "p\(session): idle") }
+        }
+        #expect(log.recent.count == 22)
+    }
+}

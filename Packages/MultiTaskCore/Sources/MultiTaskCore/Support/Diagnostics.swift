@@ -53,6 +53,7 @@ public final class Diagnostics: @unchecked Sendable {
     /// several hundred reports about its own fixtures, and the one real entry
     /// anyone wanted would have scrolled away.
     private var enabled = !FileSupport.isRunningTests
+    private var lastByKey: [String: String] = [:]
     private var handle: FileHandle?
     private var written: UInt64 = 0
 
@@ -153,10 +154,30 @@ public final class Diagnostics: @unchecked Sendable {
         return entries
     }
 
+    /// Records a decision only when it differs from the last one filed under the
+    /// same key.
+    ///
+    /// **The log was drowning itself.** Every refresh re-derived a verdict for
+    /// every session and recorded all of them, so a real machine with 22
+    /// sessions and a five-second cadence wrote 264 lines a minute — filling the
+    /// buffer in under two minutes and burying the one transition anyone wanted.
+    /// A status that has not changed is not news.
+    public func recordChange(_ category: Category, key: String,
+                             _ message: @autoclosure () -> String, at: Date = Date()) {
+        let text = message()
+        lock.lock()
+        let unchanged = lastByKey[key] == text
+        if !unchanged { lastByKey[key] = text }
+        lock.unlock()
+        guard !unchanged else { return }
+        record(category, text, at: at)
+    }
+
     public func clear() {
         lock.lock()
         defer { lock.unlock() }
         entries.removeAll()
+        lastByKey.removeAll()
     }
 
     /// Turned off for tests, so a suite does not accumulate half a million

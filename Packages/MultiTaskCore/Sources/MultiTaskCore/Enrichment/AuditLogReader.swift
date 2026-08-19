@@ -57,10 +57,22 @@ public struct AuditIndex: Sendable {
     public init() {}
 
     /// Looks up a session by exact id, falling back to its project directory.
-    public func activity(sessionId: String?, projectPath: String?) -> AuditActivity? {
+    ///
+    /// - Parameter tool: which agent the session belongs to. **The directory
+    ///   fallback must not cross agents.** Three Codex sessions working in one
+    ///   project produce audit events for that directory; a Claude Code session
+    ///   in the same project then matched them and reported *itself* as working.
+    ///   The result was a project showing "Claude Code active" when no Claude
+    ///   Code was running at all — activity attributed to the wrong agent, and
+    ///   the same work counted twice.
+    public func activity(sessionId: String?, projectPath: String?,
+                         tool: String? = nil) -> AuditActivity? {
         if let sessionId, let hit = bySession[sessionId] { return hit }
-        if let projectPath, let hit = byCWD[projectPath] { return hit }
-        return nil
+        guard let projectPath, let hit = byCWD[projectPath] else { return nil }
+        // No tool on either side means the old, coarse behaviour — better than
+        // nothing when the harness did not record one.
+        guard let tool, let hitTool = hit.tool else { return hit }
+        return hitTool.caseInsensitiveCompare(tool) == .orderedSame ? hit : nil
     }
 }
 

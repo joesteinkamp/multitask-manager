@@ -211,7 +211,8 @@ public actor DetectionEngine {
         // the interface wrong — the header said four projects while one of them
         // pointed at nothing.
         projectStore.forgetVanished()
-        Diagnostics.shared.record(.detection, "refresh started")
+        // Only when something about the machine changed, not once per tick.
+        Diagnostics.shared.recordChange(.detection, key: "refresh", "watching \(projectStore.load().count) project(s)")
 
         let config = configurationProvider.configuration
         var snapshot = EngineSnapshot()
@@ -379,7 +380,8 @@ public actor DetectionEngine {
             if let renamed = overrides.renames[s.id] { s.title = renamed }
             s.isPinned = overrides.pinned.contains(s.id)
 
-            let activity = audit.activity(sessionId: s.harnessSessionId, projectPath: s.projectPath)
+            let activity = audit.activity(sessionId: s.harnessSessionId, projectPath: s.projectPath,
+                                          tool: s.source.harnessToolName)
             if let activity {
                 s.lastActivity = max(s.lastActivity, activity.lastEventAt)
                 s.lastToolName = activity.lastToolName
@@ -422,7 +424,7 @@ public actor DetectionEngine {
                                 config: Configuration,
                                 now: Date) -> Verdict {
         if let hook = session.hookStatus {
-            Diagnostics.shared.record(.status,
+            Diagnostics.shared.recordChange(.status, key: session.id,
                 "\(session.projectName): \(hook.rawValue) — the harness said so\(session.waiting.map { " (\($0.rawValue))" } ?? "")")
             return Verdict(status: hook, evidence: .hook,
                            waiting: session.waiting, reason: session.reason)
@@ -435,8 +437,10 @@ public actor DetectionEngine {
             // cleanly lit the badge claiming it wanted a response. It wanted
             // nothing. A run that ended is `complete` until it ages out.
             let status: SessionStatus = sinceEnd >= config.idleThreshold ? .idle : .complete
-            Diagnostics.shared.record(.status,
-                "\(session.projectName): \(status.rawValue) — ended \(Int(sinceEnd))s ago (\(activity.endReason ?? "no reason given"))")
+            // Keyed without the elapsed seconds, which tick every pass and would
+            // make every line "new".
+            Diagnostics.shared.recordChange(.status, key: session.id,
+                "\(session.projectName): \(status.rawValue) — ended (\(activity.endReason ?? "no reason given"))")
             return Verdict(status: status, evidence: .sessionEnd,
                            waiting: nil, reason: activity.endReason)
         }
@@ -448,8 +452,8 @@ public actor DetectionEngine {
             // on you, and only one of those should interrupt.
             let gap = now.timeIntervalSince(activity.lastEventAt)
             let inferred = status(forGap: gap, config: config)
-            Diagnostics.shared.record(.status,
-                "\(session.projectName): \(inferred.rawValue) — \(Int(gap))s since its last tool call (inferred; no hook)")
+            Diagnostics.shared.recordChange(.status, key: session.id,
+                "\(session.projectName): \(inferred.rawValue) — from its last tool call (inferred; no hook)")
             return Verdict(status: inferred, evidence: .auditActivity, waiting: nil, reason: nil)
         }
 
@@ -458,8 +462,8 @@ public actor DetectionEngine {
         }
         let gap = now.timeIntervalSince(session.lastActivity)
         let inferred = status(forGap: gap, config: config)
-        Diagnostics.shared.record(.status,
-            "\(session.projectName): \(inferred.rawValue) — transcript untouched for \(Int(gap))s (weakest evidence; install hooks)")
+        Diagnostics.shared.recordChange(.status, key: session.id,
+            "\(session.projectName): \(inferred.rawValue) — transcript untouched (weakest evidence; install hooks)")
         return Verdict(status: inferred, evidence: .fileActivity, waiting: nil, reason: nil)
     }
 
